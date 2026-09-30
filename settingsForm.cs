@@ -12,15 +12,15 @@ namespace opentuner
 {
     public partial class settingsForm : Form
     {
-
         MainSettings _settings;
+
         public settingsForm(ref MainSettings settings)
         {
             InitializeComponent();
+            ApplyModernSettingsStyle();
 
             _settings = settings;
 
-            // load settings
             comboDefaultSource.SelectedIndex = _settings.default_source;
             comboMediaPlayer1.SelectedIndex = _settings.mediaplayer_preferences[0];
             comboMediaPlayer2.SelectedIndex = _settings.mediaplayer_preferences[1];
@@ -48,6 +48,29 @@ namespace opentuner
             checkBoxMuted.Checked = _settings.mute_at_startup;
         }
 
+        private void ApplyModernSettingsStyle()
+        {
+            ModernTheme.ApplyToForm(this);
+            Text = "OpenTuner Settings";
+            BackColor = ModernTheme.Background;
+            ForeColor = ModernTheme.TextPrimary;
+            Font = ModernTheme.FontBody;
+
+            Control[] saveButtons = Controls.Find("button2", true);
+            if (saveButtons.Length > 0)
+            {
+                Button save = saveButtons[0] as Button;
+                if (save != null)
+                {
+                    save.BackColor = ModernTheme.Accent;
+                    save.FlatAppearance.BorderColor = ModernTheme.Accent;
+                    save.FlatAppearance.MouseOverBackColor = ModernTheme.AccentHover;
+                    save.ForeColor = ModernTheme.TextPrimary;
+                    save.Font = ModernTheme.FontBodySemibold;
+                }
+            }
+        }
+
         private void button3_Click(object sender, EventArgs e)
         {
             this.DialogResult = DialogResult.Cancel;
@@ -56,7 +79,6 @@ namespace opentuner
 
         private void button2_Click(object sender, EventArgs e)
         {
-            // save
             int streamingPort1 = 0;
             int streamingPort2 = 0;
             int streamingPort3 = 0;
@@ -86,7 +108,7 @@ namespace opentuner
                 return;
             }
 
-            _settings.streamer_udp_ports[0]= streamingPort1;
+            _settings.streamer_udp_ports[0] = streamingPort1;
             _settings.streamer_udp_ports[1] = streamingPort2;
             _settings.streamer_udp_ports[2] = streamingPort3;
             _settings.streamer_udp_ports[3] = streamingPort4;
@@ -108,9 +130,7 @@ namespace opentuner
 
             _settings.media_path = txtSnapshotPath.Text;
             _settings.media_video_path = txtVideoPath.Text;
-
             _settings.default_source = comboDefaultSource.SelectedIndex;
-
             _settings.mute_at_startup = checkBoxMuted.Checked;
 
             this.DialogResult = DialogResult.OK;
@@ -122,10 +142,8 @@ namespace opentuner
             FolderBrowserDialog fbd = new FolderBrowserDialog();
             fbd.SelectedPath = txtSnapshotPath.Text;
 
-            if (fbd.ShowDialog() == DialogResult.OK )
-            {
+            if (fbd.ShowDialog() == DialogResult.OK)
                 txtSnapshotPath.Text = fbd.SelectedPath + "\\";
-            }
         }
 
         private void btnBrowseFolder1_Click(object sender, EventArgs e)
@@ -134,9 +152,7 @@ namespace opentuner
             fbd.SelectedPath = txtVideoPath.Text;
 
             if (fbd.ShowDialog() == DialogResult.OK)
-            {
                 txtVideoPath.Text = fbd.SelectedPath + "\\";
-            }
         }
     }
 }
