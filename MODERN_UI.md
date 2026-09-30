@@ -20,3 +20,5 @@ GitHub Actions on this branch also performs a Windows Release build and uploads 
 ## Hardware testing
 
 Test source discovery/connection first, then video/audio playback, tuner controls, recording, UDP output and optional integrations. Report any layout issue with a screenshot and display scaling percentage.
+
+Build validation is run automatically for every push to `modern-ui`.
