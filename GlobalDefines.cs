@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Drawing;
 using System.Windows.Forms;
+using opentuner.MediaSources;
 
 namespace opentuner
 {
@@ -70,7 +71,7 @@ namespace opentuner
             button.FlatStyle = FlatStyle.Flat;
             button.FlatAppearance.BorderSize = 1;
             button.Font = FontBodySemibold;
-            button.Cursor = Cursors.Hand;
+            button.Cursor = System.Windows.Forms.Cursors.Hand;
             button.ForeColor = TextPrimary;
             button.BackColor = primary ? Accent : SurfaceRaised;
             button.FlatAppearance.BorderColor = primary ? Accent : Border;
@@ -87,7 +88,7 @@ namespace opentuner
             if (label != null)
             {
                 label.BackColor = Color.Transparent;
-                label.ForeColor = label.Cursor == Cursors.Hand ? AccentHover : TextPrimary;
+                label.ForeColor = label.Cursor == System.Windows.Forms.Cursors.Hand ? AccentHover : TextPrimary;
                 return;
             }
 
@@ -196,17 +197,23 @@ namespace opentuner
 
     /// <summary>
     /// Modern presentation layer applied on top of the existing MainForm.
-    /// This is kept as a partial class so existing receiver behaviour remains unchanged.
+    /// Existing receiver behaviour remains unchanged.
     /// </summary>
     public partial class MainForm
     {
         private Panel modernHeader;
         private Panel modernFooter;
+        private FlowLayoutPanel modernReceiverStrip;
         private ComboBox modernSourceSelector;
         private Label modernConnectionStatus;
         private Label modernSourceStatus;
         private Timer modernUiTimer;
         private bool modernUiInitialised;
+        private OTSource modernHookedSource;
+        private Label[] modernTunerHeadings = new Label[4];
+        private Label[] modernTunerFrequencies = new Label[4];
+        private Label[] modernTunerDetails = new Label[4];
+        private Label[] modernTunerStates = new Label[4];
 
         protected override void OnShown(EventArgs e)
         {
@@ -230,6 +237,7 @@ namespace opentuner
 
             StyleMainMenu();
             CreateModernHeader();
+            CreateModernReceiverStrip();
             CreateModernFooter();
             HookDynamicTheming(this);
 
@@ -405,6 +413,69 @@ namespace opentuner
             layoutHeader(modernHeader, EventArgs.Empty);
         }
 
+        private void CreateModernReceiverStrip()
+        {
+            modernReceiverStrip = new FlowLayoutPanel();
+            modernReceiverStrip.Name = "modernReceiverStrip";
+            modernReceiverStrip.Dock = DockStyle.Top;
+            modernReceiverStrip.Height = 92;
+            modernReceiverStrip.Padding = new Padding(12, 7, 12, 7);
+            modernReceiverStrip.BackColor = ModernTheme.Background;
+            modernReceiverStrip.WrapContents = false;
+            modernReceiverStrip.AutoScroll = true;
+
+            for (int i = 0; i < 4; i++)
+            {
+                Panel card = new Panel();
+                card.Width = 232;
+                card.Height = 72;
+                card.Margin = new Padding(4);
+                card.Padding = new Padding(10, 7, 10, 6);
+                card.BackColor = ModernTheme.Surface;
+
+                modernTunerHeadings[i] = new Label();
+                modernTunerHeadings[i].AutoSize = true;
+                modernTunerHeadings[i].Text = "TUNER " + (i + 1).ToString();
+                modernTunerHeadings[i].Font = ModernTheme.FontBodySemibold;
+                modernTunerHeadings[i].ForeColor = ModernTheme.TextSecondary;
+                modernTunerHeadings[i].Location = new Point(10, 7);
+
+                modernTunerStates[i] = new Label();
+                modernTunerStates[i].AutoSize = false;
+                modernTunerStates[i].Size = new Size(74, 20);
+                modernTunerStates[i].Location = new Point(146, 5);
+                modernTunerStates[i].TextAlign = ContentAlignment.MiddleRight;
+                modernTunerStates[i].Text = "IDLE";
+                modernTunerStates[i].Font = ModernTheme.FontBodySemibold;
+                modernTunerStates[i].ForeColor = ModernTheme.TextMuted;
+
+                modernTunerFrequencies[i] = new Label();
+                modernTunerFrequencies[i].AutoSize = true;
+                modernTunerFrequencies[i].Text = "— MHz";
+                modernTunerFrequencies[i].Font = ModernTheme.FontSection;
+                modernTunerFrequencies[i].ForeColor = ModernTheme.TextPrimary;
+                modernTunerFrequencies[i].Location = new Point(10, 29);
+
+                modernTunerDetails[i] = new Label();
+                modernTunerDetails[i].AutoSize = true;
+                modernTunerDetails[i].Text = "Waiting for receiver data";
+                modernTunerDetails[i].Font = new Font("Segoe UI", 8.5f, FontStyle.Regular, GraphicsUnit.Point);
+                modernTunerDetails[i].ForeColor = ModernTheme.TextMuted;
+                modernTunerDetails[i].Location = new Point(10, 51);
+
+                card.Controls.Add(modernTunerHeadings[i]);
+                card.Controls.Add(modernTunerStates[i]);
+                card.Controls.Add(modernTunerFrequencies[i]);
+                card.Controls.Add(modernTunerDetails[i]);
+                modernReceiverStrip.Controls.Add(card);
+            }
+
+            Controls.Add(modernReceiverStrip);
+            modernReceiverStrip.BringToFront();
+            if (modernHeader != null)
+                modernHeader.BringToFront();
+        }
+
         private void CreateModernFooter()
         {
             modernFooter = new Panel();
@@ -436,7 +507,45 @@ namespace opentuner
 
         private void ModernUiTimer_Tick(object sender, EventArgs e)
         {
+            EnsureModernDataHook();
             UpdateModernStatus();
+        }
+
+        private void EnsureModernDataHook()
+        {
+            if (!source_connected || videoSource == null)
+                return;
+
+            if (modernHookedSource == videoSource)
+                return;
+
+            if (modernHookedSource != null)
+                modernHookedSource.OnSourceData -= ModernSourceData;
+
+            modernHookedSource = videoSource;
+            modernHookedSource.OnSourceData += ModernSourceData;
+        }
+
+        private void ModernSourceData(int videoNumber, OTSourceData data, string description)
+        {
+            if (data == null || videoNumber < 0 || videoNumber >= modernTunerFrequencies.Length)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<int, OTSourceData, string>(ModernSourceData), videoNumber, data, description);
+                return;
+            }
+
+            double mhz = data.frequency / 1000.0;
+            modernTunerFrequencies[videoNumber].Text = mhz.ToString("0.000") + " MHz";
+            modernTunerStates[videoNumber].Text = data.demod_locked ? "● LOCK" : "NO LOCK";
+            modernTunerStates[videoNumber].ForeColor = data.demod_locked ? ModernTheme.Success : ModernTheme.Warning;
+
+            string service = String.IsNullOrWhiteSpace(data.service_name) ? "No service" : data.service_name;
+            string mode = String.IsNullOrWhiteSpace(data.modcode) ? "" : "  •  " + data.modcode;
+            modernTunerDetails[videoNumber].Text = service + "  •  " + data.symbol_rate.ToString() + " kS  •  MER " + data.mer.ToString("0.0") + " dB" + mode;
+            modernTunerHeadings[videoNumber].Text = String.IsNullOrWhiteSpace(description) ? "TUNER " + (videoNumber + 1).ToString() : description.ToUpperInvariant();
         }
 
         private void UpdateModernStatus()
@@ -479,7 +588,7 @@ namespace opentuner
 
         private void ModernControlAdded(object sender, ControlEventArgs e)
         {
-            if (e.Control == null || e.Control == modernHeader || e.Control == modernFooter)
+            if (e.Control == null || e.Control == modernHeader || e.Control == modernFooter || e.Control == modernReceiverStrip)
                 return;
 
             ModernTheme.ApplyToControlTree(e.Control);
