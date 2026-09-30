@@ -16,6 +16,12 @@ namespace opentuner
         {
             base.OnActivated(e);
 
+            // Create the modern operating surface the first time the main window
+            // becomes active. This reuses the form's existing lifecycle without
+            // introducing another OnShown override.
+            if (mdRoot == null)
+                BuildModernDashboard();
+
             if (!mdTunerLayoutInitialised && mdTunerSelector != null)
             {
                 mdTunerLayoutInitialised = true;
