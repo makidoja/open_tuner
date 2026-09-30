@@ -114,8 +114,8 @@ namespace opentuner
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Flyleaf/FFmpeg is an optional media engine. The application must still
-            // start when its native runtime folder is absent; VLC remains available.
+            // Flyleaf/FFmpeg is optional at startup. The packaged build normally carries
+            // the runtime, but a missing native folder must not stop the receiver opening.
             try
             {
                 Engine.Start(new EngineConfig()
@@ -136,13 +136,33 @@ namespace opentuner
             {
                 MainForm mainForm = new MainForm(args);
 
-                // The modern controls are created by MainForm.OnShown. Queue the final
-                // layout pass after that code has completed so docking/z-order is stable.
+                // MainForm's existing OnShown code completes the legacy dynamic-control
+                // setup. Queue our dashboard until the next message-loop turn so the new
+                // view always wins the final z-order and becomes the operating surface.
                 mainForm.Shown += delegate
                 {
                     mainForm.BeginInvoke((MethodInvoker)delegate
                     {
-                        ModernRuntimeLayout.Apply(mainForm);
+                        try
+                        {
+                            var method = typeof(MainForm).GetMethod(
+                                "BuildModernDashboard",
+                                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+                            if (method == null)
+                                throw new MissingMethodException("Modern dashboard entry point not found.");
+
+                            method.Invoke(mainForm, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "Could not create modern dashboard; leaving legacy view available.");
+                            MessageBox.Show(
+                                "The modern dashboard could not be created. The original OpenTuner controls will remain available.\r\n\r\n" + ex.Message,
+                                "OpenTuner modern UI",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
+                        }
                     });
                 };
 
@@ -175,85 +195,6 @@ namespace opentuner
             finally
             {
                 Log.CloseAndFlush();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Final layout pass for the modern shell. This deliberately changes presentation
-    /// only; the existing receiver controls remain available through the original menus.
-    /// </summary>
-    internal static class ModernRuntimeLayout
-    {
-        public static void Apply(Form form)
-        {
-            if (form == null || form.IsDisposed)
-                return;
-
-            form.SuspendLayout();
-
-            Control header = FindControl(form, "modernHeader");
-            Control receiverStrip = FindControl(form, "modernReceiverStrip");
-
-            // WinForms docks controls according to z-order. In the first test build the
-            // header was being laid out below the receiver strip. Making the strip the
-            // front-most top-docked control places the header above it on screen.
-            if (receiverStrip != null)
-                receiverStrip.BringToFront();
-
-            if (header != null)
-                header.Height = 60;
-
-            if (receiverStrip != null)
-                receiverStrip.Height = 88;
-
-            // The modern tuner cards replace the always-visible legacy property column.
-            // Users can still restore it with the existing Show/Hide Properties command.
-            SplitContainer mainSplit = FindControl(form, "splitContainer1") as SplitContainer;
-            if (mainSplit != null)
-            {
-                mainSplit.BorderStyle = BorderStyle.None;
-                mainSplit.SplitterWidth = 2;
-                mainSplit.BackColor = ModernTheme.Border;
-
-                if (!mainSplit.Panel1Collapsed)
-                    mainSplit.Panel1Collapsed = true;
-            }
-
-            foreach (Control control in GetAllControls(form))
-            {
-                SplitContainer split = control as SplitContainer;
-                if (split != null)
-                {
-                    split.BorderStyle = BorderStyle.None;
-                    split.SplitterWidth = 2;
-                    split.BackColor = ModernTheme.Border;
-                    split.Panel1.BackColor = ModernTheme.Background;
-                    split.Panel2.BackColor = ModernTheme.Background;
-                }
-            }
-
-            form.ResumeLayout(true);
-            form.PerformLayout();
-        }
-
-        private static Control FindControl(Control root, string name)
-        {
-            if (root == null)
-                return null;
-
-            Control[] matches = root.Controls.Find(name, true);
-            return matches.Length > 0 ? matches[0] : null;
-        }
-
-        private static System.Collections.Generic.IEnumerable<Control> GetAllControls(Control root)
-        {
-            foreach (Control child in root.Controls)
-            {
-                yield return child;
-
-                foreach (Control descendant in GetAllControls(child))
-                    yield return descendant;
             }
         }
     }
