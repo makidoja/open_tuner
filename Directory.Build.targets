@@ -1,5 +1,6 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Compile Include="ModernDashboard.cs" Condition="Exists('ModernDashboard.cs')" />
+    <Compile Include="ModernTunerLayout.cs" Condition="Exists('ModernTunerLayout.cs')" />
   </ItemGroup>
 </Project>
