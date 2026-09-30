@@ -1,4 +1,4 @@
-﻿using FlyleafLib;
+using FlyleafLib;
 using System;
 using System.IO;
 using System.Linq;
@@ -16,6 +16,8 @@ namespace opentuner
         /// The main entry point for the application.
         /// </summary>
         public static LoggingLevelSwitch levelSwitch;
+        public static bool FFmpegEngineAvailable { get; private set; } = false;
+        public static string FFmpegStartupError { get; private set; } = "";
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow([In] IntPtr hWnd, [In] int nCmdShow);
@@ -24,7 +26,6 @@ namespace opentuner
         static extern IntPtr GetConsoleWindow();
 
         [STAThread]
-
         static void Main(string[] args)
         {
             int i = 0;
@@ -38,61 +39,35 @@ namespace opentuner
                     case "--debuglevel":
                         int new_debug_level = -1;
 
-                        if (int.TryParse(args[i + 1], out new_debug_level))
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out new_debug_level))
                         {
                             if (new_debug_level < 6 && new_debug_level >= 0)
-                            {
                                 debugLevel = new_debug_level;
-                            }
                             i += 1;
                         }
                         break;
 
                     case "--hideconsolewindow":
-                        // minimize console window
                         IntPtr handle = GetConsoleWindow();
                         if (handle != IntPtr.Zero)
-                        {
                             ShowWindow(handle, 0);
-                        }
                         break;
 
                     default:
                         break;
                 }
-                // grab next param
                 i += 1;
             }
 
             switch (debugLevel)
             {
-                case 0: // Verbose
-                    levelSwitch.MinimumLevel = LogEventLevel.Verbose;
-                    break;
-
-                case 1: // Debug
-                    levelSwitch.MinimumLevel = LogEventLevel.Debug;
-                    break;
-
-                case 2: // Information
-                    levelSwitch.MinimumLevel = LogEventLevel.Information;
-                    break;
-
-                case 3: // Warning
-                    levelSwitch.MinimumLevel = LogEventLevel.Warning;
-                    break;
-
-                case 4: // Error
-                    levelSwitch.MinimumLevel = LogEventLevel.Error;
-                    break;
-
-                case 5: // Fatal
-                    levelSwitch.MinimumLevel = LogEventLevel.Fatal;
-                    break;
-
-                default:
-                    levelSwitch.MinimumLevel = LogEventLevel.Warning;
-                    break;
+                case 0: levelSwitch.MinimumLevel = LogEventLevel.Verbose; break;
+                case 1: levelSwitch.MinimumLevel = LogEventLevel.Debug; break;
+                case 2: levelSwitch.MinimumLevel = LogEventLevel.Information; break;
+                case 3: levelSwitch.MinimumLevel = LogEventLevel.Warning; break;
+                case 4: levelSwitch.MinimumLevel = LogEventLevel.Error; break;
+                case 5: levelSwitch.MinimumLevel = LogEventLevel.Fatal; break;
+                default: levelSwitch.MinimumLevel = LogEventLevel.Warning; break;
             }
 
             Log.Logger = new LoggerConfiguration()
@@ -101,21 +76,18 @@ namespace opentuner
                 .WriteTo.File("logs\\ot_log_" + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".txt")
                 .CreateLogger();
 
-            // Always log the starting information
-            // swith logging level to Information
             LogEventLevel lastMinimumLevel = levelSwitch.MinimumLevel;
             levelSwitch.MinimumLevel = LogEventLevel.Information;
-
             Log.Information("Starting OpenTuner");
-
-            // swith logging level back
             levelSwitch.MinimumLevel = lastMinimumLevel;
 
             string logDirectory = AppDomain.CurrentDomain.BaseDirectory + "logs\\";
 
             if (Directory.Exists(logDirectory))
             {
-                var logFiles = Directory.GetFiles(logDirectory, "*.txt").Select(f => new FileInfo(f)).OrderByDescending(f => f.CreationTime);
+                var logFiles = Directory.GetFiles(logDirectory, "*.txt")
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.CreationTime);
                 int fileCount = logFiles.Count();
                 if (fileCount > 10)
                 {
@@ -139,30 +111,56 @@ namespace opentuner
                 }
             }
 
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            // Flyleaf/FFmpeg is an optional media engine. The application must still
+            // start when its native runtime folder is absent; VLC remains available.
             try
             {
                 Engine.Start(new EngineConfig()
                 {
                     FFmpegPath = @"ffmpeg\",
-                    FFmpegDevices = false,    // Prevents loading avdevice/avfilter dll files. Enable it only if you plan to use dshow/gdigrab etc.
-                                              //LogLevel = LogLevel.Debug,
-                                              //LogOutput = ":console",
-                                              //LogOutput = @"C:\temp2\ffmpeg.log",
-
-                    /*
-                    UIRefresh = true,    // Required for Activity, BufferedDuration, Stats in combination with Config.Player.Stats = true
-                    UIRefreshInterval = 250,      // How often (in ms) to notify the UI
-                    UICurTimePerSecond = false,     // Whether to notify UI for CurTime only when it's second changed or by UIRefreshInterval
-                    */
+                    FFmpegDevices = false,
                 });
+                FFmpegEngineAvailable = true;
+            }
+            catch (Exception ex)
+            {
+                FFmpegEngineAvailable = false;
+                FFmpegStartupError = ex.Message;
+                Log.Error(ex, "FFmpeg/Flyleaf engine unavailable. Continuing with remaining media engines.");
+            }
 
-                Application.EnableVisualStyles();
-                Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new MainForm(args));
+            try
+            {
+                MainForm mainForm = new MainForm(args);
+
+                if (!FFmpegEngineAvailable)
+                {
+                    mainForm.Shown += delegate
+                    {
+                        MessageBox.Show(
+                            "The FFmpeg runtime was not found in this test package.\r\n\r\n" +
+                            "OpenTuner will continue to run, but the FFmpeg/Flyleaf media-player option is unavailable. " +
+                            "Use VLC for testing this build.\r\n\r\n" +
+                            "Details: " + FFmpegStartupError,
+                            "OpenTuner - FFmpeg runtime missing",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    };
+                }
+
+                Application.Run(mainForm);
             }
             catch (Exception ex)
             {
                 Log.Fatal(ex, "Program.Main: Uncaught Exception");
+                MessageBox.Show(
+                    "OpenTuner could not start.\r\n\r\n" + ex,
+                    "OpenTuner startup error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
             finally
             {
