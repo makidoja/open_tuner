@@ -41,16 +41,52 @@ namespace opentuner
 
             _source = Source;
 
+            ApplyModernTunerStyle();
+
             update_offset();
             update_freq(_frequency);
             update_sr(_symbol_rate);
-
 
             lblkHz.MouseWheel += LblkHz_MouseWheel;
             lblmHz.MouseWheel += LblmHz_MouseWheel;
             lblgHz.MouseWheel += LblgHz_MouseWheel;
 
-            this.Text += " - Tuner " + (Id + 1).ToString();
+            this.Text = "OpenTuner • Tuner " + (Id + 1).ToString();
+        }
+
+        private void ApplyModernTunerStyle()
+        {
+            ModernTheme.ApplyToForm(this);
+            BackColor = ModernTheme.Background;
+            ForeColor = ModernTheme.TextPrimary;
+            Font = ModernTheme.FontBody;
+            MinimumSize = new Size(520, 300);
+
+            Label[] frequencyDigits = { lblgHz, lblmHz, lblkHz };
+            foreach (Label digit in frequencyDigits)
+            {
+                digit.Font = ModernTheme.FontFrequency;
+                digit.ForeColor = ModernTheme.TextPrimary;
+                digit.BackColor = ModernTheme.Surface;
+                digit.Cursor = Cursors.Hand;
+                digit.Padding = new Padding(4, 2, 4, 2);
+            }
+
+            lblNimFreq.Font = ModernTheme.FontStatus;
+            lblNimFreq.ForeColor = ModernTheme.TextSecondary;
+            lblSR.ForeColor = ModernTheme.TextPrimary;
+            lblOffset.ForeColor = ModernTheme.TextSecondary;
+
+            btnUpdateFreq.FlatStyle = FlatStyle.Flat;
+            btnUpdateFreq.BackColor = ModernTheme.Accent;
+            btnUpdateFreq.ForeColor = ModernTheme.TextPrimary;
+            btnUpdateFreq.FlatAppearance.BorderColor = ModernTheme.Accent;
+            btnUpdateFreq.FlatAppearance.MouseOverBackColor = ModernTheme.AccentHover;
+            btnUpdateFreq.Font = ModernTheme.FontBodySemibold;
+            btnUpdateFreq.Cursor = Cursors.Hand;
+
+            checkTunerOnTop.ForeColor = ModernTheme.TextSecondary;
+            checkTunerOnTop.BackColor = Color.Transparent;
         }
 
         void scroll_frequency(uint freq_modifier, int delta)
@@ -85,7 +121,6 @@ namespace opentuner
 
             if (Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl))
                 modifier = 100000;
-
 
             scroll_frequency(modifier, e.Delta);
         }
@@ -123,12 +158,12 @@ namespace opentuner
 
             if (new_freq < 144000 || new_freq > 2450000)
             {
-                lblNimFreq.ForeColor = Color.Red;
+                lblNimFreq.ForeColor = ModernTheme.Danger;
                 btnUpdateFreq.Enabled = false;
             }
             else
             {
-                lblNimFreq.ForeColor = Color.Black;
+                lblNimFreq.ForeColor = ModernTheme.Success;
                 btnUpdateFreq.Enabled = true;
             }
         }
@@ -171,9 +206,7 @@ namespace opentuner
 
             update_sr(_symbol_rate);
             update_offset(_offset);
-
             update_freq(_frequency);
-
         }
 
         public void UpdateTuner(uint freq, uint symbolrate, uint offset)
@@ -200,42 +233,40 @@ namespace opentuner
 
             update_sr(_symbol_rate);
             update_offset(_offset);
-
             update_freq(_frequency);
 
             Show();
             Focus();
         }
 
-
         private void lblkHz_MouseEnter(object sender, EventArgs e)
         {
-            lblkHz.ForeColor = Color.DarkGreen;
+            lblkHz.ForeColor = ModernTheme.AccentHover;
         }
 
         private void lblkHz_MouseLeave(object sender, EventArgs e)
         {
-            lblkHz.ForeColor = Color.Black;
+            lblkHz.ForeColor = ModernTheme.TextPrimary;
         }
 
         private void lblmHz_MouseEnter(object sender, EventArgs e)
         {
-            lblmHz.ForeColor = Color.DarkGreen;
+            lblmHz.ForeColor = ModernTheme.AccentHover;
         }
 
         private void lblmHz_MouseLeave(object sender, EventArgs e)
         {
-            lblmHz.ForeColor = Color.Black;
+            lblmHz.ForeColor = ModernTheme.TextPrimary;
         }
 
         private void lblgHz_MouseEnter(object sender, EventArgs e)
         {
-            lblgHz.ForeColor = Color.DarkGreen;
+            lblgHz.ForeColor = ModernTheme.AccentHover;
         }
 
         private void lblgHz_MouseLeave(object sender, EventArgs e)
         {
-            lblgHz.ForeColor = Color.Black;
+            lblgHz.ForeColor = ModernTheme.TextPrimary;
         }
 
         private void TunerControlForm_FormClosing(object sender, FormClosingEventArgs e)
