@@ -136,6 +136,16 @@ namespace opentuner
             {
                 MainForm mainForm = new MainForm(args);
 
+                // The modern controls are created by MainForm.OnShown. Queue the final
+                // layout pass after that code has completed so docking/z-order is stable.
+                mainForm.Shown += delegate
+                {
+                    mainForm.BeginInvoke((MethodInvoker)delegate
+                    {
+                        ModernRuntimeLayout.Apply(mainForm);
+                    });
+                };
+
                 if (!FFmpegEngineAvailable)
                 {
                     mainForm.Shown += delegate
@@ -165,6 +175,85 @@ namespace opentuner
             finally
             {
                 Log.CloseAndFlush();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Final layout pass for the modern shell. This deliberately changes presentation
+    /// only; the existing receiver controls remain available through the original menus.
+    /// </summary>
+    internal static class ModernRuntimeLayout
+    {
+        public static void Apply(Form form)
+        {
+            if (form == null || form.IsDisposed)
+                return;
+
+            form.SuspendLayout();
+
+            Control header = FindControl(form, "modernHeader");
+            Control receiverStrip = FindControl(form, "modernReceiverStrip");
+
+            // WinForms docks controls according to z-order. In the first test build the
+            // header was being laid out below the receiver strip. Making the strip the
+            // front-most top-docked control places the header above it on screen.
+            if (receiverStrip != null)
+                receiverStrip.BringToFront();
+
+            if (header != null)
+                header.Height = 60;
+
+            if (receiverStrip != null)
+                receiverStrip.Height = 88;
+
+            // The modern tuner cards replace the always-visible legacy property column.
+            // Users can still restore it with the existing Show/Hide Properties command.
+            SplitContainer mainSplit = FindControl(form, "splitContainer1") as SplitContainer;
+            if (mainSplit != null)
+            {
+                mainSplit.BorderStyle = BorderStyle.None;
+                mainSplit.SplitterWidth = 2;
+                mainSplit.BackColor = ModernTheme.Border;
+
+                if (!mainSplit.Panel1Collapsed)
+                    mainSplit.Panel1Collapsed = true;
+            }
+
+            foreach (Control control in GetAllControls(form))
+            {
+                SplitContainer split = control as SplitContainer;
+                if (split != null)
+                {
+                    split.BorderStyle = BorderStyle.None;
+                    split.SplitterWidth = 2;
+                    split.BackColor = ModernTheme.Border;
+                    split.Panel1.BackColor = ModernTheme.Background;
+                    split.Panel2.BackColor = ModernTheme.Background;
+                }
+            }
+
+            form.ResumeLayout(true);
+            form.PerformLayout();
+        }
+
+        private static Control FindControl(Control root, string name)
+        {
+            if (root == null)
+                return null;
+
+            Control[] matches = root.Controls.Find(name, true);
+            return matches.Length > 0 ? matches[0] : null;
+        }
+
+        private static System.Collections.Generic.IEnumerable<Control> GetAllControls(Control root)
+        {
+            foreach (Control child in root.Controls)
+            {
+                yield return child;
+
+                foreach (Control descendant in GetAllControls(child))
+                    yield return descendant;
             }
         }
     }
