@@ -26,6 +26,28 @@ jobs:
       - name: Build Release x64
         run: msbuild opentuner.csproj /m /p:Configuration=Release /p:Platform=AnyCPU /p:RestorePackages=false
 
+      - name: Add official OpenTuner FFmpeg runtime
+        shell: pwsh
+        run: |
+          $releaseUrl = 'https://github.com/tomvdb/open_tuner/releases/download/V0.B/open_tuner_0.B_20240714.zip'
+          $zipPath = Join-Path $env:RUNNER_TEMP 'opentuner-official.zip'
+          $extractPath = Join-Path $env:RUNNER_TEMP 'opentuner-official'
+          Invoke-WebRequest -Uri $releaseUrl -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $ffmpegDir = Get-ChildItem -Path $extractPath -Directory -Recurse | Where-Object { $_.Name -ieq 'ffmpeg' } | Select-Object -First 1
+          if (-not $ffmpegDir) { throw 'Official OpenTuner package did not contain an ffmpeg directory.' }
+          Copy-Item -Path $ffmpegDir.FullName -Destination 'bin/Release/ffmpeg' -Recurse -Force
+          Write-Host "Packaged FFmpeg runtime from $($ffmpegDir.FullName)"
+
+      - name: Verify packaged runtime
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'bin/Release/opentuner.exe')) { throw 'opentuner.exe missing from Release output.' }
+          if (-not (Test-Path 'bin/Release/ffmpeg')) { throw 'ffmpeg runtime folder missing from Release output.' }
+          $dlls = Get-ChildItem 'bin/Release/ffmpeg' -Filter '*.dll' -Recurse
+          if ($dlls.Count -lt 3) { throw 'ffmpeg runtime appears incomplete.' }
+          Write-Host "FFmpeg runtime contains $($dlls.Count) DLLs"
+
       - name: Upload Release build
         if: success()
         uses: actions/upload-artifact@v4
