@@ -68,7 +68,7 @@ namespace opentuner
                 digit.Font = ModernTheme.FontFrequency;
                 digit.ForeColor = ModernTheme.TextPrimary;
                 digit.BackColor = ModernTheme.Surface;
-                digit.Cursor = Cursors.Hand;
+                digit.Cursor = System.Windows.Forms.Cursors.Hand;
                 digit.Padding = new Padding(4, 2, 4, 2);
             }
 
@@ -83,7 +83,7 @@ namespace opentuner
             btnUpdateFreq.FlatAppearance.BorderColor = ModernTheme.Accent;
             btnUpdateFreq.FlatAppearance.MouseOverBackColor = ModernTheme.AccentHover;
             btnUpdateFreq.Font = ModernTheme.FontBodySemibold;
-            btnUpdateFreq.Cursor = Cursors.Hand;
+            btnUpdateFreq.Cursor = System.Windows.Forms.Cursors.Hand;
 
             checkTunerOnTop.ForeColor = ModernTheme.TextSecondary;
             checkTunerOnTop.BackColor = Color.Transparent;
