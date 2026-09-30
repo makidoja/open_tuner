@@ -470,9 +470,9 @@ namespace opentuner
             mdActiveTuner = tuner;
             for (int i = 0; i < 4; i++)
             {
+                bool active = i == tuner;
                 if (mdTunerButtons[i] != null)
                 {
-                    bool active = i == tuner;
                     mdTunerButtons[i].BackColor = active ? ModernTheme.Accent : ModernTheme.SurfaceRaised;
                     mdTunerButtons[i].FlatAppearance.BorderColor = active ? ModernTheme.Accent : ModernTheme.Border;
                 }
