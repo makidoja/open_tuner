@@ -1,4 +1,5 @@
 using System;
+using opentuner.MediaSources.WinterHill;
 
 namespace opentuner
 {
@@ -11,16 +12,28 @@ namespace opentuner
 
         public void BackendSetVolume(int tuner, int volume)
         {
+            volume = Math.Max(0, Math.Min(100, volume));
+
+            WinterHillSource winterHill = videoSource as WinterHillSource;
+            if (winterHill != null)
+            {
+                winterHill.ModernSetVolume(tuner, volume);
+                return;
+            }
+
             if (_mediaPlayers == null || tuner < 0 || tuner >= _mediaPlayers.Count || _mediaPlayers[tuner] == null)
                 return;
 
-            volume = Math.Max(0, Math.Min(100, volume));
             try { _mediaPlayers[tuner].SetVolume(volume); }
             catch { }
         }
 
         public int BackendGetVolume(int tuner)
         {
+            WinterHillSource winterHill = videoSource as WinterHillSource;
+            if (winterHill != null)
+                return winterHill.ModernGetVolume(tuner);
+
             if (_mediaPlayers == null || tuner < 0 || tuner >= _mediaPlayers.Count || _mediaPlayers[tuner] == null)
                 return 0;
 
@@ -30,6 +43,13 @@ namespace opentuner
 
         public void BackendEnsureAudible(int tuner)
         {
+            WinterHillSource winterHill = videoSource as WinterHillSource;
+            if (winterHill != null)
+            {
+                winterHill.ModernEnsureAudible(tuner, 60);
+                return;
+            }
+
             int current = BackendGetVolume(tuner);
             if (current <= 0)
                 BackendSetVolume(tuner, 60);
