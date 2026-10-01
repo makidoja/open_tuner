@@ -27,6 +27,9 @@ namespace opentuner
                 mdTunerLayoutInitialised = true;
                 InitialiseTunerLayoutSelector();
             }
+
+            if (!mdSourceSettingsInitialised && mdSource != null)
+                InitialiseSourceSettingsButton();
         }
 
         private void InitialiseTunerLayoutSelector()
