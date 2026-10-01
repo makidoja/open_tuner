@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
@@ -10,6 +11,7 @@ namespace opentuner
     {
         private static bool spectrumResizeHooked;
         private static bool quickTuneHooked;
+        private static bool navigationHooked;
         private static PictureBox spectrumProxy;
         private static Timer spectrumRefreshTimer;
         private static Timer connectionStatusTimer;
@@ -18,21 +20,85 @@ namespace opentuner
         {
             if (form == null) return;
 
-            // Keep BATCSpectrum itself at its native 922x275 drawing size. The original
-            // renderer uses 255-pixel Y coordinates internally; physically shrinking its
-            // PictureBox clips the peaks and causes concurrent bitmap recreation errors.
-            // A separate compact proxy displays the complete native image scaled down.
             ApplyCompactSpectrumLayout(form);
+            HookNavigation(form);
 
             form.Shown += delegate
             {
                 ApplyCompactSpectrumLayout(form);
                 HookQuickTune(form);
+                HookNavigation(form);
                 StartSpectrumProxyRefresh(form);
                 StartConnectionStatusCorrection(form);
             };
 
             form.Resize += delegate { ApplyCompactSpectrumLayout(form); };
+        }
+
+        private static MainForm GetBackend(ModernConceptForm form)
+        {
+            FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
+            return backendField == null ? null : backendField.GetValue(form) as MainForm;
+        }
+
+        private static IEnumerable<Button> FindButtons(Control root)
+        {
+            foreach (Control c in root.Controls)
+            {
+                Button b = c as Button;
+                if (b != null)
+                    yield return b;
+
+                if (c.HasChildren)
+                {
+                    foreach (Button child in FindButtons(c))
+                        yield return child;
+                }
+            }
+        }
+
+        private static void HookNavigation(ModernConceptForm form)
+        {
+            if (navigationHooked || form == null) return;
+
+            MainForm backend = GetBackend(form);
+            if (backend == null) return;
+
+            foreach (Button b in FindButtons(form))
+            {
+                string text = (b.Text ?? "").Trim();
+
+                if (text.IndexOf("Chat (BATC)", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate { backend.BackendShowBatcChat(); };
+                else if (text.IndexOf("Presets", StringComparison.OrdinalIgnoreCase) >= 0 && text.IndexOf("Manage", StringComparison.OrdinalIgnoreCase) < 0)
+                    b.Click += delegate { backend.BackendShowPresets(); };
+                else if (text.IndexOf("Spectrum", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate
+                    {
+                        if (spectrumProxy != null && !spectrumProxy.IsDisposed)
+                        {
+                            spectrumProxy.Focus();
+                            spectrumProxy.BringToFront();
+                        }
+                        backend.BackendShowSpectrum();
+                    };
+                else if (text.IndexOf("Scan", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate
+                    {
+                        if (spectrumProxy != null && !spectrumProxy.IsDisposed)
+                            spectrumProxy.Focus();
+                    };
+                else if (text.IndexOf("Recordings", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate { backend.BackendOpenRecordingsFolder(); };
+                else if (text.IndexOf("Snapshots", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate { backend.BackendOpenSnapshotsFolder(); };
+                else if (text.IndexOf("Band Profiles", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate { backend.BackendShowPresets(); };
+                else if (text.IndexOf("External Tools", StringComparison.OrdinalIgnoreCase) >= 0)
+                    b.Click += delegate { backend.BackendShowExternalTools(); };
+            }
+
+            navigationHooked = true;
         }
 
         private static void ApplyCompactSpectrumLayout(ModernConceptForm form)
@@ -47,9 +113,6 @@ namespace opentuner
                 if (card == null) return;
 
                 card.Height = 174;
-
-                // Native renderer remains full size but is kept off-screen. This prevents
-                // SizeChanged from continually rebuilding bmp/bmp2 while FFT frames arrive.
                 nativeBox.Anchor = AnchorStyles.None;
                 nativeBox.SizeMode = PictureBoxSizeMode.Normal;
                 nativeBox.Size = new Size(922, 275);
@@ -83,9 +146,6 @@ namespace opentuner
                     spectrumProxy.Location = new Point(left, 34);
                     spectrumProxy.Size = new Size(width, height);
                     spectrumProxy.BringToFront();
-
-                    // The legacy card resize handler also touches nativeBox. Always put it
-                    // back to the fixed renderer size after the proxy geometry is updated.
                     nativeBox.Size = new Size(922, 275);
                     nativeBox.Location = new Point(-2000, -2000);
                 };
@@ -163,8 +223,7 @@ namespace opentuner
                 BATCSpectrum spectrum = spectrumField == null ? null : spectrumField.GetValue(form) as BATCSpectrum;
                 if (spectrum == null) return;
 
-                FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-                MainForm backend = backendField == null ? null : backendField.GetValue(form) as MainForm;
+                MainForm backend = GetBackend(form);
 
                 FieldInfo freqField = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
                 NumericUpDown[] freqInputs = freqField == null ? null : freqField.GetValue(form) as NumericUpDown[];
@@ -194,8 +253,6 @@ namespace opentuner
                     });
                 };
 
-                // Replace the original callback so BATC's symbols/sec value is converted
-                // to kS before the receiver is tuned.
                 FieldInfo eventField = typeof(BATCSpectrum).GetField("OnSignalSelected", BindingFlags.Instance | BindingFlags.NonPublic);
                 if (eventField != null)
                     eventField.SetValue(spectrum, handler);
@@ -213,8 +270,7 @@ namespace opentuner
         {
             if (connectionStatusTimer != null) return;
 
-            FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            MainForm backend = backendField == null ? null : backendField.GetValue(form) as MainForm;
+            MainForm backend = GetBackend(form);
             FieldInfo pillField = typeof(ModernConceptForm).GetField("connectionPill", BindingFlags.Instance | BindingFlags.NonPublic);
             Label pill = pillField == null ? null : pillField.GetValue(form) as Label;
             if (backend == null || pill == null) return;
