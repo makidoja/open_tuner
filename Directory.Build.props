@@ -4,5 +4,7 @@
     <Compile Include="ModernTunerLayout.cs" Condition="Exists('ModernTunerLayout.cs')" />
     <Compile Include="ModernSourceSettings.cs" Condition="Exists('ModernSourceSettings.cs')" />
     <Compile Include="ModernChromeCleanup.cs" Condition="Exists('ModernChromeCleanup.cs')" />
+    <Compile Include="ModernBackendBridge.cs" Condition="Exists('ModernBackendBridge.cs')" />
+    <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
   </ItemGroup>
 </Project>
