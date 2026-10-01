@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Windows.Forms;
 using opentuner.MediaSources;
+using Serilog;
 
 namespace opentuner
 {
@@ -179,12 +180,42 @@ namespace opentuner
             if (videoSource == null)
                 return;
 
-            // The modern UI and BATC spectrum use the displayed RF frequency, i.e. the
-            // value already includes the configured LNB offset. WinterHill's UDP command
-            // sends the frequency and offset as separate fields. Passing false here caused
-            // WinterHillSource.SetFrequency() to add the offset a second time, so every
-            // manual/quick tune command was sent to the wrong frequency.
-            videoSource.SetFrequency(tuner, frequencyKHz, symbolRate, true);
+            try
+            {
+                // The modern UI displays RF/downlink frequency. Reproduce the exact
+                // frequency path used by OpenTuner's proven legacy tuner control: convert
+                // displayed RF back to the NIM/IF frequency, then call SetFrequency with
+                // offset_included=false so the source applies its configured offset.
+                // This matters especially for WinterHill/PicoTuner Ethernet.
+                long offset = 0;
+                try
+                {
+                    long withOffset = videoSource.GetFrequency(tuner, true);
+                    long withoutOffset = videoSource.GetFrequency(tuner, false);
+                    offset = withOffset - withoutOffset;
+                    if (offset < 0) offset = 0;
+                }
+                catch { offset = 0; }
+
+                uint sourceFrequency = frequencyKHz;
+                bool offsetIncluded = true;
+
+                if (videoSource.GetName() == "WinterHill Variant" && offset > 0 && frequencyKHz > (uint)offset)
+                {
+                    sourceFrequency = frequencyKHz - (uint)offset;
+                    offsetIncluded = false;
+                }
+
+                Log.Information(
+                    "Modern tune: tuner {Tuner}, displayed RF {Rf} kHz, source freq {SourceFreq} kHz, SR {Sr} kS, offsetIncluded {OffsetIncluded}",
+                    tuner, frequencyKHz, sourceFrequency, symbolRate, offsetIncluded);
+
+                videoSource.SetFrequency(tuner, sourceFrequency, symbolRate, offsetIncluded);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Modern tune failed for tuner {Tuner}", tuner);
+            }
         }
 
         public Control[] BackendTakeVideoControls(int tuner)
