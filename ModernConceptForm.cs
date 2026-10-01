@@ -46,7 +46,7 @@ namespace opentuner
 
         public ModernConceptForm(string[] args)
         {
-            Text = "OpenTuner Modern - " + GlobalDefines.Version;
+            base.Text = "OpenTuner Modern - " + GlobalDefines.Version;
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;
             MinimumSize = new Size(1280, 760);
