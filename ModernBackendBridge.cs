@@ -145,7 +145,11 @@ namespace opentuner
 
         public bool BackendConnected
         {
-            get { return source_connected && videoSource != null && videoSource.DeviceConnected; }
+            // Some receiver sources (notably WinterHill/PicoTuner UDP) do not update
+            // DeviceConnected reliably even though Initialise succeeded and live source
+            // data/video are flowing. For the standalone UI, successful SourceConnect is
+            // the correct readiness signal for tuning and connection status.
+            get { return source_connected && videoSource != null; }
         }
 
         public int BackendTunerCount
