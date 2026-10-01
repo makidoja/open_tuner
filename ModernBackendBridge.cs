@@ -17,10 +17,20 @@ namespace opentuner
 
         public void BackendPrepare()
         {
-            // Run the normal non-visual initialisation that previously happened on Load
-            // (media directories, stored window/settings state, etc.) without showing
-            // the legacy form.
-            Form1_Load(this, EventArgs.Empty);
+            // Run the normal non-visual initialisation that previously happened on Load,
+            // but never allow the hidden legacy form to auto-connect. The standalone
+            // ModernMainForm owns the connect action; allowing both layers to connect can
+            // bind the same UDP socket twice (WSAEADDRINUSE / 10048).
+            bool savedAutoConnect = _settings.auto_connect;
+            try
+            {
+                _settings.auto_connect = false;
+                Form1_Load(this, EventArgs.Empty);
+            }
+            finally
+            {
+                _settings.auto_connect = savedAutoConnect;
+            }
         }
 
         public string[] BackendSourceNames()
@@ -42,6 +52,11 @@ namespace opentuner
         {
             if (sourceIndex < 0 || sourceIndex >= _availableSources.Count)
                 return false;
+
+            // Do not initialise the same source twice if a previous connection attempt
+            // already succeeded. This is an additional guard against duplicate socket binds.
+            if (source_connected && videoSource != null)
+                return true;
 
             BackendSelectedSourceIndex = sourceIndex;
             source_connected = ConnectSelectedSource();
