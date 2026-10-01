@@ -20,11 +20,19 @@ namespace opentuner.Utilities
         private Thread listenThread;
         
         private int _id;
+        private volatile string lastRemoteAddress = "";
+        private volatile int lastRemotePort = 0;
 
         public event EventHandler<byte[]> DataReceived;
         public event EventHandler<bool> ConnectionStatusChanged;
 
-        public int getID() { return _id; }  
+        public int getID() { return _id; }
+
+        // Expose the most recent packet sender. This is particularly useful for
+        // PicoTuner/WinterHill UDP mode, where status packets provide the authoritative
+        // receiver IP even if a stale or local PC address was saved in settings.
+        public string LastRemoteAddress { get { return lastRemoteAddress; } }
+        public int LastRemotePort { get { return lastRemotePort; } }
 
         public void Close()
         {
@@ -88,6 +96,11 @@ namespace opentuner.Utilities
                     if (0 != udpClient.Available)
                     {
                         byte[] receivedBytes = udpClient.Receive(ref remoteEndPoint);
+                        if (remoteEndPoint != null)
+                        {
+                            lastRemoteAddress = remoteEndPoint.Address.ToString();
+                            lastRemotePort = remoteEndPoint.Port;
+                        }
 
                         try
                         {
