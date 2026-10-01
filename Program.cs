@@ -118,6 +118,7 @@ namespace opentuner
             try
             {
                 ModernConceptForm mainForm = new ModernConceptForm(args);
+                ModernConceptRuntimeFixes.Attach(mainForm);
 
                 if (!FFmpegEngineAvailable)
                 {
