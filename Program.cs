@@ -12,9 +12,6 @@ namespace opentuner
 {
     static class Program
     {
-        /// <summary>
-        /// The main entry point for the application.
-        /// </summary>
         public static LoggingLevelSwitch levelSwitch;
         public static bool FFmpegEngineAvailable { get; private set; } = false;
         public static string FFmpegStartupError { get; private set; } = "";
@@ -29,7 +26,7 @@ namespace opentuner
         static void Main(string[] args)
         {
             int i = 0;
-            int debugLevel = 3; // Warning
+            int debugLevel = 3;
             levelSwitch = new LoggingLevelSwitch();
 
             while (i < args.Length)
@@ -37,12 +34,11 @@ namespace opentuner
                 switch (args[i])
                 {
                     case "--debuglevel":
-                        int new_debug_level = -1;
-
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out new_debug_level))
+                        int newDebugLevel = -1;
+                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out newDebugLevel))
                         {
-                            if (new_debug_level < 6 && new_debug_level >= 0)
-                                debugLevel = new_debug_level;
+                            if (newDebugLevel < 6 && newDebugLevel >= 0)
+                                debugLevel = newDebugLevel;
                             i += 1;
                         }
                         break;
@@ -51,9 +47,6 @@ namespace opentuner
                         IntPtr handle = GetConsoleWindow();
                         if (handle != IntPtr.Zero)
                             ShowWindow(handle, 0);
-                        break;
-
-                    default:
                         break;
                 }
                 i += 1;
@@ -78,11 +71,10 @@ namespace opentuner
 
             LogEventLevel lastMinimumLevel = levelSwitch.MinimumLevel;
             levelSwitch.MinimumLevel = LogEventLevel.Information;
-            Log.Information("Starting OpenTuner");
+            Log.Information("Starting OpenTuner Modern standalone UI");
             levelSwitch.MinimumLevel = lastMinimumLevel;
 
             string logDirectory = AppDomain.CurrentDomain.BaseDirectory + "logs\\";
-
             if (Directory.Exists(logDirectory))
             {
                 var logFiles = Directory.GetFiles(logDirectory, "*.txt")
@@ -96,15 +88,8 @@ namespace opentuner
                     {
                         if (i > 9)
                         {
-                            try
-                            {
-                                File.Delete(file.FullName);
-                                Log.Debug("Log file deleted: " + file.Name);
-                            }
-                            catch
-                            {
-                                Log.Warning("Log file for deletion not found: " + file.Name);
-                            }
+                            try { File.Delete(file.FullName); }
+                            catch { Log.Warning("Log file for deletion not found: " + file.Name); }
                         }
                         i++;
                     }
@@ -114,8 +99,6 @@ namespace opentuner
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            // Flyleaf/FFmpeg is optional at startup. The packaged build normally carries
-            // the runtime, but a missing native folder must not stop the receiver opening.
             try
             {
                 Engine.Start(new EngineConfig()
@@ -134,44 +117,14 @@ namespace opentuner
 
             try
             {
-                MainForm mainForm = new MainForm(args);
-
-                // MainForm's existing OnShown code completes the legacy dynamic-control
-                // setup. Queue our dashboard until the next message-loop turn so the new
-                // view always wins the final z-order and becomes the operating surface.
-                mainForm.Shown += delegate
-                {
-                    mainForm.BeginInvoke((MethodInvoker)delegate
-                    {
-                        try
-                        {
-                            var method = typeof(MainForm).GetMethod(
-                                "BuildModernDashboard",
-                                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-
-                            if (method == null)
-                                throw new MissingMethodException("Modern dashboard entry point not found.");
-
-                            method.Invoke(mainForm, null);
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error(ex, "Could not create modern dashboard; leaving legacy view available.");
-                            MessageBox.Show(
-                                "The modern dashboard could not be created. The original OpenTuner controls will remain available.\r\n\r\n" + ex.Message,
-                                "OpenTuner modern UI",
-                                MessageBoxButtons.OK,
-                                MessageBoxIcon.Warning);
-                        }
-                    });
-                };
+                ModernMainForm mainForm = new ModernMainForm(args);
 
                 if (!FFmpegEngineAvailable)
                 {
                     mainForm.Shown += delegate
                     {
                         MessageBox.Show(
-                            "The FFmpeg runtime was not found in this test package.\r\n\r\n" +
+                            "The FFmpeg runtime was not found.\r\n\r\n" +
                             "OpenTuner will continue to run, but the FFmpeg/Flyleaf media-player option is unavailable. " +
                             "Use VLC for testing this build.\r\n\r\n" +
                             "Details: " + FFmpegStartupError,
