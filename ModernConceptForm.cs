@@ -114,7 +114,7 @@ namespace opentuner
 
             Panel spectrumCard = BuildSpectrumCard();
             spectrumCard.Dock = DockStyle.Top;
-            spectrumCard.Height = 185;
+            spectrumCard.Height = 319;
             work.Controls.Add(spectrumCard);
 
             TableLayoutPanel tunerGrid = new TableLayoutPanel
@@ -194,9 +194,19 @@ namespace opentuner
             Panel p = Card();
             Label t = new Label { Text = "BATC WIDEBAND QUICK TUNE   •   click a signal to tune", AutoSize = true, Location = new Point(14, 9), ForeColor = Text, Font = new Font("Segoe UI Semibold", 9.5f) };
             p.Controls.Add(t);
-            batcSpectrumBox = new PictureBox { Location = new Point(10, 34), Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right, BackColor = Color.Black, SizeMode = PictureBoxSizeMode.StretchImage };
+            batcSpectrumBox = new PictureBox
+            {
+                Location = new Point(10, 34),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+                BackColor = Color.Black,
+                SizeMode = PictureBoxSizeMode.Normal,
+                Size = new Size(922, 275)
+            };
             p.Controls.Add(batcSpectrumBox);
-            p.Resize += delegate { batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), Math.Max(10, p.Height - 44)); };
+            p.Resize += delegate
+            {
+                batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), 275);
+            };
             return p;
         }
 
