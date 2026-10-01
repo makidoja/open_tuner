@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using System.IO;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCWebchat;
 
@@ -37,9 +39,7 @@ namespace opentuner
             try
             {
                 if (ExtraToolsTab != null && ExtraSpectrumTab != null)
-                {
                     ExtraToolsTab.SelectedTab = ExtraSpectrumTab;
-                }
             }
             catch { }
         }
@@ -47,6 +47,37 @@ namespace opentuner
         public void BackendShowExternalTools()
         {
             try { ToggleExtraToolPanel(false); } catch { }
+        }
+
+        public void BackendOpenRecordingsFolder()
+        {
+            OpenMediaFolder(_settings == null ? null : _settings.media_video_path, "recordings");
+        }
+
+        public void BackendOpenSnapshotsFolder()
+        {
+            string path = _settings == null ? null : _settings.media_path;
+            if (string.IsNullOrWhiteSpace(path) && _settings != null)
+                path = _settings.media_video_path;
+            OpenMediaFolder(path, "snapshots");
+        }
+
+        private void OpenMediaFolder(string path, string description)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                {
+                    MessageBox.Show("The " + description + " folder is not configured or does not exist. Set the media paths in SETTINGS.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + path + "\"") { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not open the " + description + " folder.\r\n\r\n" + ex.Message, "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
