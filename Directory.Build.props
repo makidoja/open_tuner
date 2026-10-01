@@ -9,5 +9,6 @@
     <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
+    <Compile Include="MediaSources\Winterhill\WinterHillModernSupport.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernSupport.cs')" />
   </ItemGroup>
 </Project>
