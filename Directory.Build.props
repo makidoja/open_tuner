@@ -8,5 +8,6 @@
     <Compile Include="ModernBackendAudioBridge.cs" Condition="Exists('ModernBackendAudioBridge.cs')" />
     <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
+    <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
   </ItemGroup>
 </Project>
