@@ -16,9 +16,6 @@ namespace opentuner
         {
             base.OnActivated(e);
 
-            // Create the modern operating surface the first time the main window
-            // becomes active. This reuses the form's existing lifecycle without
-            // introducing another OnShown override.
             if (mdRoot == null)
                 BuildModernDashboard();
 
@@ -30,6 +27,8 @@ namespace opentuner
 
             if (!mdSourceSettingsInitialised && mdSource != null)
                 InitialiseSourceSettingsButton();
+
+            EnforceModernDashboardChrome();
         }
 
         private void InitialiseTunerLayoutSelector()
@@ -66,7 +65,6 @@ namespace opentuner
             mdTunerViewCaption.BringToFront();
             mdTunerViewMode.BringToFront();
 
-            // Move the frequency section down slightly to make room for the selector.
             foreach (Control control in tuningPanel.Controls)
             {
                 if (control == mdTunerViewCaption || control == mdTunerViewMode || control == mdTunerSelector)
@@ -106,7 +104,6 @@ namespace opentuner
                 }
             }
 
-            // PicoTuner/MiniTiouner is the common case, so default to two before connection.
             return 2;
         }
 
@@ -131,9 +128,7 @@ namespace opentuner
                 SelectDashboardTuner(0);
 
             if (mdTunerSelector != null)
-            {
                 mdTunerSelector.Width = mdVisibleTunerCount == 2 ? 120 : 245;
-            }
         }
     }
 }
