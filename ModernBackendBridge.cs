@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Windows.Forms;
 using opentuner.MediaSources;
 
@@ -59,7 +60,48 @@ namespace opentuner
                 return true;
 
             BackendSelectedSourceIndex = sourceIndex;
-            source_connected = ConnectSelectedSource();
+
+            try
+            {
+                source_connected = ConnectSelectedSource();
+            }
+            catch (SocketException ex)
+            {
+                source_connected = false;
+
+                string message;
+                if (ex.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    message =
+                        "OpenTuner could not open the UDP listener because the required local port is already in use.\r\n\r\n" +
+                        "For WinterHill / PicoTuner Ethernet mode, open SOURCE SETTINGS and change the UDP Base Port, " +
+                        "or close the application currently using that port.\r\n\r\n" +
+                        "Example: a UDP Base Port of 9900 uses local status port 9901.\r\n\r\n" +
+                        "Windows error: " + ex.Message;
+                }
+                else
+                {
+                    message = "OpenTuner could not open the receiver network socket.\r\n\r\n" + ex.Message;
+                }
+
+                MessageBox.Show(
+                    message,
+                    "OpenTuner - receiver network error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                source_connected = false;
+                MessageBox.Show(
+                    "OpenTuner could not initialise the selected receiver source.\r\n\r\n" + ex.Message,
+                    "OpenTuner - receiver error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                return false;
+            }
 
             if (source_connected && videoSource != null && !backendSourceHooked)
             {
