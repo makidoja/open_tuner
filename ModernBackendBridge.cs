@@ -178,7 +178,13 @@ namespace opentuner
         {
             if (videoSource == null)
                 return;
-            videoSource.SetFrequency(tuner, frequencyKHz, symbolRate, false);
+
+            // The modern UI and BATC spectrum use the displayed RF frequency, i.e. the
+            // value already includes the configured LNB offset. WinterHill's UDP command
+            // sends the frequency and offset as separate fields. Passing false here caused
+            // WinterHillSource.SetFrequency() to add the offset a second time, so every
+            // manual/quick tune command was sent to the wrong frequency.
+            videoSource.SetFrequency(tuner, frequencyKHz, symbolRate, true);
         }
 
         public Control[] BackendTakeVideoControls(int tuner)
