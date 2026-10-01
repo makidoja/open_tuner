@@ -71,7 +71,7 @@ namespace opentuner
 
             LogEventLevel lastMinimumLevel = levelSwitch.MinimumLevel;
             levelSwitch.MinimumLevel = LogEventLevel.Information;
-            Log.Information("Starting OpenTuner Modern standalone UI");
+            Log.Information("Starting OpenTuner Modern concept UI");
             levelSwitch.MinimumLevel = lastMinimumLevel;
 
             string logDirectory = AppDomain.CurrentDomain.BaseDirectory + "logs\\";
@@ -117,7 +117,7 @@ namespace opentuner
 
             try
             {
-                ModernMainForm mainForm = new ModernMainForm(args);
+                ModernConceptForm mainForm = new ModernConceptForm(args);
 
                 if (!FFmpegEngineAvailable)
                 {
