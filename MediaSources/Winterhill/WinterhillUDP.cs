@@ -85,51 +85,58 @@ namespace opentuner.MediaSources.WinterHill
 
             int receiver = 1;
 
-            for (int c = 0; c <  status_strings.Length; c++)
+            for (int c = 0; c < status_strings.Length; c++)
             {
                 string[] dt = status_strings[c].Trim().Split(',');
                 if (dt.Length == 0)
                     continue;
 
-                switch(dt[0])
+                switch (dt[0])
                 {
                     case "$0":
                         if (dt.Length < 2) break;
                         int receiver_num = udp_base_port % 100;
                         receiver = Convert.ToInt32(dt[1]) - receiver_num;
-                        if (receiver < 1 || receiver > 2 )
+                        if (receiver < 1 || receiver > 2)
                             return;
                         break;
+
                     case "$1":
                         if (dt.Length < 2) break;
+
+                        // PicoTuner/WinterHill firmware variants have used several labels
+                        // for DVB-S and DVB-S2 over time. Normalise the text and accept
+                        // descriptive suffixes (for example "DVB-S QPSK" or "DVB-S1 LOCK")
+                        // rather than requiring one exact literal string.
                         string demodState = (dt[1] ?? "").Trim().ToUpperInvariant();
-                        switch (demodState)
+                        string compactState = demodState.Replace("_", "-").Replace(" ", "");
+
+                        if (compactState.StartsWith("DVB-S2") || compactState.StartsWith("DVBS2"))
                         {
-                            case "DVB-S2":
-                            case "DVBS2":
-                                mm.rx[receiver].scanstate = 2;
-                                break;
-
-                            case "DVB-S":
-                            case "DVB-S1":
-                            case "DVBS":
-                            case "DVBS1":
-                                mm.rx[receiver].scanstate = 3;
-                                break;
-
-                            case "HEADER":
-                                mm.rx[receiver].scanstate = 1;
-                                break;
-                            case "SEARCH":
-                            case "LOST":
-                                mm.rx[receiver].scanstate = 0;
-                                break;
-                            default:
-                                Log.Warning("WH: Don't know how to decode demod state: '" + dt[1] + "'");
-                                mm.rx[receiver].scanstate = 1;
-                                break;
+                            mm.rx[receiver].scanstate = 2;
+                        }
+                        else if (compactState.StartsWith("DVB-S1") ||
+                                 compactState.StartsWith("DVBS1") ||
+                                 compactState.StartsWith("DVB-S") ||
+                                 compactState.StartsWith("DVBS"))
+                        {
+                            mm.rx[receiver].scanstate = 3;
+                        }
+                        else if (compactState == "HEADER")
+                        {
+                            mm.rx[receiver].scanstate = 1;
+                        }
+                        else if (compactState == "SEARCH" || compactState == "SEARCHING" || compactState == "LOST")
+                        {
+                            mm.rx[receiver].scanstate = 0;
+                        }
+                        else
+                        {
+                            Log.Warning("WH: Don't know how to decode demod state: '" + dt[1] + "'");
+                            mm.rx[receiver].scanstate = 1;
                         }
                         break;
+
                     case "$6": if (dt.Length > 1) mm.rx[receiver].frequency = dt[1]; break;
                     case "$9": if (dt.Length > 1) mm.rx[receiver].symbol_rate = dt[1]; break;
                     case "$12": if (dt.Length > 1) mm.rx[receiver].mer = dt[1]; break;
@@ -178,7 +185,7 @@ namespace opentuner.MediaSources.WinterHill
             string vg = plug == 0 ? "vgx" : "vgy";
             switch (voltage)
             {
-                case 0: command2 =  ("[to@wh] " + vg + "=OFF"); break;
+                case 0: command2 = ("[to@wh] " + vg + "=OFF"); break;
                 case 13: command2 = ("[to@wh] " + vg + "=LO"); break;
                 case 18: command2 = ("[to@wh] " + vg + "=HI"); break;
             }
@@ -199,10 +206,10 @@ namespace opentuner.MediaSources.WinterHill
 
         public void UDPSetFrequency(int device, int freq, int sr)
         {
-            int base_port = _settings.WinterHillUdpBasePort + ( device == 0 ? 21 : 22);
+            int base_port = _settings.WinterHillUdpBasePort + (device == 0 ? 21 : 22);
             int receiver_num = (_settings.WinterHillUdpBasePort % 100) + 1 + device;
             string controlHost = GetRuntimeUdpHost();
-            IPEndPoint WinterHill_end_point = new IPEndPoint(IPAddress.Parse(controlHost), base_port );
+            IPEndPoint WinterHill_end_point = new IPEndPoint(IPAddress.Parse(controlHost), base_port);
 
             Log.Information("UDP Set Frequency Device: " + device + " : " + controlHost + " : " + base_port.ToString());
 
