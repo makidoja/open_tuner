@@ -15,13 +15,13 @@ namespace opentuner
     {
         public static bool FFmpegEngineAvailable = false;
         public static string FFmpegStartupError = "";
+        public static LoggingLevelSwitch levelSwitch = new LoggingLevelSwitch();
 
         [STAThread]
         static void Main(string[] args)
         {
             int i = 0;
 
-            var levelSwitch = new LoggingLevelSwitch();
             levelSwitch.MinimumLevel = LogEventLevel.Debug;
 
             string logPath = AppDomain.CurrentDomain.BaseDirectory + "logs\\opentuner_.txt";
