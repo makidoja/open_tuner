@@ -10,11 +10,18 @@ namespace opentuner
     {
         private static bool attached;
         private static ModernBatcSpectrumControl display;
+        private static Label spectrumTitle;
 
         public static void Attach(ModernConceptForm form)
         {
             if (attached || form == null) return;
             attached = true;
+
+            // Below this width the top hardware controls begin to overlap and the
+            // per-receiver RF/LO controls no longer fit cleanly. Keep the modern UI
+            // at a practical minimum size instead of allowing controls to disappear.
+            form.MinimumSize = new Size(1500, 800);
+
             form.Shown += delegate { ReplaceLegacySpectrum(form); };
         }
 
@@ -32,6 +39,21 @@ namespace opentuner
 
             Panel card = legacyBox.Parent as Panel;
             if (card == null) return;
+
+            // Centre the BATC title across the whole section rather than leaving it
+            // tucked against the left edge.
+            foreach (Control control in card.Controls)
+            {
+                Label label = control as Label;
+                if (label != null && (label.Text ?? "").IndexOf("BATC WIDEBAND QUICK TUNE", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    spectrumTitle = label;
+                    spectrumTitle.AutoSize = false;
+                    spectrumTitle.TextAlign = ContentAlignment.MiddleCenter;
+                    spectrumTitle.Height = 24;
+                    break;
+                }
+            }
 
             FieldInfo oldSpectrumField = typeof(ModernConceptForm).GetField("batcSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
             BATCSpectrum oldSpectrum = oldSpectrumField == null ? null : oldSpectrumField.GetValue(form) as BATCSpectrum;
@@ -104,10 +126,14 @@ namespace opentuner
         {
             if (display == null || display.IsDisposed || card == null) return;
 
-            // Keep the entire BATC section only as tall as the title plus the spectrum.
-            // This preserves vertical space for the two video panes.
             if (card.Visible && card.Height != 145)
                 card.Height = 145;
+
+            if (spectrumTitle != null && !spectrumTitle.IsDisposed)
+            {
+                spectrumTitle.Location = new Point(12, 4);
+                spectrumTitle.Width = Math.Max(100, card.ClientSize.Width - 24);
+            }
 
             int available = Math.Max(300, card.ClientSize.Width - 24);
             int width = Math.Min(1140, available);
