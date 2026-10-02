@@ -11,16 +11,16 @@ namespace opentuner
         private static readonly int[] SymbolRates = { 66, 125, 250, 333, 500, 1000, 1500, 2000 };
         private static Panel spectrumCard;
         private static PictureBox spectrumProxy;
+        private static Button connectButton;
+        private static Button sourceSettingsButton;
+        private static Timer connectionTimer;
 
         public static void Attach(ModernConceptForm form)
         {
             if (attached || form == null) return;
             attached = true;
 
-            form.Shown += delegate
-            {
-                Apply(form);
-            };
+            form.Shown += delegate { Apply(form); };
         }
 
         private static void Apply(ModernConceptForm form)
@@ -40,8 +40,8 @@ namespace opentuner
             Panel header = sourceCombo.Parent as Panel;
             if (header != null)
             {
-                CompactHeader(header);
-                BuildTopToolbar(header, backend, nativeSpectrum);
+                CompactHeader(header, sourceCombo);
+                BuildSingleTopBar(header, backend, sourceCombo);
             }
 
             if (srInputs != null)
@@ -51,6 +51,7 @@ namespace opentuner
                 TightenTunerCards(videoHosts);
 
             ConfigureSpectrum(nativeSpectrum);
+            StartConnectionStateTimer(backend);
         }
 
         private static T GetField<T>(ModernConceptForm form, string name) where T : class
@@ -88,46 +89,85 @@ namespace opentuner
             side.Width = 0;
         }
 
-        private static void CompactHeader(Panel header)
+        private static void CompactHeader(Panel header, ComboBox sourceCombo)
         {
-            header.Height = 98;
+            header.Height = 48;
+            sourceCombo.Visible = false;
 
             foreach (Control c in header.Controls)
             {
                 Label l = c as Label;
-                if (l != null && (l.Text ?? "").IndexOf("MODERN RECEIVER", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (l != null)
                 {
-                    l.Text = "OpenTuner";
-                    l.Font = new Font("Segoe UI Semibold", 12f);
+                    if ((l.Text ?? "").IndexOf("MODERN RECEIVER", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        l.Text = "OpenTuner";
+                        l.Font = new Font("Segoe UI Semibold", 11f);
+                    }
+                    else if (string.Equals((l.Text ?? "").Trim(), "READY", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals((l.Text ?? "").Trim(), "CONNECTED", StringComparison.OrdinalIgnoreCase))
+                    {
+                        l.Visible = false;
+                    }
                 }
 
                 Button b = c as Button;
-                if (b != null && string.Equals((b.Text ?? "").Trim(), "SETTINGS", StringComparison.OrdinalIgnoreCase))
-                    b.Visible = false;
+                if (b != null)
+                {
+                    string text = (b.Text ?? "").Trim();
+                    if (string.Equals(text, "SETTINGS", StringComparison.OrdinalIgnoreCase) ||
+                        text.IndexOf("SOURCE SETTINGS", StringComparison.OrdinalIgnoreCase) >= 0)
+                        b.Visible = false;
+                    else if (string.Equals(text, "CONNECT", StringComparison.OrdinalIgnoreCase))
+                        connectButton = b;
+                }
             }
         }
 
-        private static void BuildTopToolbar(Panel header, MainForm backend, PictureBox nativeSpectrum)
+        private static void BuildSingleTopBar(Panel header, MainForm backend, ComboBox sourceCombo)
         {
-            if (header.Controls["ModernTopToolbar"] != null) return;
+            if (header.Controls["ModernSingleTopBar"] != null) return;
 
-            FlowLayoutPanel bar = new FlowLayoutPanel
+            Panel bar = new Panel
             {
-                Name = "ModernTopToolbar",
-                Dock = DockStyle.Bottom,
-                Height = 40,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Padding = new Padding(12, 4, 8, 3),
-                BackColor = Color.FromArgb(9, 24, 39)
+                Name = "ModernSingleTopBar",
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(13, 28, 45),
+                Padding = new Padding(12, 7, 12, 7)
             };
 
-            bar.Controls.Add(ToolButton("PRESETS", delegate { backend.BackendShowPresets(); }));
-            bar.Controls.Add(ToolButton("RECORDINGS", delegate { backend.BackendOpenRecordingsFolder(); }));
-            bar.Controls.Add(ToolButton("SNAPSHOTS", delegate { backend.BackendOpenSnapshotsFolder(); }));
-            bar.Controls.Add(ToolButton("BATC CHAT", delegate { backend.BackendShowBatcChat(); }));
-            bar.Controls.Add(ToolButton("EXTERNAL TOOLS", delegate { backend.BackendShowExternalTools(); }));
-            bar.Controls.Add(ToolButton("SETTINGS", delegate { backend.BackendShowGeneralSettings(); }));
+            FlowLayoutPanel left = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                BackColor = Color.Transparent,
+                Padding = new Padding(0),
+                Margin = new Padding(0)
+            };
+
+            Label brand = new Label
+            {
+                Text = "OpenTuner",
+                AutoSize = false,
+                Width = 92,
+                Height = 30,
+                TextAlign = ContentAlignment.MiddleLeft,
+                ForeColor = Color.FromArgb(242, 247, 252),
+                Font = new Font("Segoe UI Semibold", 11f),
+                Margin = new Padding(0, 0, 12, 0)
+            };
+            left.Controls.Add(brand);
+
+            left.Controls.Add(ToolButton("PRESETS", delegate { backend.BackendShowPresets(); }));
+            left.Controls.Add(ToolButton("RECORDINGS", delegate { backend.BackendOpenRecordingsFolder(); }));
+            left.Controls.Add(ToolButton("SNAPSHOTS", delegate { backend.BackendOpenSnapshotsFolder(); }));
+            left.Controls.Add(ToolButton("BATC CHAT", delegate { backend.BackendShowBatcChat(); }));
+            left.Controls.Add(ToolButton("EXTERNAL TOOLS", delegate { backend.BackendShowExternalTools(); }));
+            left.Controls.Add(ToolButton("SETTINGS", delegate { backend.BackendShowGeneralSettings(); }));
+
+            sourceSettingsButton = ToolButton("SOURCE SETTINGS ▼", delegate { ShowSourceMenu(backend, sourceCombo); });
+            left.Controls.Add(sourceSettingsButton);
 
             CheckBox qo100 = new CheckBox
             {
@@ -136,15 +176,92 @@ namespace opentuner
                 Checked = false,
                 ForeColor = Color.FromArgb(242, 247, 252),
                 BackColor = Color.Transparent,
-                Font = new Font("Segoe UI Semibold", 9f),
-                Margin = new Padding(18, 7, 0, 0),
+                Font = new Font("Segoe UI Semibold", 8.5f),
+                Margin = new Padding(10, 7, 0, 0),
                 Cursor = Cursors.Hand
             };
             qo100.CheckedChanged += delegate { SetSpectrumVisible(qo100.Checked); };
-            bar.Controls.Add(qo100);
+            left.Controls.Add(qo100);
 
+            Panel right = new Panel { Dock = DockStyle.Right, Width = 118, BackColor = Color.Transparent };
+
+            if (connectButton == null)
+            {
+                connectButton = ToolButton("CONNECT", delegate { });
+            }
+            else
+            {
+                connectButton.Visible = true;
+                connectButton.AutoSize = false;
+            }
+
+            connectButton.Dock = DockStyle.Fill;
+            connectButton.Margin = new Padding(0);
+            connectButton.Font = new Font("Segoe UI Semibold", 9f);
+            connectButton.FlatStyle = FlatStyle.Flat;
+            connectButton.BackColor = Color.FromArgb(28, 139, 253);
+            connectButton.ForeColor = Color.White;
+            connectButton.FlatAppearance.BorderColor = Color.FromArgb(28, 139, 253);
+            right.Controls.Add(connectButton);
+
+            bar.Controls.Add(left);
+            bar.Controls.Add(right);
             header.Controls.Add(bar);
             bar.BringToFront();
+        }
+
+        private static void ShowSourceMenu(MainForm backend, ComboBox hiddenSourceCombo)
+        {
+            string[] names = backend.BackendSourceNames();
+            if (names == null || names.Length == 0) return;
+
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+
+            for (int i = 0; i < names.Length; i++)
+            {
+                int index = i;
+                ToolStripMenuItem item = new ToolStripMenuItem(names[i]);
+                item.Checked = backend.BackendSelectedSourceIndex == i;
+                item.Click += delegate
+                {
+                    backend.BackendSelectedSourceIndex = index;
+                    if (hiddenSourceCombo != null && index >= 0 && index < hiddenSourceCombo.Items.Count)
+                        hiddenSourceCombo.SelectedIndex = index;
+                    backend.BackendShowSourceSettings(index);
+                };
+                menu.Items.Add(item);
+            }
+
+            if (sourceSettingsButton != null)
+                menu.Show(sourceSettingsButton, new Point(0, sourceSettingsButton.Height));
+        }
+
+        private static void StartConnectionStateTimer(MainForm backend)
+        {
+            if (connectionTimer != null) return;
+
+            connectionTimer = new Timer { Interval = 250 };
+            connectionTimer.Tick += delegate
+            {
+                if (connectButton == null || connectButton.IsDisposed) return;
+
+                if (backend.BackendConnected)
+                {
+                    connectButton.Text = "CONNECTED";
+                    connectButton.BackColor = Color.FromArgb(22, 140, 85);
+                    connectButton.FlatAppearance.BorderColor = Color.FromArgb(40, 222, 126);
+                    connectButton.ForeColor = Color.White;
+                }
+                else
+                {
+                    connectButton.Text = "CONNECT";
+                    connectButton.BackColor = Color.FromArgb(28, 139, 253);
+                    connectButton.FlatAppearance.BorderColor = Color.FromArgb(28, 139, 253);
+                    connectButton.ForeColor = Color.White;
+                }
+            };
+            connectionTimer.Start();
         }
 
         private static Button ToolButton(string text, Action click)
@@ -157,10 +274,10 @@ namespace opentuner
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Color.FromArgb(18, 38, 60),
                 ForeColor = Color.FromArgb(242, 247, 252),
-                Font = new Font("Segoe UI Semibold", 8.5f),
+                Font = new Font("Segoe UI Semibold", 8.25f),
                 Cursor = Cursors.Hand,
-                Margin = new Padding(0, 0, 6, 0),
-                Padding = new Padding(7, 0, 7, 0)
+                Margin = new Padding(0, 0, 5, 0),
+                Padding = new Padding(6, 0, 6, 0)
             };
             b.FlatAppearance.BorderColor = Color.FromArgb(37, 67, 94);
             b.Click += delegate { click(); };
