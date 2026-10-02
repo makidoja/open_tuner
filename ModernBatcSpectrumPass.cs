@@ -40,10 +40,12 @@ namespace opentuner
             try { oldSpectrum?.Close(); } catch { }
             try { if (oldSpectrumField != null) oldSpectrumField.SetValue(form, null); } catch { }
 
-            // The compact-layout pass knows about the original PictureBox and can make it
-            // visible again on a resize. Hiding it is therefore not enough. Remove and
-            // dispose it completely, then clear the form field so there is only one
-            // spectrum control in the card.
+            // Remove the original PictureBox completely so the old renderer can never
+            // paint underneath the modern spectrum. ModernConceptForm still has a resize
+            // handler and startup guard that reference batcSpectrumBox, so replace that
+            // field with an inert 1px compatibility PictureBox rather than nulling it.
+            // It has no parent and can never be visible, while keeping those legacy
+            // callbacks harmless until they are removed from the base form entirely.
             try
             {
                 Image oldImage = legacyBox.Image;
@@ -54,7 +56,21 @@ namespace opentuner
 
             try { card.Controls.Remove(legacyBox); } catch { }
             try { legacyBox.Dispose(); } catch { }
-            try { if (boxField != null) boxField.SetValue(form, null); } catch { }
+
+            try
+            {
+                if (boxField != null)
+                {
+                    PictureBox compatibilityBox = new PictureBox
+                    {
+                        Name = "LegacySpectrumCompatibilityPlaceholder",
+                        Size = new Size(1, 1),
+                        Visible = false
+                    };
+                    boxField.SetValue(form, compatibilityBox);
+                }
+            }
+            catch { }
 
             MainForm backend = GetField<MainForm>(form, "backend");
             NumericUpDown[] freqInputs = GetField<NumericUpDown[]>(form, "freqInputs");
