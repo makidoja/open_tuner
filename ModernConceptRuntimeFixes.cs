@@ -12,10 +12,7 @@ namespace opentuner
         private static bool spectrumResizeHooked;
         private static bool quickTuneHooked;
         private static bool navigationHooked;
-        private static PictureBox spectrumProxy;
-        private static Timer spectrumRefreshTimer;
         private static Timer connectionStatusTimer;
-        private static Image spectrumProxyOwnedImage;
 
         public static void Attach(ModernConceptForm form)
         {
@@ -29,37 +26,22 @@ namespace opentuner
                 ApplyCompactSpectrumLayout(form);
                 HookQuickTune(form);
                 HookNavigation(form);
-                StartSpectrumProxyRefresh(form);
                 StartConnectionStatusCorrection(form);
             };
 
             form.Resize += delegate { ApplyCompactSpectrumLayout(form); };
-            form.FormClosed += delegate
-            {
-                try
-                {
-                    if (spectrumRefreshTimer != null)
-                    {
-                        spectrumRefreshTimer.Stop();
-                        spectrumRefreshTimer.Dispose();
-                        spectrumRefreshTimer = null;
-                    }
-                    if (spectrumProxy != null && !spectrumProxy.IsDisposed)
-                        spectrumProxy.Image = null;
-                    if (spectrumProxyOwnedImage != null)
-                    {
-                        spectrumProxyOwnedImage.Dispose();
-                        spectrumProxyOwnedImage = null;
-                    }
-                }
-                catch { }
-            };
         }
 
         private static MainForm GetBackend(ModernConceptForm form)
         {
             FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
             return backendField == null ? null : backendField.GetValue(form) as MainForm;
+        }
+
+        private static PictureBox GetSpectrumBox(ModernConceptForm form)
+        {
+            FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
+            return boxField == null ? null : boxField.GetValue(form) as PictureBox;
         }
 
         private static IEnumerable<Button> FindButtons(Control root)
@@ -96,18 +78,20 @@ namespace opentuner
                 else if (text.IndexOf("Spectrum", StringComparison.OrdinalIgnoreCase) >= 0)
                     b.Click += delegate
                     {
-                        if (spectrumProxy != null && !spectrumProxy.IsDisposed)
+                        PictureBox box = GetSpectrumBox(form);
+                        if (box != null && !box.IsDisposed)
                         {
-                            spectrumProxy.Focus();
-                            spectrumProxy.BringToFront();
+                            box.Focus();
+                            box.BringToFront();
                         }
                         backend.BackendShowSpectrum();
                     };
                 else if (text.IndexOf("Scan", StringComparison.OrdinalIgnoreCase) >= 0)
                     b.Click += delegate
                     {
-                        if (spectrumProxy != null && !spectrumProxy.IsDisposed)
-                            spectrumProxy.Focus();
+                        PictureBox box = GetSpectrumBox(form);
+                        if (box != null && !box.IsDisposed)
+                            box.Focus();
                     };
                 else if (text.IndexOf("Recordings", StringComparison.OrdinalIgnoreCase) >= 0)
                     b.Click += delegate { backend.BackendOpenRecordingsFolder(); };
@@ -126,127 +110,42 @@ namespace opentuner
         {
             try
             {
-                FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
-                PictureBox nativeBox = boxField == null ? null : boxField.GetValue(form) as PictureBox;
+                PictureBox nativeBox = GetSpectrumBox(form);
                 if (nativeBox == null || nativeBox.Parent == null) return;
 
                 Panel card = nativeBox.Parent as Panel;
                 if (card == null) return;
 
                 card.Height = 174;
-                nativeBox.Anchor = AnchorStyles.None;
-                nativeBox.SizeMode = PictureBoxSizeMode.Normal;
-                nativeBox.Size = new Size(922, 275);
-                nativeBox.Location = new Point(-2000, -2000);
-                nativeBox.Visible = false;
+                card.BackColor = Color.FromArgb(13, 28, 45);
 
-                if (spectrumProxy == null || spectrumProxy.IsDisposed || spectrumProxy.Parent != card)
+                Action layout = delegate
                 {
-                    spectrumProxy = new PictureBox
-                    {
-                        BackColor = Color.Black,
-                        SizeMode = PictureBoxSizeMode.StretchImage,
-                        Cursor = Cursors.Hand,
-                        Anchor = AnchorStyles.Top
-                    };
-
-                    spectrumProxy.MouseClick += delegate(object sender, MouseEventArgs e)
-                    {
-                        ForwardSpectrumClick(form, e);
-                    };
-
-                    card.Controls.Add(spectrumProxy);
-                    spectrumProxy.BringToFront();
-                }
-
-                Action sizeProxy = delegate
-                {
-                    int width = Math.Min(922, Math.Max(300, card.ClientSize.Width - 20));
+                    int available = Math.Max(300, card.ClientSize.Width - 24);
+                    int width = Math.Min(760, available);
                     int height = 126;
-                    int left = Math.Max(10, (card.ClientSize.Width - width) / 2);
-                    spectrumProxy.Location = new Point(left, 34);
-                    spectrumProxy.Size = new Size(width, height);
-                    spectrumProxy.BringToFront();
-                    nativeBox.Size = new Size(922, 275);
-                    nativeBox.Location = new Point(-2000, -2000);
+                    int left = Math.Max(12, (card.ClientSize.Width - width) / 2);
+
+                    // Render BATCSpectrum directly into the modern-sized PictureBox.
+                    // This removes the legacy bitmap proxy, prevents stretched text,
+                    // and keeps BATCSpectrum's own mouse hit-testing exact.
+                    nativeBox.Visible = true;
+                    nativeBox.Anchor = AnchorStyles.Top;
+                    nativeBox.SizeMode = PictureBoxSizeMode.Normal;
+                    nativeBox.BackColor = Color.FromArgb(13, 28, 45);
+                    nativeBox.Size = new Size(width, height);
+                    nativeBox.Location = new Point(left, 32);
+                    nativeBox.Cursor = Cursors.Hand;
+                    nativeBox.BringToFront();
                 };
 
-                sizeProxy();
+                layout();
 
                 if (!spectrumResizeHooked)
                 {
-                    card.Resize += delegate { sizeProxy(); };
+                    card.Resize += delegate { layout(); };
                     spectrumResizeHooked = true;
                 }
-            }
-            catch
-            {
-            }
-        }
-
-        private static void StartSpectrumProxyRefresh(ModernConceptForm form)
-        {
-            if (spectrumRefreshTimer != null) return;
-
-            spectrumRefreshTimer = new Timer { Interval = 100 };
-            spectrumRefreshTimer.Tick += delegate
-            {
-                if (form.IsDisposed || spectrumProxy == null || spectrumProxy.IsDisposed) return;
-
-                try
-                {
-                    FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
-                    PictureBox nativeBox = boxField == null ? null : boxField.GetValue(form) as PictureBox;
-                    if (nativeBox == null) return;
-
-                    Image source = nativeBox.Image;
-                    if (source == null) return;
-
-                    // BATCSpectrum replaces/disposes its render bitmap while the UI is
-                    // repainting. Never hand that shared Image instance to another
-                    // PictureBox: WinForms may query Width/Size after the renderer has
-                    // disposed it, causing System.ArgumentException in OnPaint.
-                    Image clone;
-                    lock (source)
-                    {
-                        clone = new Bitmap(source);
-                    }
-
-                    Image old = spectrumProxyOwnedImage;
-                    spectrumProxyOwnedImage = clone;
-                    spectrumProxy.Image = clone;
-                    spectrumProxy.Invalidate();
-
-                    if (old != null)
-                        old.Dispose();
-                }
-                catch
-                {
-                    // A source frame can change between acquisition and cloning. Skip that
-                    // frame; the next timer tick will safely clone the latest bitmap.
-                }
-            };
-            spectrumRefreshTimer.Start();
-        }
-
-        private static void ForwardSpectrumClick(ModernConceptForm form, MouseEventArgs e)
-        {
-            try
-            {
-                FieldInfo spectrumField = typeof(ModernConceptForm).GetField("batcSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
-                BATCSpectrum spectrum = spectrumField == null ? null : spectrumField.GetValue(form) as BATCSpectrum;
-                if (spectrum == null || spectrumProxy == null || spectrumProxy.Width <= 0 || spectrumProxy.Height <= 0) return;
-
-                FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
-                PictureBox nativeBox = boxField == null ? null : boxField.GetValue(form) as PictureBox;
-                if (nativeBox == null) return;
-
-                int nativeX = (int)Math.Round(e.X * (nativeBox.Width / (double)spectrumProxy.Width));
-                int nativeY = (int)Math.Round(e.Y * (nativeBox.Height / (double)spectrumProxy.Height));
-
-                MethodInfo selectSignal = typeof(BATCSpectrum).GetMethod("selectSignal", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (selectSignal != null)
-                    selectSignal.Invoke(spectrum, new object[] { nativeX, nativeY });
             }
             catch
             {
