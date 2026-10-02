@@ -147,12 +147,25 @@ namespace opentuner.MediaSources.WinterHill
         }
 
         // PicoTuner status packets teach the modern build the receiver's real IP address.
-        // Once status is flowing, send the exact same current tuner setup again as a
-        // second safety net in case startup discovery was unavailable.
+        // Once the correct host is known we must resend BOTH LNB power and tuning. On a
+        // cold start the original voltage commands may have gone to a stale configured IP,
+        // leaving the tuner correctly addressed but with no RF at the NIM.
         public void ModernReapplyStartupTune()
         {
             if (!ModernIsPicoTunerEthernet)
                 return;
+
+            if (_settings != null && _settings.LNBVoltage != null)
+            {
+                int lnbCount = System.Math.Min(2, _settings.LNBVoltage.Length);
+                for (int output = 0; output < lnbCount; output++)
+                {
+                    Serilog.Log.Information(
+                        "Reapplying PicoTuner LNB {Output} power: {Voltage} V",
+                        output == 0 ? "A" : "B", _settings.LNBVoltage[output]);
+                    UDPSetVoltage(output, _settings.LNBVoltage[output]);
+                }
+            }
 
             int count = System.Math.Min(2, _current_frequency.Length);
             for (int tuner = 0; tuner < count; tuner++)
