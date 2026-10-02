@@ -21,10 +21,6 @@ namespace opentuner
 
         public void BackendPrepare()
         {
-            // Run the normal non-visual initialisation that previously happened on Load,
-            // but never allow the hidden legacy form to auto-connect. The standalone
-            // ModernMainForm owns the connect action; allowing both layers to connect can
-            // bind the same UDP socket twice (WSAEADDRINUSE / 10048).
             bool savedAutoConnect = _settings.auto_connect;
             try
             {
@@ -57,18 +53,14 @@ namespace opentuner
             if (sourceIndex < 0 || sourceIndex >= _availableSources.Count)
                 return false;
 
-            // Do not initialise the same source twice if a previous connection attempt
-            // already succeeded. This is an additional guard against duplicate socket binds.
             if (source_connected && videoSource != null)
                 return true;
 
             BackendSelectedSourceIndex = sourceIndex;
             backendStartupRetuneDone = false;
 
-            // The visible modern UI owns BATC spectrum/chat/quick-tune. If the hidden
-            // legacy MainForm also creates those extras we end up with two BATCSpectrum
-            // instances sharing the legacy static band-plan bitmap. That is what caused
-            // the repeated "Object is currently in use elsewhere" GDI+ exceptions.
+            // The visible modern UI owns BATC spectrum/chat/quick-tune. Do not let the
+            // hidden legacy MainForm create a second copy of those extras.
             bool savedSpectrum = checkBatcSpectrum.Checked;
             bool savedChat = checkBatcChat.Checked;
             bool savedQuickTune = checkQuicktune.Checked;
@@ -104,12 +96,7 @@ namespace opentuner
                     message = "OpenTuner could not open the receiver network socket.\r\n\r\n" + ex.Message;
                 }
 
-                MessageBox.Show(
-                    message,
-                    "OpenTuner - receiver network error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error);
-
+                MessageBox.Show(message, "OpenTuner - receiver network error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return false;
             }
             catch (Exception ex)
@@ -131,10 +118,33 @@ namespace opentuner
                 checkDATVReporter.Checked = savedReporter;
             }
 
-            if (source_connected && videoSource != null && !backendSourceHooked)
+            if (source_connected && videoSource != null)
             {
-                videoSource.OnSourceData += BackendForwardSourceData;
-                backendSourceHooked = true;
+                // On a cold start a stale configured host can point at the Windows PC
+                // itself. In that state no PicoTuner status packets arrive, so waiting for
+                // status to learn the correct IP can never work. PicoTuner broadcasts its
+                // address on UDP 9997, so discover it first and immediately resend the
+                // receiver setup to the hardware.
+                WinterHillSource winterHill = videoSource as WinterHillSource;
+                if (winterHill != null && winterHill.ModernIsPicoTunerEthernet)
+                {
+                    bool discovered = false;
+                    try { discovered = winterHill.ModernDiscoverPicoTuner(1800); }
+                    catch (Exception ex) { Log.Warning(ex, "PicoTuner discovery failed"); }
+
+                    Log.Warning(discovered
+                        ? "Modern startup: PicoTuner discovery succeeded; reapplying receiver setup"
+                        : "Modern startup: PicoTuner discovery unavailable; using configured host and live-status fallback");
+
+                    try { winterHill.ModernReapplyStartupTune(); }
+                    catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                }
+
+                if (!backendSourceHooked)
+                {
+                    videoSource.OnSourceData += BackendForwardSourceData;
+                    backendSourceHooked = true;
+                }
             }
 
             return source_connected;
@@ -142,10 +152,8 @@ namespace opentuner
 
         private void BackendForwardSourceData(int videoNr, OTSourceData data, string description)
         {
-            // In PicoTuner Ethernet mode the first live status packet is also what allows
-            // WinterHillUDP to learn the actual hardware IP. Re-send the normal startup
-            // frequencies/SRs exactly once after that point so a cold launch behaves the
-            // same as the original OpenTuner instead of requiring the old program to prime it.
+            // Re-send once more after the first live status packet. At that point
+            // WinterHillUDP has also learned the actual sender address directly.
             if (!backendStartupRetuneDone)
             {
                 WinterHillSource winterHill = videoSource as WinterHillSource;
@@ -192,10 +200,6 @@ namespace opentuner
 
         public bool BackendConnected
         {
-            // Some receiver sources (notably WinterHill/PicoTuner UDP) do not update
-            // DeviceConnected reliably even though Initialise succeeded and live source
-            // data/video are flowing. For the standalone UI, successful SourceConnect is
-            // the correct readiness signal for tuning and connection status.
             get { return source_connected && videoSource != null; }
         }
 
@@ -228,11 +232,6 @@ namespace opentuner
 
             try
             {
-                // The modern UI displays RF/downlink frequency. Reproduce the exact
-                // frequency path used by OpenTuner's proven legacy tuner control: convert
-                // displayed RF back to the NIM/IF frequency, then call SetFrequency with
-                // offset_included=false so the source applies its configured offset.
-                // This matters especially for WinterHill/PicoTuner Ethernet.
                 long offset = 0;
                 try
                 {
@@ -280,8 +279,6 @@ namespace opentuner
             }
             catch
             {
-                // Shutdown is best-effort; the original close path already catches its
-                // own receiver/media cleanup exceptions.
             }
         }
     }
