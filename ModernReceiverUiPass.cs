@@ -13,6 +13,10 @@ namespace opentuner
         private static Label presetTargetLabel;
         private static Label[] detailLabels = new Label[2];
         private static Button[] recordButtons = new Button[2];
+        private static Panel[] merBarFill = new Panel[2];
+        private static Panel[] marginBarFill = new Panel[2];
+        private static Panel[] merBarBack = new Panel[2];
+        private static Panel[] marginBarBack = new Panel[2];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -104,6 +108,8 @@ namespace opentuner
                     detailLabels[tuner] = detail;
                     detail.Text = "Waiting for receiver details";
                 }
+
+                BuildSignalBars(card, tuner);
             }
 
             backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
@@ -120,8 +126,62 @@ namespace opentuner
                     }
                     if (recordButtons[tuner] != null)
                         ApplyRecordState(recordButtons[tuner], backend.BackendIsRecording(tuner));
+
+                    UpdateBar(merBarBack[tuner], merBarFill[tuner], data.mer, 12.0);
+                    UpdateBar(marginBarBack[tuner], marginBarFill[tuner], data.db_margin, 10.0);
                 });
             };
+        }
+
+        private static void BuildSignalBars(Control card, int tuner)
+        {
+            Label mer = FindLabel(card, "MER");
+            Label margin = FindLabel(card, "Margin");
+            if (mer == null || margin == null || mer.Parent == null || margin.Parent == null) return;
+
+            mer.Location = new Point(350, 48);
+            mer.Size = new Size(92, 19);
+            margin.Location = new Point(445, 48);
+            margin.Size = new Size(100, 19);
+
+            merBarBack[tuner] = new Panel
+            {
+                Location = new Point(350, 69),
+                Size = new Size(88, 8),
+                BackColor = Color.FromArgb(25, 47, 68)
+            };
+            merBarFill[tuner] = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 0,
+                BackColor = Color.FromArgb(38, 148, 255)
+            };
+            merBarBack[tuner].Controls.Add(merBarFill[tuner]);
+            mer.Parent.Controls.Add(merBarBack[tuner]);
+            merBarBack[tuner].BringToFront();
+
+            marginBarBack[tuner] = new Panel
+            {
+                Location = new Point(445, 69),
+                Size = new Size(92, 8),
+                BackColor = Color.FromArgb(25, 47, 68)
+            };
+            marginBarFill[tuner] = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 0,
+                BackColor = Color.FromArgb(34, 197, 94)
+            };
+            marginBarBack[tuner].Controls.Add(marginBarFill[tuner]);
+            margin.Parent.Controls.Add(marginBarBack[tuner]);
+            marginBarBack[tuner].BringToFront();
+        }
+
+        private static void UpdateBar(Panel back, Panel fill, double value, double max)
+        {
+            if (back == null || fill == null || max <= 0) return;
+            double clamped = Math.Max(0.0, Math.Min(max, value));
+            fill.Width = (int)Math.Round(back.ClientSize.Width * (clamped / max));
         }
 
         private static void ApplyRecordState(Button button, bool on)
@@ -229,6 +289,22 @@ namespace opentuner
                 if (c.HasChildren)
                 {
                     Button nested = FindButton(c, contains);
+                    if (nested != null) return nested;
+                }
+            }
+            return null;
+        }
+
+        private static Label FindLabel(Control root, string startsWith)
+        {
+            foreach (Control c in root.Controls)
+            {
+                Label l = c as Label;
+                if (l != null && (l.Text ?? "").StartsWith(startsWith, StringComparison.OrdinalIgnoreCase))
+                    return l;
+                if (c.HasChildren)
+                {
+                    Label nested = FindLabel(c, startsWith);
                     if (nested != null) return nested;
                 }
             }
