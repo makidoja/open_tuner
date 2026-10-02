@@ -19,7 +19,6 @@ namespace opentuner
         {
             if (attached || form == null) return;
             attached = true;
-
             form.Shown += delegate { Apply(form); };
         }
 
@@ -44,11 +43,8 @@ namespace opentuner
                 BuildSingleTopBar(header, backend, sourceCombo);
             }
 
-            if (srInputs != null)
-                ReplaceSymbolRateControls(srInputs);
-
-            if (videoHosts != null)
-                TightenTunerCards(videoHosts);
+            if (srInputs != null) ReplaceSymbolRateControls(srInputs);
+            if (videoHosts != null) TightenTunerCards(videoHosts);
 
             ConfigureSpectrum(nativeSpectrum);
             StartConnectionStateTimer(backend);
@@ -62,8 +58,7 @@ namespace opentuner
 
         private static void HideLeftNavigation(Form form)
         {
-            foreach (Control c in form.Controls)
-                HideLeftNavigationRecursive(c);
+            foreach (Control c in form.Controls) HideLeftNavigationRecursive(c);
         }
 
         private static void HideLeftNavigationRecursive(Control root)
@@ -186,9 +181,7 @@ namespace opentuner
             Panel right = new Panel { Dock = DockStyle.Right, Width = 118, BackColor = Color.Transparent };
 
             if (connectButton == null)
-            {
                 connectButton = ToolButton("CONNECT", delegate { });
-            }
             else
             {
                 connectButton.Visible = true;
@@ -218,6 +211,8 @@ namespace opentuner
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9f);
             menu.ShowImageMargin = false;
+            menu.BackColor = Color.FromArgb(13, 28, 45);
+            menu.ForeColor = Color.FromArgb(242, 247, 252);
 
             for (int i = 0; i < names.Length; i++)
             {
@@ -237,8 +232,10 @@ namespace opentuner
             }
 
             ModernWindowTheme.ThemeContextMenu(menu);
-            menu.Closed += delegate { menu.Dispose(); };
 
+            // Deliberately do not Dispose() from the Closed event. WinForms can still
+            // be completing OnItemClicked at that point; disposing there causes the
+            // ObjectDisposedException seen when selecting a source.
             if (sourceSettingsButton != null)
                 menu.Show(sourceSettingsButton, new Point(0, sourceSettingsButton.Height));
         }
