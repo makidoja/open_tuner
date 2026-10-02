@@ -9,13 +9,16 @@
     <Compile Include="ModernBackendConnectionBridge.cs" Condition="Exists('ModernBackendConnectionBridge.cs')" />
     <Compile Include="ModernExtrasBridge.cs" Condition="Exists('ModernExtrasBridge.cs')" />
     <Compile Include="ModernReceiverActionBridge.cs" Condition="Exists('ModernReceiverActionBridge.cs')" />
+    <Compile Include="ModernHardwareBridge.cs" Condition="Exists('ModernHardwareBridge.cs')" />
     <Compile Include="ModernWindowTheme.cs" Condition="Exists('ModernWindowTheme.cs')" />
     <Compile Include="ModernFullscreenSupport.cs" Condition="Exists('ModernFullscreenSupport.cs')" />
     <Compile Include="ModernReceiverUiPass.cs" Condition="Exists('ModernReceiverUiPass.cs')" />
     <Compile Include="ModernCompactUiPass.cs" Condition="Exists('ModernCompactUiPass.cs')" />
+    <Compile Include="ModernHardwareUiPass.cs" Condition="Exists('ModernHardwareUiPass.cs')" />
     <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
     <Compile Include="MediaSources\Winterhill\WinterHillModernSupport.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernSupport.cs')" />
+    <Compile Include="MediaSources\Winterhill\WinterHillModernHardware.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernHardware.cs')" />
   </ItemGroup>
 </Project>
