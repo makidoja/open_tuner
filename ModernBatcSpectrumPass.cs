@@ -47,8 +47,6 @@ namespace opentuner
             }
             catch { }
 
-            // Keep a harmless invisible placeholder because the original form owns
-            // resize/startup callbacks which still reference batcSpectrumBox.
             try { card.Controls.Remove(legacyBox); } catch { }
             try { legacyBox.Dispose(); } catch { }
 
@@ -105,6 +103,11 @@ namespace opentuner
         private static void LayoutDisplay(Panel card)
         {
             if (display == null || display.IsDisposed || card == null) return;
+
+            // Keep the entire BATC section only as tall as the title plus the spectrum.
+            // This preserves vertical space for the two video panes.
+            if (card.Visible && card.Height != 145)
+                card.Height = 145;
 
             int available = Math.Max(300, card.ClientSize.Width - 24);
             int width = Math.Min(1140, available);
