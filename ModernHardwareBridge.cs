@@ -36,10 +36,22 @@ namespace opentuner
             return wh == null ? "—" : wh.ModernGetRfInput(tuner);
         }
 
+        public void BackendSetRfInput(int tuner, int input)
+        {
+            WinterHillSource wh = BackendWinterHill();
+            if (wh != null) wh.ModernSetRfInput(tuner, input);
+        }
+
         public long BackendGetOffset(int tuner)
         {
             WinterHillSource wh = BackendWinterHill();
             return wh == null ? 0 : wh.ModernGetOffset(tuner);
+        }
+
+        public void BackendSetOffset(int tuner, long offsetKHz)
+        {
+            WinterHillSource wh = BackendWinterHill();
+            if (wh != null) wh.ModernSetOffset(tuner, offsetKHz);
         }
 
         public string BackendHardwareName
