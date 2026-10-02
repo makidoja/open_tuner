@@ -15,6 +15,7 @@ namespace opentuner
         private static PictureBox spectrumProxy;
         private static Timer spectrumRefreshTimer;
         private static Timer connectionStatusTimer;
+        private static Image spectrumProxyOwnedImage;
 
         public static void Attach(ModernConceptForm form)
         {
@@ -33,6 +34,26 @@ namespace opentuner
             };
 
             form.Resize += delegate { ApplyCompactSpectrumLayout(form); };
+            form.FormClosed += delegate
+            {
+                try
+                {
+                    if (spectrumRefreshTimer != null)
+                    {
+                        spectrumRefreshTimer.Stop();
+                        spectrumRefreshTimer.Dispose();
+                        spectrumRefreshTimer = null;
+                    }
+                    if (spectrumProxy != null && !spectrumProxy.IsDisposed)
+                        spectrumProxy.Image = null;
+                    if (spectrumProxyOwnedImage != null)
+                    {
+                        spectrumProxyOwnedImage.Dispose();
+                        spectrumProxyOwnedImage = null;
+                    }
+                }
+                catch { }
+            };
         }
 
         private static MainForm GetBackend(ModernConceptForm form)
@@ -167,23 +188,42 @@ namespace opentuner
         {
             if (spectrumRefreshTimer != null) return;
 
-            spectrumRefreshTimer = new Timer { Interval = 80 };
+            spectrumRefreshTimer = new Timer { Interval = 100 };
             spectrumRefreshTimer.Tick += delegate
             {
+                if (form.IsDisposed || spectrumProxy == null || spectrumProxy.IsDisposed) return;
+
                 try
                 {
                     FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
                     PictureBox nativeBox = boxField == null ? null : boxField.GetValue(form) as PictureBox;
-                    if (nativeBox == null || spectrumProxy == null || spectrumProxy.IsDisposed) return;
+                    if (nativeBox == null) return;
 
-                    Image image = nativeBox.Image;
-                    if (image != null && !ReferenceEquals(spectrumProxy.Image, image))
-                        spectrumProxy.Image = image;
+                    Image source = nativeBox.Image;
+                    if (source == null) return;
 
+                    // BATCSpectrum replaces/disposes its render bitmap while the UI is
+                    // repainting. Never hand that shared Image instance to another
+                    // PictureBox: WinForms may query Width/Size after the renderer has
+                    // disposed it, causing System.ArgumentException in OnPaint.
+                    Image clone;
+                    lock (source)
+                    {
+                        clone = new Bitmap(source);
+                    }
+
+                    Image old = spectrumProxyOwnedImage;
+                    spectrumProxyOwnedImage = clone;
+                    spectrumProxy.Image = clone;
                     spectrumProxy.Invalidate();
+
+                    if (old != null)
+                        old.Dispose();
                 }
                 catch
                 {
+                    // A source frame can change between acquisition and cloning. Skip that
+                    // frame; the next timer tick will safely clone the latest bitmap.
                 }
             };
             spectrumRefreshTimer.Start();
