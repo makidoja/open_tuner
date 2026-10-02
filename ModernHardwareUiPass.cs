@@ -192,11 +192,13 @@ namespace opentuner
                         oldHint.Visible = false;
                 }
 
+                // Keep receiver input/LO controls on the main tuning row.  This leaves
+                // the bottom status line completely clear for LOCK/SR/MODCOD/LO telemetry.
                 Label inputLabel = new Label
                 {
-                    Text = "INPUT",
-                    Location = new Point(4, 138),
-                    Size = new Size(46, 24),
+                    Text = "RF",
+                    Location = new Point(540, 10),
+                    Size = new Size(24, 26),
                     TextAlign = ContentAlignment.MiddleLeft,
                     ForeColor = Color.FromArgb(142, 165, 190),
                     Font = new Font("Segoe UI Semibold", 8f)
@@ -211,8 +213,8 @@ namespace opentuner
                     BackColor = Color.FromArgb(18, 38, 60),
                     ForeColor = Color.FromArgb(242, 247, 252),
                     Font = new Font("Segoe UI Semibold", 8.5f),
-                    Location = new Point(52, 137),
-                    Size = new Size(74, 26)
+                    Location = new Point(566, 10),
+                    Size = new Size(78, 26)
                 };
                 rfInputs[tuner].Items.Add("Tuner A");
                 rfInputs[tuner].Items.Add("Tuner B");
@@ -225,9 +227,9 @@ namespace opentuner
 
                 Label loLabel = new Label
                 {
-                    Text = "LNB OFFSET",
-                    Location = new Point(140, 138),
-                    Size = new Size(78, 24),
+                    Text = "LO",
+                    Location = new Point(654, 10),
+                    Size = new Size(22, 26),
                     TextAlign = ContentAlignment.MiddleLeft,
                     ForeColor = Color.FromArgb(142, 165, 190),
                     Font = new Font("Segoe UI Semibold", 8f)
@@ -244,7 +246,7 @@ namespace opentuner
                     Minimum = 0,
                     Maximum = 15000,
                     Value = initialLo,
-                    Location = new Point(220, 137),
+                    Location = new Point(678, 10),
                     Size = new Size(92, 26),
                     BackColor = Color.FromArgb(18, 38, 60),
                     ForeColor = Color.FromArgb(242, 247, 252),
@@ -266,9 +268,9 @@ namespace opentuner
 
                 Label mhz = new Label
                 {
-                    Text = "MHz   (0 = direct 400–2000 MHz)",
-                    Location = new Point(318, 138),
-                    Size = new Size(220, 24),
+                    Text = "MHz",
+                    Location = new Point(772, 10),
+                    Size = new Size(34, 26),
                     TextAlign = ContentAlignment.MiddleLeft,
                     ForeColor = Color.FromArgb(142, 165, 190),
                     Font = new Font("Segoe UI", 8f)
