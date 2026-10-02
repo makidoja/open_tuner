@@ -1,72 +1,35 @@
-using FlyleafLib;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Windows.Forms;
+using FlyleafLib;
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 
 namespace opentuner
 {
-    static class Program
+    internal static class Program
     {
-        public static LoggingLevelSwitch levelSwitch;
-        public static bool FFmpegEngineAvailable { get; private set; } = false;
-        public static string FFmpegStartupError { get; private set; } = "";
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow([In] IntPtr hWnd, [In] int nCmdShow);
-
-        [DllImport("kernel32.dll")]
-        static extern IntPtr GetConsoleWindow();
+        public static bool FFmpegEngineAvailable = false;
+        public static string FFmpegStartupError = "";
 
         [STAThread]
         static void Main(string[] args)
         {
             int i = 0;
-            int debugLevel = 3;
-            levelSwitch = new LoggingLevelSwitch();
 
-            while (i < args.Length)
-            {
-                switch (args[i])
-                {
-                    case "--debuglevel":
-                        int newDebugLevel = -1;
-                        if (i + 1 < args.Length && int.TryParse(args[i + 1], out newDebugLevel))
-                        {
-                            if (newDebugLevel < 6 && newDebugLevel >= 0)
-                                debugLevel = newDebugLevel;
-                            i += 1;
-                        }
-                        break;
+            var levelSwitch = new LoggingLevelSwitch();
+            levelSwitch.MinimumLevel = LogEventLevel.Debug;
 
-                    case "--hideconsolewindow":
-                        IntPtr handle = GetConsoleWindow();
-                        if (handle != IntPtr.Zero)
-                            ShowWindow(handle, 0);
-                        break;
-                }
-                i += 1;
-            }
-
-            switch (debugLevel)
-            {
-                case 0: levelSwitch.MinimumLevel = LogEventLevel.Verbose; break;
-                case 1: levelSwitch.MinimumLevel = LogEventLevel.Debug; break;
-                case 2: levelSwitch.MinimumLevel = LogEventLevel.Information; break;
-                case 3: levelSwitch.MinimumLevel = LogEventLevel.Warning; break;
-                case 4: levelSwitch.MinimumLevel = LogEventLevel.Error; break;
-                case 5: levelSwitch.MinimumLevel = LogEventLevel.Fatal; break;
-                default: levelSwitch.MinimumLevel = LogEventLevel.Warning; break;
-            }
+            string logPath = AppDomain.CurrentDomain.BaseDirectory + "logs\\opentuner_.txt";
 
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.ControlledBy(levelSwitch)
                 .WriteTo.Console()
-                .WriteTo.File("logs\\ot_log_" + DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss") + ".txt")
+                .WriteTo.File(logPath, rollingInterval: RollingInterval.Day, retainedFileCountLimit: 10)
                 .CreateLogger();
 
             LogEventLevel lastMinimumLevel = levelSwitch.MinimumLevel;
@@ -119,6 +82,7 @@ namespace opentuner
             try
             {
                 ModernConceptForm mainForm = new ModernConceptForm(args);
+                ModernBranding.Apply(mainForm);
                 ModernConceptRuntimeFixes.Attach(mainForm);
                 ModernFullscreenSupport.Attach(mainForm);
                 ModernReceiverUiPass.Attach(mainForm);
