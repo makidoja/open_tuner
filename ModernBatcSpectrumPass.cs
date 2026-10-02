@@ -26,7 +26,8 @@ namespace opentuner
 
         private static void ReplaceLegacySpectrum(ModernConceptForm form)
         {
-            PictureBox legacyBox = GetField<PictureBox>(form, "batcSpectrumBox");
+            FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
+            PictureBox legacyBox = boxField == null ? null : boxField.GetValue(form) as PictureBox;
             if (legacyBox == null || legacyBox.Parent == null) return;
 
             Panel card = legacyBox.Parent as Panel;
@@ -34,11 +35,15 @@ namespace opentuner
 
             FieldInfo oldSpectrumField = typeof(ModernConceptForm).GetField("batcSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
             BATCSpectrum oldSpectrum = oldSpectrumField == null ? null : oldSpectrumField.GetValue(form) as BATCSpectrum;
-            try { oldSpectrum?.Close(); } catch { }
 
-            // Detach the old PictureBox completely. It is deliberately left alive as a
-            // hidden compatibility placeholder for the existing compact-layout code, but
-            // it never receives or paints BATCSpectrum bitmaps again.
+            // Stop the original renderer first.
+            try { oldSpectrum?.Close(); } catch { }
+            try { if (oldSpectrumField != null) oldSpectrumField.SetValue(form, null); } catch { }
+
+            // The compact-layout pass knows about the original PictureBox and can make it
+            // visible again on a resize. Hiding it is therefore not enough. Remove and
+            // dispose it completely, then clear the form field so there is only one
+            // spectrum control in the card.
             try
             {
                 Image oldImage = legacyBox.Image;
@@ -46,7 +51,10 @@ namespace opentuner
                 oldImage?.Dispose();
             }
             catch { }
-            legacyBox.Visible = false;
+
+            try { card.Controls.Remove(legacyBox); } catch { }
+            try { legacyBox.Dispose(); } catch { }
+            try { if (boxField != null) boxField.SetValue(form, null); } catch { }
 
             MainForm backend = GetField<MainForm>(form, "backend");
             NumericUpDown[] freqInputs = GetField<NumericUpDown[]>(form, "freqInputs");
