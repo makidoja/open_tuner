@@ -13,6 +13,8 @@ namespace opentuner
         private static ComboBox lnbA;
         private static ComboBox lnbB;
         private static Label[] detailLabels = new Label[2];
+        private static ComboBox[] rfInputs = new ComboBox[2];
+        private static NumericUpDown[] loInputs = new NumericUpDown[2];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -25,6 +27,7 @@ namespace opentuner
                 if (backend == null) return;
 
                 AddHardwareControls(form, backend);
+                AddPerReceiverControls(form, backend);
                 HookReceiverDetails(form, backend);
             };
         }
@@ -39,6 +42,12 @@ namespace opentuner
         {
             FieldInfo f = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
             return f == null ? null : f.GetValue(form) as Panel[];
+        }
+
+        private static NumericUpDown[] GetFreqInputs(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as NumericUpDown[];
         }
 
         private static void AddHardwareControls(ModernConceptForm form, MainForm backend)
@@ -79,6 +88,25 @@ namespace opentuner
                 {
                     SetComboVoltage(lnbA, backend.BackendGetLnbVoltage(0));
                     SetComboVoltage(lnbB, backend.BackendGetLnbVoltage(1));
+                }
+
+                for (int tuner = 0; tuner < 2; tuner++)
+                {
+                    if (rfInputs[tuner] != null && !rfInputs[tuner].DroppedDown)
+                    {
+                        string rf = backend.BackendGetRfInput(tuner);
+                        int index = string.Equals(rf, "B", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+                        if (rfInputs[tuner].SelectedIndex != index)
+                            rfInputs[tuner].SelectedIndex = index;
+                    }
+
+                    if (loInputs[tuner] != null && !loInputs[tuner].Focused)
+                    {
+                        decimal mhz = backend.BackendGetOffset(tuner) / 1000M;
+                        mhz = Math.Min(loInputs[tuner].Maximum, Math.Max(loInputs[tuner].Minimum, mhz));
+                        if (loInputs[tuner].Value != mhz)
+                            loInputs[tuner].Value = mhz;
+                    }
                 }
             };
             refresh.Start();
@@ -121,6 +149,134 @@ namespace opentuner
             if (combo.SelectedIndex != index) combo.SelectedIndex = index;
         }
 
+        private static void AddPerReceiverControls(ModernConceptForm form, MainForm backend)
+        {
+            Panel[] hosts = GetVideoHosts(form);
+            NumericUpDown[] freq = GetFreqInputs(form);
+            if (hosts == null) return;
+
+            if (freq != null)
+            {
+                for (int i = 0; i < 2 && i < freq.Length; i++)
+                {
+                    if (freq[i] == null) continue;
+                    freq[i].Minimum = 400;
+                    freq[i].Maximum = 15000;
+                    freq[i].DecimalPlaces = 3;
+                    freq[i].Increment = 0.001M;
+                }
+            }
+
+            for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
+            {
+                int captured = tuner;
+                Control card = hosts[tuner] == null ? null : hosts[tuner].Parent;
+                if (card == null) continue;
+
+                Panel controls = null;
+                foreach (Control c in card.Controls)
+                {
+                    Panel p = c as Panel;
+                    if (p != null && p.Dock == DockStyle.Bottom)
+                    {
+                        controls = p;
+                        break;
+                    }
+                }
+                if (controls == null || controls.Controls["ModernRfInput" + tuner] != null) continue;
+
+                foreach (Control c in controls.Controls)
+                {
+                    Label oldHint = c as Label;
+                    if (oldHint != null && (oldHint.Text ?? "").IndexOf("Frequency and SR", StringComparison.OrdinalIgnoreCase) >= 0)
+                        oldHint.Visible = false;
+                }
+
+                Label inputLabel = new Label
+                {
+                    Text = "INPUT",
+                    Location = new Point(4, 138),
+                    Size = new Size(46, 24),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.FromArgb(142, 165, 190),
+                    Font = new Font("Segoe UI Semibold", 8f)
+                };
+                controls.Controls.Add(inputLabel);
+
+                rfInputs[tuner] = new ComboBox
+                {
+                    Name = "ModernRfInput" + tuner,
+                    DropDownStyle = ComboBoxStyle.DropDownList,
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = Color.FromArgb(18, 38, 60),
+                    ForeColor = Color.FromArgb(242, 247, 252),
+                    Font = new Font("Segoe UI Semibold", 8.5f),
+                    Location = new Point(52, 137),
+                    Size = new Size(74, 26)
+                };
+                rfInputs[tuner].Items.Add("Tuner A");
+                rfInputs[tuner].Items.Add("Tuner B");
+                rfInputs[tuner].SelectedIndex = string.Equals(backend.BackendGetRfInput(tuner), "B", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+                rfInputs[tuner].SelectionChangeCommitted += delegate
+                {
+                    backend.BackendSetRfInput(captured, rfInputs[captured].SelectedIndex == 1 ? 1 : 0);
+                };
+                controls.Controls.Add(rfInputs[tuner]);
+
+                Label loLabel = new Label
+                {
+                    Text = "LNB OFFSET",
+                    Location = new Point(140, 138),
+                    Size = new Size(78, 24),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.FromArgb(142, 165, 190),
+                    Font = new Font("Segoe UI Semibold", 8f)
+                };
+                controls.Controls.Add(loLabel);
+
+                decimal initialLo = backend.BackendGetOffset(tuner) / 1000M;
+                initialLo = Math.Min(15000M, Math.Max(0M, initialLo));
+                loInputs[tuner] = new NumericUpDown
+                {
+                    Name = "ModernLoOffset" + tuner,
+                    DecimalPlaces = 3,
+                    Increment = 0.001M,
+                    Minimum = 0,
+                    Maximum = 15000,
+                    Value = initialLo,
+                    Location = new Point(220, 137),
+                    Size = new Size(92, 26),
+                    BackColor = Color.FromArgb(18, 38, 60),
+                    ForeColor = Color.FromArgb(242, 247, 252),
+                    ThousandsSeparator = false
+                };
+                loInputs[tuner].Leave += delegate
+                {
+                    backend.BackendSetOffset(captured, (long)Math.Round(loInputs[captured].Value * 1000M));
+                };
+                loInputs[tuner].KeyDown += delegate(object sender, KeyEventArgs e)
+                {
+                    if (e.KeyCode == Keys.Enter)
+                    {
+                        backend.BackendSetOffset(captured, (long)Math.Round(loInputs[captured].Value * 1000M));
+                        e.SuppressKeyPress = true;
+                    }
+                };
+                controls.Controls.Add(loInputs[tuner]);
+
+                Label mhz = new Label
+                {
+                    Text = "MHz   (0 = direct 400–2000 MHz)",
+                    Location = new Point(318, 138),
+                    Size = new Size(220, 24),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.FromArgb(142, 165, 190),
+                    Font = new Font("Segoe UI", 8f)
+                };
+                controls.Controls.Add(mhz);
+            }
+        }
+
         private static void HookReceiverDetails(ModernConceptForm form, MainForm backend)
         {
             Panel[] hosts = GetVideoHosts(form);
@@ -148,10 +304,10 @@ namespace opentuner
                     string sr = data.symbol_rate > 0 ? data.symbol_rate + " kS" : "SR —";
                     string rf = backend.BackendGetRfInput(tuner);
                     long offset = backend.BackendGetOffset(tuner);
-                    string lo = offset > 0 ? (offset / 1000.0).ToString("0.###") + " MHz LO" : "LO —";
+                    string lo = offset > 0 ? (offset / 1000.0).ToString("0.###") + " MHz LO" : "DIRECT";
 
                     label.Text = mode + "   •   " + sr + "   •   " + mod +
-                                 "   •   RF " + rf + "   •   " + lo +
+                                 "   •   Tuner " + rf + "   •   " + lo +
                                  (data.streaming ? "   •   TS" : "") +
                                  (data.recording || backend.BackendIsRecording(tuner) ? "   •   REC" : "");
                 });
