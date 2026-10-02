@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCWebchat;
@@ -31,7 +32,129 @@ namespace opentuner
 
         public void BackendShowPresets()
         {
-            BackendManagePresets();
+            var presets = BackendPresets();
+            if (presets == null || presets.Count == 0)
+            {
+                if (MessageBox.Show("There are no saved presets yet.\r\n\r\nOpen the preset manager now?", "OpenTuner - Presets", MessageBoxButtons.YesNo, MessageBoxIcon.Information) == DialogResult.Yes)
+                    BackendManagePresets();
+                return;
+            }
+
+            using (Form dialog = new Form())
+            {
+                dialog.Text = "Load Preset";
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MinimizeBox = false;
+                dialog.MaximizeBox = false;
+                dialog.ShowInTaskbar = false;
+                dialog.ClientSize = new Size(560, 410);
+                dialog.BackColor = Color.FromArgb(13, 28, 45);
+                dialog.ForeColor = Color.FromArgb(242, 247, 252);
+                dialog.Font = new Font("Segoe UI", 9f);
+
+                Label heading = new Label
+                {
+                    Text = "Select a preset and the receiver window to load it into",
+                    Location = new Point(16, 14),
+                    AutoSize = true,
+                    Font = new Font("Segoe UI Semibold", 10f),
+                    ForeColor = dialog.ForeColor
+                };
+                dialog.Controls.Add(heading);
+
+                RadioButton tunerA = new RadioButton
+                {
+                    Text = "Receiver 1 / Tuner A",
+                    Location = new Point(18, 45),
+                    AutoSize = true,
+                    Checked = true,
+                    ForeColor = dialog.ForeColor
+                };
+                RadioButton tunerB = new RadioButton
+                {
+                    Text = "Receiver 2 / Tuner B",
+                    Location = new Point(180, 45),
+                    AutoSize = true,
+                    ForeColor = dialog.ForeColor
+                };
+                dialog.Controls.Add(tunerA);
+                dialog.Controls.Add(tunerB);
+
+                ListBox list = new ListBox
+                {
+                    Location = new Point(18, 76),
+                    Size = new Size(524, 262),
+                    BackColor = Color.FromArgb(18, 38, 60),
+                    ForeColor = dialog.ForeColor,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Consolas", 9f)
+                };
+
+                foreach (StoredFrequency p in presets)
+                {
+                    string rf = p.Frequency >= 10000000
+                        ? (p.Frequency / 1000M).ToString("0.000") + " MHz RF"
+                        : (p.Frequency / 1000M).ToString("0.000") + " MHz";
+                    string input = p.RFInput > 0 ? "  IN " + (p.RFInput == 1 ? "A" : "B") : "";
+                    list.Items.Add(p.Name + "   |   " + rf + "   |   " + p.SymbolRate + " kS" + input);
+                }
+                if (list.Items.Count > 0) list.SelectedIndex = 0;
+                dialog.Controls.Add(list);
+
+                Button manage = new Button
+                {
+                    Text = "MANAGE PRESETS",
+                    Location = new Point(18, 355),
+                    Size = new Size(132, 34),
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = Color.FromArgb(18, 38, 60),
+                    ForeColor = dialog.ForeColor
+                };
+                manage.FlatAppearance.BorderColor = Color.FromArgb(37, 67, 94);
+                manage.Click += delegate
+                {
+                    dialog.Close();
+                    BackendManagePresets();
+                };
+                dialog.Controls.Add(manage);
+
+                Button load = new Button
+                {
+                    Text = "LOAD PRESET",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(406, 355),
+                    Size = new Size(136, 34),
+                    FlatStyle = FlatStyle.Flat,
+                    BackColor = Color.FromArgb(28, 139, 253),
+                    ForeColor = Color.White
+                };
+                load.FlatAppearance.BorderColor = Color.FromArgb(28, 139, 253);
+                dialog.Controls.Add(load);
+                dialog.AcceptButton = load;
+
+                list.DoubleClick += delegate
+                {
+                    if (list.SelectedIndex >= 0)
+                    {
+                        dialog.DialogResult = DialogResult.OK;
+                        dialog.Close();
+                    }
+                };
+
+                if (dialog.ShowDialog() != DialogResult.OK || list.SelectedIndex < 0)
+                    return;
+
+                int tuner = tunerB.Checked ? 1 : 0;
+                StoredFrequency preset = presets[list.SelectedIndex];
+
+                if (preset.Offset <= 15000000)
+                    BackendSetOffset(tuner, preset.Offset);
+                if (preset.RFInput == 1 || preset.RFInput == 2)
+                    BackendSetRfInput(tuner, preset.RFInput - 1);
+
+                BackendTune(tuner, preset.Frequency, preset.SymbolRate);
+            }
         }
 
         public void BackendShowSpectrum()
