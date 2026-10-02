@@ -102,15 +102,30 @@ namespace opentuner.MediaSources.WinterHill
                         break;
                     case "$1":
                         if (dt.Length < 2) break;
-                        switch(dt[1].Trim())
+                        string demodState = (dt[1] ?? "").Trim().ToUpperInvariant();
+                        switch (demodState)
                         {
-                            case "DVB-S2": mm.rx[receiver].scanstate = 2; break;
-                            case "DVB-S1": mm.rx[receiver].scanstate = 3; break;
-                            case "header": mm.rx[receiver].scanstate = 1; break;
-                            case "search": mm.rx[receiver].scanstate = 0; break;
-                            case "lost": mm.rx[receiver].scanstate = 0; break;
+                            case "DVB-S2":
+                            case "DVBS2":
+                                mm.rx[receiver].scanstate = 2;
+                                break;
+
+                            case "DVB-S":
+                            case "DVB-S1":
+                            case "DVBS":
+                            case "DVBS1":
+                                mm.rx[receiver].scanstate = 3;
+                                break;
+
+                            case "HEADER":
+                                mm.rx[receiver].scanstate = 1;
+                                break;
+                            case "SEARCH":
+                            case "LOST":
+                                mm.rx[receiver].scanstate = 0;
+                                break;
                             default:
-                                Log.Warning("WH: Don't know how to decode: " + dt[1]);
+                                Log.Warning("WH: Don't know how to decode demod state: '" + dt[1] + "'");
                                 mm.rx[receiver].scanstate = 1;
                                 break;
                         }
