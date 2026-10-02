@@ -378,10 +378,12 @@ namespace opentuner
             if (spectrumCard == null || spectrumProxy == null || !spectrumCard.Visible) return;
 
             int available = Math.Max(300, spectrumCard.ClientSize.Width - 24);
-            int width = Math.Min(922, available);
+            int width = Math.Min(760, available);
             int height = 126;
 
-            spectrumProxy.SizeMode = PictureBoxSizeMode.StretchImage;
+            // Preserve the source image aspect ratio so the BATC labels and frequency
+            // text do not get stretched horizontally on wide displays.
+            spectrumProxy.SizeMode = PictureBoxSizeMode.Zoom;
             spectrumProxy.Size = new Size(width, height);
             spectrumProxy.Location = new Point(Math.Max(12, (spectrumCard.ClientSize.Width - width) / 2), 32);
             spectrumProxy.BringToFront();
