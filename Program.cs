@@ -98,12 +98,13 @@ namespace opentuner
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            ModernWindowTheme.EnableGlobalStyling();
 
             try
             {
                 Engine.Start(new EngineConfig()
                 {
-                    FFmpegPath = @"ffmpeg\",
+                    FFmpegPath = @"ffmpeg\\",
                     FFmpegDevices = false,
                 });
                 FFmpegEngineAvailable = true;
