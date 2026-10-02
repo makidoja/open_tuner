@@ -9,6 +9,7 @@
     <Compile Include="ModernBackendConnectionBridge.cs" Condition="Exists('ModernBackendConnectionBridge.cs')" />
     <Compile Include="ModernExtrasBridge.cs" Condition="Exists('ModernExtrasBridge.cs')" />
     <Compile Include="ModernWindowTheme.cs" Condition="Exists('ModernWindowTheme.cs')" />
+    <Compile Include="ModernFullscreenSupport.cs" Condition="Exists('ModernFullscreenSupport.cs')" />
     <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
