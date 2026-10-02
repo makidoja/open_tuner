@@ -15,6 +15,7 @@
     <Compile Include="ModernReceiverUiPass.cs" Condition="Exists('ModernReceiverUiPass.cs')" />
     <Compile Include="ModernCompactUiPass.cs" Condition="Exists('ModernCompactUiPass.cs')" />
     <Compile Include="ModernHardwareUiPass.cs" Condition="Exists('ModernHardwareUiPass.cs')" />
+    <Compile Include="ModernFinalPolishPass.cs" Condition="Exists('ModernFinalPolishPass.cs')" />
     <Compile Include="ModernBranding.cs" Condition="Exists('ModernBranding.cs')" />
     <Compile Include="ModernBatcChatEnhancements.cs" Condition="Exists('ModernBatcChatEnhancements.cs')" />
     <Compile Include="ModernBatcSpectrumControl.cs" Condition="Exists('ModernBatcSpectrumControl.cs')" />
