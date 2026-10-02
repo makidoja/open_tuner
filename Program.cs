@@ -88,6 +88,7 @@ namespace opentuner
                 ModernReceiverUiPass.Attach(mainForm);
                 ModernCompactUiPass.Attach(mainForm);
                 ModernHardwareUiPass.Attach(mainForm);
+                ModernBatcSpectrumPass.Attach(mainForm);
 
                 if (!FFmpegEngineAvailable)
                 {
