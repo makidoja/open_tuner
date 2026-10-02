@@ -138,6 +138,7 @@ namespace opentuner
 
             FlowLayoutPanel left = new FlowLayoutPanel
             {
+                Name = "ModernTopToolbar",
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
@@ -163,7 +164,6 @@ namespace opentuner
             left.Controls.Add(ToolButton("RECORDINGS", delegate { backend.BackendOpenRecordingsFolder(); }));
             left.Controls.Add(ToolButton("SNAPSHOTS", delegate { backend.BackendOpenSnapshotsFolder(); }));
             left.Controls.Add(ToolButton("BATC CHAT", delegate { backend.BackendShowBatcChat(); }));
-            left.Controls.Add(ToolButton("EXTERNAL TOOLS", delegate { backend.BackendShowExternalTools(); }));
             left.Controls.Add(ToolButton("SETTINGS", delegate { backend.BackendShowGeneralSettings(); }));
 
             sourceSettingsButton = ToolButton("SOURCE SETTINGS ▼", delegate { ShowSourceMenu(backend, sourceCombo); });
