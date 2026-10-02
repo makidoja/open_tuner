@@ -18,7 +18,7 @@ namespace opentuner
 
         private static readonly HashSet<IntPtr> StyledForms = new HashSet<IntPtr>();
         private static readonly HashSet<IntPtr> StyledTabs = new HashSet<IntPtr>();
-        private static readonly HashSet<IntPtr> StyledCombos = new HashSet<IntPtr>();
+        private static readonly HashSet<ComboBox> StyledCombos = new HashSet<ComboBox>();
         private static readonly HashSet<Control> HookedContainers = new HashSet<Control>();
         private static readonly ToolStripRenderer DarkRenderer = new ToolStripProfessionalRenderer(new DarkColorTable());
         private static bool enabled;
@@ -42,15 +42,11 @@ namespace opentuner
                         if (form == null || form.IsDisposed || !form.IsHandleCreated)
                             continue;
 
-                        // Style each form once. The previous implementation re-applied
-                        // combo properties on every Idle cycle, causing visible flicker.
                         if (StyledForms.Contains(form.Handle))
                             continue;
 
                         if (form is ModernConceptForm)
                         {
-                            // Keep the hand-built modern form's own colours/layout intact;
-                            // only darken the title bar and its combo boxes.
                             ApplyDarkTitleBar(form);
                             StyleComboBoxesRecursive(form.Controls);
                             HookDynamicControls(form);
@@ -85,22 +81,11 @@ namespace opentuner
         {
             if (cb == null || cb.IsDisposed) return;
 
-            if (!cb.IsHandleCreated)
-            {
-                EventHandler onHandle = null;
-                onHandle = delegate
-                {
-                    cb.HandleCreated -= onHandle;
-                    ThemeComboBox(cb);
-                };
-                cb.HandleCreated += onHandle;
-                return;
-            }
-
-            // Do not keep assigning DrawMode/ItemHeight/colours to an already styled
-            // combo. Those assignments force WinForms to repaint/recreate portions of
-            // the control and were the source of the selector flicker.
-            if (!StyledCombos.Add(cb.Handle))
+            // Style each ComboBox object exactly once. Do not defer styling to
+            // HandleCreated: changing DrawMode while a Win32 handle is being created
+            // can force RecreateHandle recursively and eventually fail with
+            // "Error creating window handle".
+            if (!StyledCombos.Add(cb))
                 return;
 
             cb.BeginUpdate();
@@ -119,7 +104,8 @@ namespace opentuner
                 cb.EndUpdate();
             }
 
-            cb.Invalidate();
+            if (cb.IsHandleCreated)
+                cb.Invalidate();
         }
 
         public static void ThemeContextMenu(ContextMenuStrip menu)
