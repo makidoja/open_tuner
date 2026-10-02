@@ -18,6 +18,7 @@ namespace opentuner
 
         private static readonly HashSet<IntPtr> StyledForms = new HashSet<IntPtr>();
         private static readonly HashSet<IntPtr> StyledTabs = new HashSet<IntPtr>();
+        private static readonly HashSet<IntPtr> StyledCombos = new HashSet<IntPtr>();
         private static readonly ToolStripRenderer DarkRenderer = new ToolStripProfessionalRenderer(new DarkColorTable());
         private static bool enabled;
 
@@ -29,6 +30,8 @@ namespace opentuner
             if (enabled) return;
             enabled = true;
 
+            ToolStripManager.Renderer = DarkRenderer;
+
             Application.Idle += delegate
             {
                 try
@@ -38,10 +41,10 @@ namespace opentuner
                         if (form == null || form.IsDisposed || !form.IsHandleCreated)
                             continue;
 
-                        // The main receiver already has its own purpose-built styling.
                         if (form is ModernConceptForm)
                         {
                             ApplyDarkTitleBar(form);
+                            StyleComboBoxesRecursive(form.Controls);
                             continue;
                         }
 
@@ -49,6 +52,13 @@ namespace opentuner
                         {
                             Apply(form);
                             StyledForms.Add(form.Handle);
+                        }
+                        else
+                        {
+                            // Some legacy setup forms add controls dynamically after Load.
+                            // Re-scan just the combo boxes so newly created drop-downs cannot
+                            // fall back to the default white Windows style.
+                            StyleComboBoxesRecursive(form.Controls);
                         }
                     }
                 }
@@ -67,6 +77,74 @@ namespace opentuner
             form.Font = new Font("Segoe UI", 9f);
             ApplyDarkTitleBar(form);
             StyleChildren(form.Controls);
+        }
+
+        public static void ThemeComboBox(ComboBox cb)
+        {
+            if (cb == null || cb.IsDisposed) return;
+
+            cb.BackColor = Surface2;
+            cb.ForeColor = Text;
+            cb.FlatStyle = FlatStyle.Flat;
+            cb.DrawMode = DrawMode.OwnerDrawFixed;
+            cb.ItemHeight = Math.Max(18, cb.Font.Height + 4);
+
+            if (!cb.IsHandleCreated)
+            {
+                EventHandler onHandle = null;
+                onHandle = delegate
+                {
+                    cb.HandleCreated -= onHandle;
+                    ThemeComboBox(cb);
+                };
+                cb.HandleCreated += onHandle;
+                return;
+            }
+
+            if (!StyledCombos.Add(cb.Handle)) return;
+            cb.DrawItem += DrawComboItem;
+        }
+
+        public static void ThemeContextMenu(ContextMenuStrip menu)
+        {
+            if (menu == null) return;
+            menu.Renderer = DarkRenderer;
+            menu.BackColor = Surface;
+            menu.ForeColor = Text;
+            foreach (ToolStripItem item in menu.Items)
+            {
+                item.BackColor = Surface;
+                item.ForeColor = Text;
+            }
+        }
+
+        private static void DrawComboItem(object sender, DrawItemEventArgs e)
+        {
+            ComboBox cb = sender as ComboBox;
+            if (cb == null || e.Index < 0) return;
+
+            bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            Color back = selected ? Accent : Surface2;
+            Color fore = Color.White;
+
+            using (Brush b = new SolidBrush(back))
+                e.Graphics.FillRectangle(b, e.Bounds);
+
+            string text = cb.GetItemText(cb.Items[e.Index]);
+            Rectangle r = new Rectangle(e.Bounds.X + 5, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 8), e.Bounds.Height);
+            TextRenderer.DrawText(e.Graphics, text, cb.Font, r, fore,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            e.DrawFocusRectangle();
+        }
+
+        private static void StyleComboBoxesRecursive(Control.ControlCollection controls)
+        {
+            foreach (Control control in controls)
+            {
+                ComboBox cb = control as ComboBox;
+                if (cb != null) ThemeComboBox(cb);
+                if (control.HasChildren) StyleComboBoxesRecursive(control.Controls);
+            }
         }
 
         private static void ApplyDarkTitleBar(Form form)
@@ -120,10 +198,7 @@ namespace opentuner
 
             if (control is ComboBox)
             {
-                ComboBox cb = (ComboBox)control;
-                cb.BackColor = Surface2;
-                cb.ForeColor = Text;
-                cb.FlatStyle = FlatStyle.Flat;
+                ThemeComboBox((ComboBox)control);
                 return;
             }
 
@@ -232,7 +307,10 @@ namespace opentuner
                 strip.BackColor = Surface;
                 strip.ForeColor = Text;
                 foreach (ToolStripItem item in strip.Items)
+                {
+                    item.BackColor = Surface;
                     item.ForeColor = Text;
+                }
                 return;
             }
 
@@ -269,8 +347,6 @@ namespace opentuner
                 return;
             }
 
-            // Leave video/spectrum PictureBoxes alone. Everything else receives the
-            // common text colour so old setup dialogs no longer look like a separate app.
             if (!(control is PictureBox))
                 control.ForeColor = Text;
         }
