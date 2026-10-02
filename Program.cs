@@ -122,6 +122,7 @@ namespace opentuner
                 ModernConceptRuntimeFixes.Attach(mainForm);
                 ModernFullscreenSupport.Attach(mainForm);
                 ModernReceiverUiPass.Attach(mainForm);
+                ModernCompactUiPass.Attach(mainForm);
 
                 if (!FFmpegEngineAvailable)
                 {
