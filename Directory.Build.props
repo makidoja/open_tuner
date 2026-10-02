@@ -8,8 +8,10 @@
     <Compile Include="ModernBackendAudioBridge.cs" Condition="Exists('ModernBackendAudioBridge.cs')" />
     <Compile Include="ModernBackendConnectionBridge.cs" Condition="Exists('ModernBackendConnectionBridge.cs')" />
     <Compile Include="ModernExtrasBridge.cs" Condition="Exists('ModernExtrasBridge.cs')" />
+    <Compile Include="ModernReceiverActionBridge.cs" Condition="Exists('ModernReceiverActionBridge.cs')" />
     <Compile Include="ModernWindowTheme.cs" Condition="Exists('ModernWindowTheme.cs')" />
     <Compile Include="ModernFullscreenSupport.cs" Condition="Exists('ModernFullscreenSupport.cs')" />
+    <Compile Include="ModernReceiverUiPass.cs" Condition="Exists('ModernReceiverUiPass.cs')" />
     <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
