@@ -32,7 +32,15 @@ jobs:
           $releaseUrl = 'https://github.com/tomvdb/open_tuner/releases/download/V0.B/open_tuner_0.B_20240714.zip'
           $zipPath = Join-Path $env:RUNNER_TEMP 'opentuner-official.zip'
           $extractPath = Join-Path $env:RUNNER_TEMP 'opentuner-official'
-          Invoke-WebRequest -Uri $releaseUrl -OutFile $zipPath
+
+          # This is a ~190 MB release asset. GitHub/CDN connections can occasionally
+          # reset mid-transfer, so use curl's retry support instead of a single
+          # Invoke-WebRequest attempt.
+          & curl.exe -L --fail --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --output $zipPath $releaseUrl
+          if ($LASTEXITCODE -ne 0) { throw "Failed to download official OpenTuner runtime after retries (curl exit $LASTEXITCODE)." }
+          if (-not (Test-Path $zipPath)) { throw 'Official OpenTuner runtime download did not create a ZIP file.' }
+          if ((Get-Item $zipPath).Length -lt 100MB) { throw 'Official OpenTuner runtime download is unexpectedly small/incomplete.' }
+
           Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
           $ffmpegDir = Get-ChildItem -Path $extractPath -Directory -Recurse | Where-Object { $_.Name -ieq 'ffmpeg' } | Select-Object -First 1
           if (-not $ffmpegDir) { throw 'Official OpenTuner package did not contain an ffmpeg directory.' }
