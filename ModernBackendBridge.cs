@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Windows.Forms;
 using opentuner.MediaSources;
+using opentuner.MediaSources.WinterHill;
 using Serilog;
 
 namespace opentuner
@@ -16,6 +17,7 @@ namespace opentuner
         public event Action<int, OTSourceData, string> BackendSourceData;
 
         private bool backendSourceHooked;
+        private bool backendStartupRetuneDone;
 
         public void BackendPrepare()
         {
@@ -61,6 +63,7 @@ namespace opentuner
                 return true;
 
             BackendSelectedSourceIndex = sourceIndex;
+            backendStartupRetuneDone = false;
 
             // The visible modern UI owns BATC spectrum/chat/quick-tune. If the hidden
             // legacy MainForm also creates those extras we end up with two BATCSpectrum
@@ -139,6 +142,25 @@ namespace opentuner
 
         private void BackendForwardSourceData(int videoNr, OTSourceData data, string description)
         {
+            // In PicoTuner Ethernet mode the first live status packet is also what allows
+            // WinterHillUDP to learn the actual hardware IP. Re-send the normal startup
+            // frequencies/SRs exactly once after that point so a cold launch behaves the
+            // same as the original OpenTuner instead of requiring the old program to prime it.
+            if (!backendStartupRetuneDone)
+            {
+                WinterHillSource winterHill = videoSource as WinterHillSource;
+                if (winterHill != null && winterHill.ModernIsPicoTunerEthernet)
+                {
+                    backendStartupRetuneDone = true;
+                    try { winterHill.ModernReapplyStartupTune(); }
+                    catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                }
+                else if (videoSource != null)
+                {
+                    backendStartupRetuneDone = true;
+                }
+            }
+
             var handler = BackendSourceData;
             if (handler != null)
                 handler(videoNr, data, description);
