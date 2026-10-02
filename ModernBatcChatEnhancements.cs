@@ -32,6 +32,18 @@ namespace opentuner
             };
         }
 
+        private static ToolStripStatusLabel GetNickLabel(WebChatForm form)
+        {
+            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
+            return nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
+        }
+
+        private static TextBox GetMessageBox(WebChatForm form)
+        {
+            FieldInfo field = typeof(WebChatForm).GetField("txtMessage", BindingFlags.Instance | BindingFlags.NonPublic);
+            return field == null ? null : field.GetValue(form) as TextBox;
+        }
+
         private static void ImproveNickDisplay(WebChatForm form, WebChatSettings settings)
         {
             FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -44,14 +56,12 @@ namespace opentuner
             status.ForeColor = Text;
             status.SizingGrip = true;
 
-            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
-            ToolStripStatusLabel nickLabel = nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
+            ToolStripStatusLabel nickLabel = GetNickLabel(form);
             if (nickLabel == null) return;
 
-            // IMPORTANT: txtNick is not just display text. The original setNick()
-            // method reads txtNick.Text and sends that exact value to BATC. Keep this
-            // field as the raw callsign/nickname and use a separate caption for styling.
-            string nick = settings == null ? nickLabel.Text : settings.nickname;
+            // txtNick is also the actual value used by WebChatForm.setNick(). Never put
+            // captions or decorative text into this item; keep it as the raw nickname.
+            string nick = nickLabel.Text;
             if (string.IsNullOrWhiteSpace(nick)) nick = "NONICK";
             nickLabel.Text = nick.Trim().ToUpperInvariant();
 
@@ -83,6 +93,8 @@ namespace opentuner
             nickLabel.Padding = new Padding(2, 3, 10, 3);
             nickLabel.Margin = new Padding(0, 2, 4, 2);
             nickLabel.ToolTipText = "Click to set or change BATC chat nickname";
+            // Keep the original txtNick_Click handler intact. It is a known-good fallback
+            // and must not be double-wired to our modern login dialog.
         }
 
         private static void AddLoginControl(WebChatForm form, WebChatSettings settings)
@@ -91,8 +103,7 @@ namespace opentuner
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
             if (status == null || status.Items["ModernBatcLogin"] != null) return;
 
-            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
-            ToolStripStatusLabel nickLabel = nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
+            ToolStripStatusLabel nickLabel = GetNickLabel(form);
 
             ToolStripStatusLabel spacer = new ToolStripStatusLabel
             {
@@ -113,30 +124,37 @@ namespace opentuner
                 Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
                 Padding = new Padding(10, 3, 10, 3),
                 Margin = new Padding(4, 2, 4, 2),
-                Text = LoginText(settings),
+                Text = "LOGIN TO BATC CHAT",
                 ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            EventHandler openLogin = delegate
-            {
-                ShowLoginDialog(form, settings, login, nickLabel);
-            };
-
-            login.Click += openLogin;
-            if (nickLabel != null)
-                nickLabel.Click += openLogin;
+            login.Click += delegate { ShowLoginDialog(form, settings, login, nickLabel); };
 
             status.Items.Add(spacer);
             status.Items.Add(login);
-        }
 
-        private static string LoginText(WebChatSettings settings)
-        {
-            string nick = settings == null ? null : settings.nickname;
-            if (string.IsNullOrWhiteSpace(nick) || string.Equals(nick, "NONICK", StringComparison.OrdinalIgnoreCase))
-                return "LOGIN TO BATC CHAT";
+            // Reflect the real chat state, not merely the saved nickname. The original
+            // form enables txtMessage only after setNick() has actually been accepted for
+            // this connection, making it a reliable indicator that login was attempted.
+            Timer stateTimer = new Timer { Interval = 500 };
+            stateTimer.Tick += delegate
+            {
+                if (form.IsDisposed)
+                {
+                    stateTimer.Stop();
+                    stateTimer.Dispose();
+                    return;
+                }
 
-            return "LOGGED IN  •  CHANGE NICK";
+                TextBox message = GetMessageBox(form);
+                bool loggedIn = message != null && message.Enabled && nickLabel != null &&
+                                !string.IsNullOrWhiteSpace(nickLabel.Text) &&
+                                !string.Equals(nickLabel.Text.Trim(), "NONICK", StringComparison.OrdinalIgnoreCase);
+
+                if (!string.Equals(login.Text, "LOGGING IN...", StringComparison.OrdinalIgnoreCase))
+                    login.Text = loggedIn ? "LOGGED IN  •  CHANGE NICK" : "LOGIN TO BATC CHAT";
+            };
+            stateTimer.Start();
         }
 
         private static void ShowLoginDialog(WebChatForm form, WebChatSettings settings, ToolStripStatusLabel login, ToolStripStatusLabel nickLabel)
@@ -162,7 +180,7 @@ namespace opentuner
                     ForeColor = dialog.ForeColor
                 };
 
-                string current = settings == null ? "" : settings.nickname;
+                string current = nickLabel == null ? "" : nickLabel.Text;
                 if (string.Equals(current, "NONICK", StringComparison.OrdinalIgnoreCase)) current = "";
 
                 TextBox nick = new TextBox
@@ -206,14 +224,14 @@ namespace opentuner
                 dialog.AcceptButton = ok;
                 dialog.CancelButton = cancel;
 
+                ModernWindowTheme.Apply(dialog);
+
                 if (dialog.ShowDialog(form) != DialogResult.OK) return;
 
                 string value = (nick.Text ?? "").Trim().ToUpperInvariant();
                 if (value.Length == 0) return;
 
                 if (settings != null) settings.nickname = value;
-
-                // setNick() reads this exact field, so write only the raw nickname.
                 if (nickLabel != null)
                 {
                     nickLabel.Text = value;
@@ -235,11 +253,9 @@ namespace opentuner
                 return;
             }
 
-            Action tryLogin = null;
             Timer retry = new Timer { Interval = 250 };
             int attempts = 0;
-
-            tryLogin = delegate
+            retry.Tick += delegate
             {
                 if (form.IsDisposed)
                 {
@@ -250,7 +266,6 @@ namespace opentuner
 
                 attempts++;
                 bool connected = false;
-
                 try
                 {
                     object client = clientField == null ? null : clientField.GetValue(form);
@@ -265,19 +280,20 @@ namespace opentuner
                     {
                         if (nickLabel != null) nickLabel.Text = value;
                         setNick.Invoke(form, null);
-                        login.Text = "LOGGED IN  •  CHANGE NICK";
-                    }
-                    catch
-                    {
-                        login.Text = "LOGIN TO BATC CHAT";
-                    }
 
-                    retry.Stop();
-                    retry.Dispose();
-                    return;
+                        TextBox message = GetMessageBox(form);
+                        if (message != null && message.Enabled)
+                        {
+                            login.Text = "LOGGED IN  •  CHANGE NICK";
+                            retry.Stop();
+                            retry.Dispose();
+                            return;
+                        }
+                    }
+                    catch { }
                 }
 
-                if (attempts >= 40) // about 10 seconds
+                if (attempts >= 40)
                 {
                     login.Text = "LOGIN TO BATC CHAT";
                     retry.Stop();
@@ -285,9 +301,27 @@ namespace opentuner
                 }
             };
 
-            retry.Tick += delegate { tryLogin(); };
             retry.Start();
-            tryLogin();
+            // Run one attempt immediately rather than always waiting for the first tick.
+            try
+            {
+                object client = clientField == null ? null : clientField.GetValue(form);
+                PropertyInfo connectedProperty = client == null ? null : client.GetType().GetProperty("Connected", BindingFlags.Instance | BindingFlags.Public);
+                bool connected = connectedProperty != null && Convert.ToBoolean(connectedProperty.GetValue(client, null));
+                if (connected)
+                {
+                    if (nickLabel != null) nickLabel.Text = value;
+                    setNick.Invoke(form, null);
+                    TextBox message = GetMessageBox(form);
+                    if (message != null && message.Enabled)
+                    {
+                        login.Text = "LOGGED IN  •  CHANGE NICK";
+                        retry.Stop();
+                        retry.Dispose();
+                    }
+                }
+            }
+            catch { }
         }
     }
 }
