@@ -73,5 +73,28 @@ namespace opentuner.MediaSources.WinterHill
 
             ModernSetVolume(tuner, volume);
         }
+
+        // PicoTuner status packets teach the modern build the receiver's real IP address.
+        // The source's normal Initialize() sends its default tune commands before that first
+        // status packet can arrive, so those initial commands can go to a stale configured
+        // address. Once status is flowing, send the exact same current tuner setup again.
+        public void ModernReapplyStartupTune()
+        {
+            if (!ModernIsPicoTunerEthernet)
+                return;
+
+            int count = System.Math.Min(2, _current_frequency.Length);
+            for (int tuner = 0; tuner < count; tuner++)
+            {
+                if (_current_frequency[tuner] <= 0 || _current_sr[tuner] <= 0)
+                    continue;
+
+                Serilog.Log.Information(
+                    "Reapplying PicoTuner startup tune T{Tuner}: {Frequency} kHz / {SymbolRate} kS",
+                    tuner + 1, _current_frequency[tuner], _current_sr[tuner]);
+
+                UDPSetFrequency(tuner, _current_frequency[tuner], _current_sr[tuner]);
+            }
+        }
     }
 }
