@@ -8,6 +8,12 @@ namespace opentuner
 {
     internal static class ModernBatcChatEnhancements
     {
+        private static readonly Color Cyan = Color.FromArgb(77, 208, 255);
+        private static readonly Color Green = Color.FromArgb(40, 222, 126);
+        private static readonly Color Surface = Color.FromArgb(13, 28, 45);
+        private static readonly Color Surface2 = Color.FromArgb(18, 38, 60);
+        private static readonly Color Text = Color.FromArgb(242, 247, 252);
+
         public static void Attach(WebChatForm form, WebChatSettings settings)
         {
             if (form == null) return;
@@ -16,6 +22,7 @@ namespace opentuner
             {
                 try
                 {
+                    ImproveNickDisplay(form, settings);
                     AddLoginControl(form, settings);
                 }
                 catch
@@ -25,11 +32,47 @@ namespace opentuner
             };
         }
 
+        private static void ImproveNickDisplay(WebChatForm form, WebChatSettings settings)
+        {
+            FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
+            StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
+            if (status == null) return;
+
+            status.AutoSize = false;
+            status.Height = 30;
+            status.BackColor = Surface;
+            status.ForeColor = Text;
+            status.SizingGrip = true;
+
+            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
+            ToolStripStatusLabel nickLabel = nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
+            if (nickLabel == null) return;
+
+            string nick = settings == null ? nickLabel.Text : settings.nickname;
+            if (string.IsNullOrWhiteSpace(nick) || string.Equals(nick, "NONICK", StringComparison.OrdinalIgnoreCase))
+                nick = "NOT SET";
+
+            nickLabel.IsLink = true;
+            nickLabel.LinkBehavior = LinkBehavior.NeverUnderline;
+            nickLabel.LinkColor = Cyan;
+            nickLabel.ActiveLinkColor = Green;
+            nickLabel.VisitedLinkColor = Cyan;
+            nickLabel.BackColor = Surface2;
+            nickLabel.Font = new Font("Segoe UI Semibold", 11f, FontStyle.Bold);
+            nickLabel.Padding = new Padding(10, 3, 10, 3);
+            nickLabel.Margin = new Padding(2, 2, 4, 2);
+            nickLabel.Text = "NICK: " + nick;
+            nickLabel.ToolTipText = "Click to change BATC chat nickname";
+        }
+
         private static void AddLoginControl(WebChatForm form, WebChatSettings settings)
         {
             FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
             if (status == null || status.Items["ModernBatcLogin"] != null) return;
+
+            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
+            ToolStripStatusLabel nickLabel = nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
 
             ToolStripStatusLabel spacer = new ToolStripStatusLabel
             {
@@ -41,16 +84,29 @@ namespace opentuner
             {
                 Name = "ModernBatcLogin",
                 IsLink = true,
-                LinkColor = Color.FromArgb(28, 139, 253),
-                ActiveLinkColor = Color.FromArgb(40, 222, 126),
-                Font = new Font("Segoe UI Semibold", 9f),
-                Text = LoginText(settings)
+                LinkBehavior = LinkBehavior.NeverUnderline,
+                LinkColor = Green,
+                ActiveLinkColor = Cyan,
+                VisitedLinkColor = Green,
+                BackColor = Surface2,
+                ForeColor = Text,
+                Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold),
+                Padding = new Padding(10, 3, 10, 3),
+                Margin = new Padding(4, 2, 4, 2),
+                Text = LoginText(settings),
+                ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            login.Click += delegate
+            EventHandler openLogin = delegate
             {
-                ShowLoginDialog(form, settings, login);
+                ShowLoginDialog(form, settings, login, nickLabel);
             };
+
+            login.Click += openLogin;
+            if (nickLabel != null)
+            {
+                nickLabel.Click += openLogin;
+            }
 
             status.Items.Add(spacer);
             status.Items.Add(login);
@@ -62,13 +118,11 @@ namespace opentuner
             if (string.IsNullOrWhiteSpace(nick) || string.Equals(nick, "NONICK", StringComparison.OrdinalIgnoreCase))
                 return "LOGIN TO BATC CHAT";
 
-            return "LOGGED IN: " + nick + "  ·  CHANGE";
+            return "LOGGED IN  •  CHANGE NICK";
         }
 
-        private static void ShowLoginDialog(WebChatForm form, WebChatSettings settings, ToolStripStatusLabel login)
+        private static void ShowLoginDialog(WebChatForm form, WebChatSettings settings, ToolStripStatusLabel login, ToolStripStatusLabel nickLabel)
         {
-            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
-            ToolStripStatusLabel nickLabel = nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
             MethodInfo setNick = typeof(WebChatForm).GetMethod("setNick", BindingFlags.Instance | BindingFlags.NonPublic);
 
             using (Form dialog = new Form())
@@ -80,8 +134,8 @@ namespace opentuner
                 dialog.MaximizeBox = false;
                 dialog.ShowInTaskbar = false;
                 dialog.ClientSize = new Size(360, 132);
-                dialog.BackColor = Color.FromArgb(13, 28, 45);
-                dialog.ForeColor = Color.FromArgb(242, 247, 252);
+                dialog.BackColor = Surface;
+                dialog.ForeColor = Text;
                 dialog.Font = new Font("Segoe UI", 9f);
 
                 Label prompt = new Label
@@ -97,9 +151,10 @@ namespace opentuner
                     Location = new Point(18, 42),
                     Width = 324,
                     CharacterCasing = CharacterCasing.Upper,
-                    BackColor = Color.FromArgb(18, 38, 60),
+                    BackColor = Surface2,
                     ForeColor = dialog.ForeColor,
                     BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI Semibold", 11f),
                     Text = settings == null || string.Equals(settings.nickname, "NONICK", StringComparison.OrdinalIgnoreCase) ? "" : settings.nickname
                 };
 
@@ -120,7 +175,7 @@ namespace opentuner
                     DialogResult = DialogResult.Cancel,
                     Location = new Point(266, 82),
                     Size = new Size(76, 30),
-                    BackColor = Color.FromArgb(18, 38, 60),
+                    BackColor = Surface2,
                     ForeColor = dialog.ForeColor,
                     FlatStyle = FlatStyle.Flat
                 };
@@ -138,10 +193,14 @@ namespace opentuner
                 if (value.Length == 0) return;
 
                 if (settings != null) settings.nickname = value;
-                if (nickLabel != null) nickLabel.Text = value;
+                if (nickLabel != null)
+                {
+                    nickLabel.Text = "NICK: " + value;
+                    nickLabel.LinkColor = Cyan;
+                }
                 if (setNick != null) setNick.Invoke(form, null);
 
-                login.Text = "LOGGED IN: " + value + "  ·  CHANGE";
+                login.Text = "LOGGED IN  •  CHANGE NICK";
             }
         }
     }
