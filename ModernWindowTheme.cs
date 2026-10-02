@@ -19,6 +19,7 @@ namespace opentuner
         private static readonly HashSet<IntPtr> StyledForms = new HashSet<IntPtr>();
         private static readonly HashSet<IntPtr> StyledTabs = new HashSet<IntPtr>();
         private static readonly HashSet<IntPtr> StyledCombos = new HashSet<IntPtr>();
+        private static readonly HashSet<Control> HookedContainers = new HashSet<Control>();
         private static readonly ToolStripRenderer DarkRenderer = new ToolStripProfessionalRenderer(new DarkColorTable());
         private static bool enabled;
 
@@ -41,25 +42,25 @@ namespace opentuner
                         if (form == null || form.IsDisposed || !form.IsHandleCreated)
                             continue;
 
+                        // Style each form once. The previous implementation re-applied
+                        // combo properties on every Idle cycle, causing visible flicker.
+                        if (StyledForms.Contains(form.Handle))
+                            continue;
+
                         if (form is ModernConceptForm)
                         {
+                            // Keep the hand-built modern form's own colours/layout intact;
+                            // only darken the title bar and its combo boxes.
                             ApplyDarkTitleBar(form);
                             StyleComboBoxesRecursive(form.Controls);
-                            continue;
-                        }
-
-                        if (!StyledForms.Contains(form.Handle))
-                        {
-                            Apply(form);
-                            StyledForms.Add(form.Handle);
+                            HookDynamicControls(form);
                         }
                         else
                         {
-                            // Some legacy setup forms add controls dynamically after Load.
-                            // Re-scan just the combo boxes so newly created drop-downs cannot
-                            // fall back to the default white Windows style.
-                            StyleComboBoxesRecursive(form.Controls);
+                            Apply(form);
                         }
+
+                        StyledForms.Add(form.Handle);
                     }
                 }
                 catch
@@ -77,17 +78,12 @@ namespace opentuner
             form.Font = new Font("Segoe UI", 9f);
             ApplyDarkTitleBar(form);
             StyleChildren(form.Controls);
+            HookDynamicControls(form);
         }
 
         public static void ThemeComboBox(ComboBox cb)
         {
             if (cb == null || cb.IsDisposed) return;
-
-            cb.BackColor = Surface2;
-            cb.ForeColor = Text;
-            cb.FlatStyle = FlatStyle.Flat;
-            cb.DrawMode = DrawMode.OwnerDrawFixed;
-            cb.ItemHeight = Math.Max(18, cb.Font.Height + 4);
 
             if (!cb.IsHandleCreated)
             {
@@ -101,8 +97,29 @@ namespace opentuner
                 return;
             }
 
-            if (!StyledCombos.Add(cb.Handle)) return;
-            cb.DrawItem += DrawComboItem;
+            // Do not keep assigning DrawMode/ItemHeight/colours to an already styled
+            // combo. Those assignments force WinForms to repaint/recreate portions of
+            // the control and were the source of the selector flicker.
+            if (!StyledCombos.Add(cb.Handle))
+                return;
+
+            cb.BeginUpdate();
+            try
+            {
+                cb.BackColor = Surface2;
+                cb.ForeColor = Text;
+                cb.FlatStyle = FlatStyle.Flat;
+                cb.DrawMode = DrawMode.OwnerDrawFixed;
+                cb.ItemHeight = Math.Max(18, cb.Font.Height + 4);
+                cb.DrawItem -= DrawComboItem;
+                cb.DrawItem += DrawComboItem;
+            }
+            finally
+            {
+                cb.EndUpdate();
+            }
+
+            cb.Invalidate();
         }
 
         public static void ThemeContextMenu(ContextMenuStrip menu)
@@ -121,20 +138,35 @@ namespace opentuner
         private static void DrawComboItem(object sender, DrawItemEventArgs e)
         {
             ComboBox cb = sender as ComboBox;
-            if (cb == null || e.Index < 0) return;
+            if (cb == null) return;
 
-            bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
-            Color back = selected ? Accent : Surface2;
-            Color fore = Color.White;
+            bool hasItem = e.Index >= 0 && e.Index < cb.Items.Count;
+            bool selected = hasItem && (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            bool editPortion = (e.State & DrawItemState.ComboBoxEdit) == DrawItemState.ComboBoxEdit || !hasItem;
+
+            Color back = selected && !editPortion ? Accent : Surface2;
+            Color fore = Text;
 
             using (Brush b = new SolidBrush(back))
                 e.Graphics.FillRectangle(b, e.Bounds);
 
-            string text = cb.GetItemText(cb.Items[e.Index]);
-            Rectangle r = new Rectangle(e.Bounds.X + 5, e.Bounds.Y, Math.Max(1, e.Bounds.Width - 8), e.Bounds.Height);
+            string text;
+            if (hasItem)
+                text = cb.GetItemText(cb.Items[e.Index]);
+            else if (cb.SelectedItem != null)
+                text = cb.GetItemText(cb.SelectedItem);
+            else
+                text = cb.Text ?? string.Empty;
+
+            Rectangle r = new Rectangle(e.Bounds.X + 5, e.Bounds.Y,
+                Math.Max(1, e.Bounds.Width - 8), e.Bounds.Height);
+
             TextRenderer.DrawText(e.Graphics, text, cb.Font, r, fore,
-                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-            e.DrawFocusRectangle();
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+
+            if (selected && !editPortion)
+                e.DrawFocusRectangle();
         }
 
         private static void StyleComboBoxesRecursive(Control.ControlCollection controls)
@@ -144,6 +176,35 @@ namespace opentuner
                 ComboBox cb = control as ComboBox;
                 if (cb != null) ThemeComboBox(cb);
                 if (control.HasChildren) StyleComboBoxesRecursive(control.Controls);
+            }
+        }
+
+        private static void HookDynamicControls(Control parent)
+        {
+            if (parent == null || parent.IsDisposed || !HookedContainers.Add(parent))
+                return;
+
+            parent.ControlAdded += DynamicControlAdded;
+
+            foreach (Control child in parent.Controls)
+                HookDynamicControls(child);
+        }
+
+        private static void DynamicControlAdded(object sender, ControlEventArgs e)
+        {
+            try
+            {
+                Control control = e.Control;
+                if (control == null) return;
+
+                StyleControl(control);
+                HookDynamicControls(control);
+
+                if (control.HasChildren)
+                    StyleChildren(control.Controls);
+            }
+            catch
+            {
             }
         }
 
@@ -166,6 +227,7 @@ namespace opentuner
             foreach (Control control in controls)
             {
                 StyleControl(control);
+                HookDynamicControls(control);
                 if (control.HasChildren)
                     StyleChildren(control.Controls);
             }
