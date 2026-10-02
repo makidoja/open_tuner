@@ -41,11 +41,36 @@ namespace opentuner.MediaSources.WinterHill
             return _settings.RFPort[tuner] == 0 ? "A" : "B";
         }
 
+        public void ModernSetRfInput(int tuner, int input)
+        {
+            if (_settings == null || _settings.RFPort == null || tuner < 0 || tuner >= _settings.RFPort.Length)
+                return;
+            if (input != 0 && input != 1)
+                return;
+
+            SetRFPort(tuner, input);
+            try { _settingsManager.SaveSettings(_settings); } catch { }
+        }
+
         public long ModernGetOffset(int tuner)
         {
             if (_current_offset == null || tuner < 0 || tuner >= _current_offset.Length)
                 return 0;
             return _current_offset[tuner];
+        }
+
+        public void ModernSetOffset(int tuner, long offsetKHz)
+        {
+            if (_settings == null || _settings.DefaultOffset == null || _current_offset == null ||
+                tuner < 0 || tuner >= _current_offset.Length || tuner >= _settings.DefaultOffset.Length)
+                return;
+
+            if (offsetKHz < 0 || offsetKHz > 15000000)
+                return;
+
+            _current_offset[tuner] = (int)offsetKHz;
+            _settings.DefaultOffset[tuner] = (uint)offsetKHz;
+            try { _settingsManager.SaveSettings(_settings); } catch { }
         }
 
         public string ModernHardwareName
