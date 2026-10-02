@@ -20,6 +20,7 @@ namespace opentuner
         private static readonly HashSet<IntPtr> StyledTabs = new HashSet<IntPtr>();
         private static readonly HashSet<ComboBox> StyledCombos = new HashSet<ComboBox>();
         private static readonly HashSet<Control> HookedContainers = new HashSet<Control>();
+        private static readonly Dictionary<ComboBox, Button> ModernComboButtons = new Dictionary<ComboBox, Button>();
         private static readonly ToolStripRenderer DarkRenderer = new ToolStripProfessionalRenderer(new DarkColorTable());
         private static bool enabled;
 
@@ -48,7 +49,7 @@ namespace opentuner
                         if (form is ModernConceptForm)
                         {
                             ApplyDarkTitleBar(form);
-                            StyleComboBoxesRecursive(form.Controls);
+                            StyleModernInputsRecursive(form.Controls);
                             HookDynamicControls(form);
                         }
                         else
@@ -79,38 +80,106 @@ namespace opentuner
 
         public static void ThemeComboBox(ComboBox cb)
         {
-            if (cb == null || cb.IsDisposed) return;
+            if (cb == null || cb.IsDisposed || StyledCombos.Contains(cb)) return;
 
-            // Style each ComboBox object exactly once. Do not defer styling to
-            // HandleCreated: changing DrawMode while a Win32 handle is being created
-            // can force RecreateHandle recursively and eventually fail with
-            // "Error creating window handle".
-            if (!StyledCombos.Add(cb))
+            Form owner = cb.FindForm();
+            if (owner is ModernConceptForm && cb.Visible)
+            {
+                ThemeModernComboAsButton(cb);
                 return;
-
-            cb.BeginUpdate();
-            try
-            {
-                cb.BackColor = Surface2;
-                cb.ForeColor = Text;
-                cb.FlatStyle = FlatStyle.Flat;
-                cb.DrawMode = DrawMode.OwnerDrawFixed;
-                cb.ItemHeight = Math.Max(18, cb.Font.Height + 4);
-                cb.DrawItem -= DrawComboItem;
-                cb.DrawItem += DrawComboItem;
-            }
-            finally
-            {
-                cb.EndUpdate();
             }
 
-            if (cb.IsHandleCreated)
-                cb.Invalidate();
+            StyledCombos.Add(cb);
+            cb.BackColor = Surface2;
+            cb.ForeColor = Text;
+            cb.FlatStyle = FlatStyle.Flat;
+            cb.DrawMode = DrawMode.OwnerDrawFixed;
+            cb.ItemHeight = Math.Max(18, cb.Font.Height + 4);
+            cb.DrawItem -= DrawComboItem;
+            cb.DrawItem += DrawComboItem;
+        }
+
+        private static void ThemeModernComboAsButton(ComboBox cb)
+        {
+            if (cb == null || cb.IsDisposed || cb.Parent == null || ModernComboButtons.ContainsKey(cb)) return;
+
+            StyledCombos.Add(cb);
+
+            Button proxy = new Button
+            {
+                Bounds = cb.Bounds,
+                Anchor = cb.Anchor,
+                Dock = cb.Dock,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Surface2,
+                ForeColor = Text,
+                Font = cb.Font,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Cursor = Cursors.Hand,
+                Padding = new Padding(5, 0, 4, 0),
+                TabStop = cb.TabStop,
+                Enabled = cb.Enabled
+            };
+            proxy.FlatAppearance.BorderColor = Border;
+            proxy.FlatAppearance.BorderSize = 1;
+
+            Action refreshText = delegate
+            {
+                string value = cb.SelectedItem != null ? cb.GetItemText(cb.SelectedItem) : cb.Text;
+                proxy.Text = (value ?? string.Empty) + "  ▼";
+            };
+            refreshText();
+
+            proxy.Click += delegate
+            {
+                if (cb.Items.Count == 0) return;
+
+                ContextMenuStrip menu = new ContextMenuStrip
+                {
+                    Font = cb.Font,
+                    ShowImageMargin = false,
+                    MinimumSize = new Size(proxy.Width, 0)
+                };
+                ThemeContextMenu(menu);
+
+                for (int i = 0; i < cb.Items.Count; i++)
+                {
+                    int index = i;
+                    ToolStripMenuItem item = new ToolStripMenuItem(cb.GetItemText(cb.Items[i]))
+                    {
+                        ForeColor = Text,
+                        BackColor = Surface,
+                        Checked = i == cb.SelectedIndex
+                    };
+                    item.Click += delegate
+                    {
+                        cb.SelectedIndex = index;
+                        refreshText();
+                    };
+                    menu.Items.Add(item);
+                }
+
+                ThemeContextMenu(menu);
+                menu.Closed += delegate { menu.Dispose(); };
+                menu.Show(proxy, new Point(0, proxy.Height));
+            };
+
+            cb.SelectedIndexChanged += delegate { if (!proxy.IsDisposed) refreshText(); };
+            cb.TextChanged += delegate { if (!proxy.IsDisposed) refreshText(); };
+            cb.LocationChanged += delegate { if (!proxy.IsDisposed && cb.Dock == DockStyle.None) proxy.Location = cb.Location; };
+            cb.SizeChanged += delegate { if (!proxy.IsDisposed && cb.Dock == DockStyle.None) proxy.Size = cb.Size; };
+            cb.EnabledChanged += delegate { if (!proxy.IsDisposed) proxy.Enabled = cb.Enabled; };
+
+            cb.Parent.Controls.Add(proxy);
+            proxy.BringToFront();
+            ModernComboButtons[cb] = proxy;
+            cb.Visible = false;
         }
 
         public static void ThemeContextMenu(ContextMenuStrip menu)
         {
             if (menu == null) return;
+            menu.RenderMode = ToolStripRenderMode.Professional;
             menu.Renderer = DarkRenderer;
             menu.BackColor = Surface;
             menu.ForeColor = Text;
@@ -155,13 +224,23 @@ namespace opentuner
                 e.DrawFocusRectangle();
         }
 
-        private static void StyleComboBoxesRecursive(Control.ControlCollection controls)
+        private static void StyleModernInputsRecursive(Control.ControlCollection controls)
         {
             foreach (Control control in controls)
             {
                 ComboBox cb = control as ComboBox;
-                if (cb != null) ThemeComboBox(cb);
-                if (control.HasChildren) StyleComboBoxesRecursive(control.Controls);
+                if (cb != null)
+                    ThemeComboBox(cb);
+                else if (control is NumericUpDown)
+                {
+                    NumericUpDown n = (NumericUpDown)control;
+                    n.BackColor = Surface2;
+                    n.ForeColor = Text;
+                    n.BorderStyle = BorderStyle.FixedSingle;
+                }
+
+                if (control.HasChildren)
+                    StyleModernInputsRecursive(control.Controls);
             }
         }
 
@@ -183,11 +262,33 @@ namespace opentuner
                 Control control = e.Control;
                 if (control == null) return;
 
-                StyleControl(control);
-                HookDynamicControls(control);
+                Form owner = control.FindForm();
+                if (owner is ModernConceptForm)
+                {
+                    ComboBox modernCombo = control as ComboBox;
+                    if (modernCombo != null)
+                        ThemeComboBox(modernCombo);
+                    else if (control is NumericUpDown)
+                    {
+                        NumericUpDown n = (NumericUpDown)control;
+                        n.BackColor = Surface2;
+                        n.ForeColor = Text;
+                        n.BorderStyle = BorderStyle.FixedSingle;
+                    }
+                }
+                else
+                {
+                    StyleControl(control);
+                }
 
+                HookDynamicControls(control);
                 if (control.HasChildren)
-                    StyleChildren(control.Controls);
+                {
+                    if (owner is ModernConceptForm)
+                        StyleModernInputsRecursive(control.Controls);
+                    else
+                        StyleChildren(control.Controls);
+                }
             }
             catch
             {
