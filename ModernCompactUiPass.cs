@@ -62,9 +62,7 @@ namespace opentuner
         private static void HideLeftNavigation(Form form)
         {
             foreach (Control c in form.Controls)
-            {
                 HideLeftNavigationRecursive(c);
-            }
         }
 
         private static void HideLeftNavigationRecursive(Control root)
@@ -177,7 +175,6 @@ namespace opentuner
                 if (input == null || input.Parent == null) continue;
                 if (input.Parent.Controls["ModernSrCombo" + tuner] != null) continue;
 
-                int captured = tuner;
                 ComboBox combo = new ComboBox
                 {
                     Name = "ModernSrCombo" + tuner,
@@ -247,7 +244,7 @@ namespace opentuner
                 }
             }
 
-            spectrumCard.Resize += delegate { LayoutSpectrumNativeSize(); };
+            spectrumCard.Resize += delegate { LayoutSpectrumCompact(); };
             SetSpectrumVisible(false);
         }
 
@@ -255,16 +252,21 @@ namespace opentuner
         {
             if (spectrumCard == null) return;
             spectrumCard.Visible = visible;
-            spectrumCard.Height = visible ? 319 : 0;
-            if (visible) LayoutSpectrumNativeSize();
+            spectrumCard.Height = visible ? 168 : 0;
+            if (visible) LayoutSpectrumCompact();
         }
 
-        private static void LayoutSpectrumNativeSize()
+        private static void LayoutSpectrumCompact()
         {
             if (spectrumCard == null || spectrumProxy == null || !spectrumCard.Visible) return;
+
+            int available = Math.Max(300, spectrumCard.ClientSize.Width - 24);
+            int width = Math.Min(922, available);
+            int height = 126;
+
             spectrumProxy.SizeMode = PictureBoxSizeMode.StretchImage;
-            spectrumProxy.Size = new Size(922, 275);
-            spectrumProxy.Location = new Point(Math.Max(10, (spectrumCard.ClientSize.Width - 922) / 2), 34);
+            spectrumProxy.Size = new Size(width, height);
+            spectrumProxy.Location = new Point(Math.Max(12, (spectrumCard.ClientSize.Width - width) / 2), 32);
             spectrumProxy.BringToFront();
         }
 
