@@ -24,7 +24,7 @@ namespace opentuner.MediaSources.WinterHill
             if (volts != 0 && volts != 13 && volts != 18)
                 return;
 
-            UDPSetVoltage(output, volts);
+            UDPSetVoltage(output, (uint)volts);
 
             try
             {
