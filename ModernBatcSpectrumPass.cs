@@ -36,16 +36,9 @@ namespace opentuner
             FieldInfo oldSpectrumField = typeof(ModernConceptForm).GetField("batcSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
             BATCSpectrum oldSpectrum = oldSpectrumField == null ? null : oldSpectrumField.GetValue(form) as BATCSpectrum;
 
-            // Stop the original renderer first.
             try { oldSpectrum?.Close(); } catch { }
             try { if (oldSpectrumField != null) oldSpectrumField.SetValue(form, null); } catch { }
 
-            // Remove the original PictureBox completely so the old renderer can never
-            // paint underneath the modern spectrum. ModernConceptForm still has a resize
-            // handler and startup guard that reference batcSpectrumBox, so replace that
-            // field with an inert 1px compatibility PictureBox rather than nulling it.
-            // It has no parent and can never be visible, while keeping those legacy
-            // callbacks harmless until they are removed from the base form entirely.
             try
             {
                 Image oldImage = legacyBox.Image;
@@ -54,23 +47,20 @@ namespace opentuner
             }
             catch { }
 
+            // Keep a harmless invisible placeholder because the original form owns
+            // resize/startup callbacks which still reference batcSpectrumBox.
             try { card.Controls.Remove(legacyBox); } catch { }
             try { legacyBox.Dispose(); } catch { }
 
-            try
+            PictureBox compatibilityBox = new PictureBox
             {
-                if (boxField != null)
-                {
-                    PictureBox compatibilityBox = new PictureBox
-                    {
-                        Name = "LegacySpectrumCompatibilityPlaceholder",
-                        Size = new Size(1, 1),
-                        Visible = false
-                    };
-                    boxField.SetValue(form, compatibilityBox);
-                }
-            }
-            catch { }
+                Name = "LegacySpectrumCompatibilityPlaceholder",
+                Visible = false,
+                Enabled = false,
+                Size = new Size(1, 1),
+                Location = new Point(0, 0)
+            };
+            try { boxField?.SetValue(form, compatibilityBox); } catch { }
 
             MainForm backend = GetField<MainForm>(form, "backend");
             NumericUpDown[] freqInputs = GetField<NumericUpDown[]>(form, "freqInputs");
@@ -81,8 +71,8 @@ namespace opentuner
             {
                 Name = "ModernBatcSpectrum",
                 BackColor = Color.FromArgb(13, 28, 45),
-                Location = new Point(12, 32),
-                Size = new Size(Math.Min(900, Math.Max(300, card.ClientSize.Width - 24)), 126),
+                Location = new Point(12, 31),
+                Size = new Size(Math.Min(1140, Math.Max(300, card.ClientSize.Width - 24)), 108),
                 Anchor = AnchorStyles.Top
             };
 
@@ -115,11 +105,13 @@ namespace opentuner
         private static void LayoutDisplay(Panel card)
         {
             if (display == null || display.IsDisposed || card == null) return;
+
             int available = Math.Max(300, card.ClientSize.Width - 24);
-            int width = Math.Min(900, available);
-            int height = Math.Max(96, Math.Min(132, card.ClientSize.Height - 38));
+            int width = Math.Min(1140, available);
+            int height = 108;
+
             display.Size = new Size(width, height);
-            display.Location = new Point(Math.Max(12, (card.ClientSize.Width - width) / 2), 32);
+            display.Location = new Point(Math.Max(12, (card.ClientSize.Width - width) / 2), 31);
         }
     }
 }
