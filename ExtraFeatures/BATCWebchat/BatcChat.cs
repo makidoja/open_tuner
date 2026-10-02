@@ -1,4 +1,4 @@
-﻿using opentuner.Utilities;
+using opentuner.Utilities;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -20,6 +20,7 @@ namespace opentuner.ExtraFeatures.BATCWebchat
             wc_settings = (wc_settingsManager.LoadSettings(wc_settings));
 
             _form = new WebChatForm(wc_settings, Source);
+            ModernBatcChatEnhancements.Attach(_form, wc_settings);
             _form.FormClosing += _form_FormClosing;
             _form.Resize += _form_Resize;
             _form.LocationChanged += _form_LocationChanged;
