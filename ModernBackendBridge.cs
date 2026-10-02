@@ -62,8 +62,24 @@ namespace opentuner
 
             BackendSelectedSourceIndex = sourceIndex;
 
+            // The visible modern UI owns BATC spectrum/chat/quick-tune. If the hidden
+            // legacy MainForm also creates those extras we end up with two BATCSpectrum
+            // instances sharing the legacy static band-plan bitmap. That is what caused
+            // the repeated "Object is currently in use elsewhere" GDI+ exceptions.
+            bool savedSpectrum = checkBatcSpectrum.Checked;
+            bool savedChat = checkBatcChat.Checked;
+            bool savedQuickTune = checkQuicktune.Checked;
+            bool savedMqtt = checkMqttClient.Checked;
+            bool savedReporter = checkDATVReporter.Checked;
+
             try
             {
+                checkBatcSpectrum.Checked = false;
+                checkBatcChat.Checked = false;
+                checkQuicktune.Checked = false;
+                checkMqttClient.Checked = false;
+                checkDATVReporter.Checked = false;
+
                 source_connected = ConnectSelectedSource();
             }
             catch (SocketException ex)
@@ -102,6 +118,14 @@ namespace opentuner
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return false;
+            }
+            finally
+            {
+                checkBatcSpectrum.Checked = savedSpectrum;
+                checkBatcChat.Checked = savedChat;
+                checkQuicktune.Checked = savedQuickTune;
+                checkMqttClient.Checked = savedMqtt;
+                checkDATVReporter.Checked = savedReporter;
             }
 
             if (source_connected && videoSource != null && !backendSourceHooked)
