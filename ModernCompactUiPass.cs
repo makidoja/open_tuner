@@ -217,11 +217,14 @@ namespace opentuner
 
             ContextMenuStrip menu = new ContextMenuStrip();
             menu.Font = new Font("Segoe UI", 9f);
+            menu.ShowImageMargin = false;
 
             for (int i = 0; i < names.Length; i++)
             {
                 int index = i;
                 ToolStripMenuItem item = new ToolStripMenuItem(names[i]);
+                item.ForeColor = Color.FromArgb(242, 247, 252);
+                item.BackColor = Color.FromArgb(13, 28, 45);
                 item.Checked = backend.BackendSelectedSourceIndex == i;
                 item.Click += delegate
                 {
@@ -232,6 +235,9 @@ namespace opentuner
                 };
                 menu.Items.Add(item);
             }
+
+            ModernWindowTheme.ThemeContextMenu(menu);
+            menu.Closed += delegate { menu.Dispose(); };
 
             if (sourceSettingsButton != null)
                 menu.Show(sourceSettingsButton, new Point(0, sourceSettingsButton.Height));
@@ -381,8 +387,6 @@ namespace opentuner
             int width = Math.Min(760, available);
             int height = 126;
 
-            // Preserve the source image aspect ratio so the BATC labels and frequency
-            // text do not get stretched horizontally on wide displays.
             spectrumProxy.SizeMode = PictureBoxSizeMode.Zoom;
             spectrumProxy.Size = new Size(width, height);
             spectrumProxy.Location = new Point(Math.Max(12, (spectrumCard.ClientSize.Width - width) / 2), 32);
