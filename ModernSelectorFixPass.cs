@@ -40,6 +40,11 @@ namespace opentuner
             Button a = ReplaceSelector(lnbA, "ModernLnbAButton", true);
             Button b = ReplaceSelector(lnbB, "ModernLnbBButton", true);
 
+            if (a != null) a.Width = Math.Max(a.Width, 122);
+            if (b != null) b.Width = Math.Max(b.Width, 112);
+
+            HideStaleLnbButtons(bar, a, b);
+
             if (hw != null)
             {
                 int hwIndex = bar.Controls.GetChildIndex(hw, false);
@@ -54,6 +59,20 @@ namespace opentuner
                     bar.Controls.SetChildIndex(b, Math.Min(aIndex + 1, bar.Controls.Count - 1));
                     b.Margin = new Padding(3, 4, 3, 0);
                 }
+            }
+        }
+
+        private static void HideStaleLnbButtons(FlowLayoutPanel bar, Button keepA, Button keepB)
+        {
+            foreach (Control c in bar.Controls)
+            {
+                Button button = c as Button;
+                if (button == null || button == keepA || button == keepB) continue;
+
+                string text = button.Text ?? string.Empty;
+                if (text.StartsWith("LNB A:", StringComparison.OrdinalIgnoreCase) ||
+                    text.StartsWith("LNB B:", StringComparison.OrdinalIgnoreCase))
+                    button.Visible = false;
             }
         }
 
@@ -76,6 +95,7 @@ namespace opentuner
                 if (rfButton != null)
                 {
                     rfButton.Height = 30;
+                    rfButton.Width = Math.Max(rfButton.Width, 90);
                     rfButton.Top = Math.Max(6, rfButton.Top - 2);
                 }
             }
