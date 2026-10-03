@@ -88,6 +88,7 @@ namespace opentuner
                 ModernReceiverUiPass.Attach(mainForm);
                 ModernCompactUiPass.Attach(mainForm);
                 ModernHardwareUiPass.Attach(mainForm);
+                ModernPresetUiSync.Attach(mainForm);
                 ModernSelectorFixPass.Attach(mainForm);
                 ModernFinalPolishPass.Attach(mainForm);
                 ModernReceiverBottomLayoutPass.Attach(mainForm);
