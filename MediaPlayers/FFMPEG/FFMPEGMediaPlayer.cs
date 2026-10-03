@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -44,22 +44,7 @@ namespace opentuner.MediaPlayers.FFMPEG
             
             config.Player.MinBufferDuration = TimeSpan.FromSeconds(1.5).Ticks;
             config.Decoder.MaxAudioFrames = 40;
-            //config.Decoder.VideoThreads = 2;
             config.Demuxer.BufferDuration = TimeSpan.FromSeconds(10).Ticks;
-            //config.Player.ThreadPriority = ThreadPriority.Highest;
-            //config.Demuxer.AllowFindStreamInfo = false;
-
-            /*
-            config.Player.MinBufferDuration = TimeSpan.FromSeconds(1.5).Ticks;
-            config.Demuxer.BufferDuration = TimeSpan.FromSeconds(10).Ticks;
-            //config.Demuxer.AllowFindStreamInfo = false;
-            config.Demuxer.FormatOpt["probesize"] = (5 * (long)1024 * 1024).ToString();
-            config.Demuxer.FormatOpt["analyzeduration"] = (2 * (long)1000 * 1000).ToString();
-            config.Decoder.MaxAudioFrames = 7;
-            config.Decoder.MaxVideoFrames = 3;
-            */
-
-            //config.Player.KeyBindings.Remove(KeyBindingAction.FullScreen);
 
             player = new Player(config);
             
@@ -67,21 +52,15 @@ namespace opentuner.MediaPlayers.FFMPEG
             player.OpenCompleted += Player_OpenCompleted;
             player.PlaybackStopped += Player_PlaybackStopped;
 
-            
-            //player.BufferingStarted += Player_BufferingStarted;
-            //player.PropertyChanged += Player_PropertyChanged;
-
             media_player.Enabled = true;
         }
 
         private void Player_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
-            //Log.Information("FFMPEG : Player Property Changed: " + e.PropertyName);
         }
 
         private void Player_BufferingStarted(object sender, EventArgs e)
         {
-            //Log.Information("FFMPEG : Buffering Started");
         }
 
         private void Player_PlaybackStopped(object sender, PlaybackStoppedArgs e)
@@ -92,6 +71,20 @@ namespace opentuner.MediaPlayers.FFMPEG
         private void Player_OpenCompleted(object sender, OpenCompletedArgs e)
         {
             Log.Information("FFMPEG : Open Completed");
+
+            // OpenAsync is genuinely asynchronous. Calling Play() immediately after
+            // OpenAsync() races the demuxer/player initialisation and can leave a locked
+            // receiver with a black video surface. Start playback only once Flyleaf has
+            // confirmed that the stream is open.
+            try
+            {
+                if (!player.IsPlaying)
+                    player.Play();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "FFMPEG : Could not start playback after open");
+            }
 
             player.Audio.Volume = player_volume;
 
@@ -143,9 +136,11 @@ namespace opentuner.MediaPlayers.FFMPEG
 
             media_stream.ts_sync = false;
             media_stream.end = false;
-            Log.Information("FFMPEG Play");
+            Log.Information("FFMPEG Play: opening stream");
+
+            // Playback is started from Player_OpenCompleted. This avoids the intermittent
+            // black-window race caused by Play() being issued before OpenAsync finished.
             player.OpenAsync(media_stream);
-            player.Play();
         }
         public override void Stop()
         {
@@ -218,15 +213,12 @@ namespace opentuner.MediaPlayers.FFMPEG
 
         public override int Read(byte[] buffer, int offset, int count)
         {
-            //Log.Information("Buffer: Len: " + buffer.Length.ToString() + "," + offset.ToString() + "," + count.ToString());
-        
             while (ts_data_queue.Count< 100000)
             {
                 if (end == true)
                 {
                     return 0;
                 }
-                //Console.Write(".");
             }
 
             int queue_count = ts_data_queue.Count;   
@@ -266,20 +258,16 @@ namespace opentuner.MediaPlayers.FFMPEG
                         Log.Information("Warning: Trying to dequeue, but nothing available : ffmpeg: read : " + queue_count.ToString());
                     }
                 }
-                //Log.Information("Sent " + buildLen);
                 return buildLen;
             }
 
-            
             Log.Information("TS StreamInput: Shouldn't be here");
             return 0;
         }
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            
             Log.Information("MediaStream: Seeking " + offset.ToString() + "," + origin.ToString());
-
             return 0;
         }
 
