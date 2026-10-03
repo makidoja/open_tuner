@@ -100,9 +100,7 @@ namespace opentuner
             if (status == null || status.Items["ModernBatcLogin"] != null) return;
 
             ToolStripStatusLabel nickLabel = GetNickLabel(form);
-            MethodInfo originalNickClick = typeof(WebChatForm).GetMethod(
-                "txtNick_Click",
-                BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo setNickMethod = typeof(WebChatForm).GetMethod("setNick", BindingFlags.Instance | BindingFlags.NonPublic);
 
             ToolStripStatusLabel spacer = new ToolStripStatusLabel
             {
@@ -127,19 +125,35 @@ namespace opentuner
                 ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            // Invoke the original txtNick_Click event handler directly. The blue NONICK link
-            // is wired to this method by the original designer and the user has confirmed that
-            // path works correctly. ToolStripStatusLabel.PerformClick() did not reliably raise it.
+            // Do not try to simulate a click on the NONICK ToolStrip label. Open the exact
+            // original nickname dialog here, copy its result into txtNick, then invoke the
+            // original private setNick() routine which emits the Socket.IO setnick event.
             login.Click += delegate
             {
+                if (nickLabel == null || nickLabel.IsDisposed) return;
+
                 try
                 {
-                    if (originalNickClick != null)
-                        originalNickClick.Invoke(form, new object[] { nickLabel, EventArgs.Empty });
+                    using (setnickdialog nickDialog = new setnickdialog())
+                    {
+                        nickDialog.txtNick.Text = nickLabel.Text;
+                        if (nickDialog.ShowDialog(form) != DialogResult.OK) return;
+
+                        string nick = (nickDialog.txtNick.Text ?? string.Empty).Trim();
+                        if (nick.Length == 0 || string.Equals(nick, "NONICK", StringComparison.OrdinalIgnoreCase)) return;
+
+                        nickLabel.Text = nick;
+                        if (setNickMethod != null)
+                            setNickMethod.Invoke(form, null);
+                    }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Keep the original NONICK link available as a fallback.
+                    MessageBox.Show(
+                        "BATC chat nickname could not be set.\r\n\r\n" + ex.Message,
+                        "OpenTuner - BATC Chat",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 }
             };
 
