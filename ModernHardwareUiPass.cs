@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Globalization;
 using System.Reflection;
 using System.Windows.Forms;
 using opentuner.MediaSources;
@@ -14,7 +15,10 @@ namespace opentuner
         private static ComboBox lnbB;
         private static Label[] detailLabels = new Label[2];
         private static ComboBox[] rfInputs = new ComboBox[2];
-        private static NumericUpDown[] loInputs = new NumericUpDown[2];
+        private static TextBox[] freqText = new TextBox[2];
+        private static TextBox[] loText = new TextBox[2];
+        private static CheckBox[] loEnabled = new CheckBox[2];
+        private static decimal[] preferredLo = new decimal[] { 9750M, 9750M };
 
         public static void Attach(ModernConceptForm form)
         {
@@ -90,6 +94,8 @@ namespace opentuner
                     SetComboVoltage(lnbB, backend.BackendGetLnbVoltage(1));
                 }
 
+                NumericUpDown[] hiddenFreq = GetFreqInputs(form);
+
                 for (int tuner = 0; tuner < 2; tuner++)
                 {
                     if (rfInputs[tuner] != null && !rfInputs[tuner].DroppedDown)
@@ -100,12 +106,31 @@ namespace opentuner
                             rfInputs[tuner].SelectedIndex = index;
                     }
 
-                    if (loInputs[tuner] != null && !loInputs[tuner].Focused)
+                    if (hiddenFreq != null && tuner < hiddenFreq.Length && hiddenFreq[tuner] != null &&
+                        freqText[tuner] != null && !freqText[tuner].Focused)
                     {
-                        decimal mhz = backend.BackendGetOffset(tuner) / 1000M;
-                        mhz = Math.Min(loInputs[tuner].Maximum, Math.Max(loInputs[tuner].Minimum, mhz));
-                        if (loInputs[tuner].Value != mhz)
-                            loInputs[tuner].Value = mhz;
+                        string wanted = hiddenFreq[tuner].Value.ToString("0.000", CultureInfo.InvariantCulture);
+                        if (!string.Equals(freqText[tuner].Text, wanted, StringComparison.Ordinal))
+                            freqText[tuner].Text = wanted;
+                    }
+
+                    long backendOffset = backend.BackendGetOffset(tuner);
+                    decimal backendLo = backendOffset / 1000M;
+                    if (backendOffset > 0)
+                    {
+                        preferredLo[tuner] = backendLo;
+                        if (loText[tuner] != null && !loText[tuner].Focused)
+                        {
+                            string wantedLo = preferredLo[tuner].ToString("0.###", CultureInfo.InvariantCulture);
+                            if (!string.Equals(loText[tuner].Text, wantedLo, StringComparison.Ordinal))
+                                loText[tuner].Text = wantedLo;
+                        }
+                        if (loEnabled[tuner] != null && !loEnabled[tuner].Checked)
+                            loEnabled[tuner].Checked = true;
+                    }
+                    else if (loEnabled[tuner] != null && loEnabled[tuner].Checked)
+                    {
+                        loEnabled[tuner].Checked = false;
                     }
                 }
             };
@@ -192,8 +217,36 @@ namespace opentuner
                         oldHint.Visible = false;
                 }
 
-                // Keep receiver input/LO controls on the main tuning row.  This leaves
-                // the bottom status line completely clear for LOCK/SR/MODCOD/LO telemetry.
+                if (freq != null && captured < freq.Length && freq[captured] != null)
+                {
+                    NumericUpDown hidden = freq[captured];
+                    freqText[captured] = new TextBox
+                    {
+                        Name = "ModernFrequencyText" + captured,
+                        Text = hidden.Value.ToString("0.000", CultureInfo.InvariantCulture),
+                        Location = hidden.Location,
+                        Size = hidden.Size,
+                        BackColor = Color.FromArgb(18, 38, 60),
+                        ForeColor = Color.FromArgb(242, 247, 252),
+                        BorderStyle = BorderStyle.FixedSingle,
+                        Font = hidden.Font,
+                        TextAlign = HorizontalAlignment.Left
+                    };
+                    controls.Controls.Add(freqText[captured]);
+                    freqText[captured].BringToFront();
+                    hidden.Visible = false;
+
+                    freqText[captured].Leave += delegate { CommitFrequency(captured, hidden); };
+                    freqText[captured].KeyDown += delegate(object sender, KeyEventArgs e)
+                    {
+                        if (e.KeyCode == Keys.Enter)
+                        {
+                            CommitFrequency(captured, hidden);
+                            e.SuppressKeyPress = true;
+                        }
+                    };
+                }
+
                 Label inputLabel = new Label
                 {
                     Text = "RF",
@@ -225,58 +278,107 @@ namespace opentuner
                 };
                 controls.Controls.Add(rfInputs[tuner]);
 
-                Label loLabel = new Label
-                {
-                    Text = "LO",
-                    Location = new Point(654, 10),
-                    Size = new Size(22, 26),
-                    TextAlign = ContentAlignment.MiddleLeft,
-                    ForeColor = Color.FromArgb(142, 165, 190),
-                    Font = new Font("Segoe UI Semibold", 8f)
-                };
-                controls.Controls.Add(loLabel);
+                long initialOffset = backend.BackendGetOffset(tuner);
+                if (initialOffset > 0)
+                    preferredLo[tuner] = initialOffset / 1000M;
 
-                decimal initialLo = backend.BackendGetOffset(tuner) / 1000M;
-                initialLo = Math.Min(15000M, Math.Max(0M, initialLo));
-                loInputs[tuner] = new NumericUpDown
+                loEnabled[tuner] = new CheckBox
                 {
-                    Name = "ModernLoOffset" + tuner,
-                    DecimalPlaces = 3,
-                    Increment = 0.001M,
-                    Minimum = 0,
-                    Maximum = 15000,
-                    Value = initialLo,
-                    Location = new Point(678, 10),
-                    Size = new Size(92, 26),
+                    Name = "ModernLoEnabled" + tuner,
+                    Text = "LO",
+                    Checked = initialOffset > 0,
+                    Location = new Point(654, 11),
+                    Size = new Size(42, 24),
+                    ForeColor = Color.FromArgb(242, 247, 252),
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI Semibold", 8f),
+                    AutoSize = false
+                };
+                controls.Controls.Add(loEnabled[tuner]);
+
+                loText[tuner] = new TextBox
+                {
+                    Name = "ModernLoText" + tuner,
+                    Text = preferredLo[tuner].ToString("0.###", CultureInfo.InvariantCulture),
+                    Location = new Point(698, 10),
+                    Size = new Size(72, 26),
                     BackColor = Color.FromArgb(18, 38, 60),
                     ForeColor = Color.FromArgb(242, 247, 252),
-                    ThousandsSeparator = false
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI", 8.5f),
+                    TextAlign = HorizontalAlignment.Left
                 };
-                loInputs[tuner].Leave += delegate
-                {
-                    backend.BackendSetOffset(captured, (long)Math.Round(loInputs[captured].Value * 1000M));
-                };
-                loInputs[tuner].KeyDown += delegate(object sender, KeyEventArgs e)
-                {
-                    if (e.KeyCode == Keys.Enter)
-                    {
-                        backend.BackendSetOffset(captured, (long)Math.Round(loInputs[captured].Value * 1000M));
-                        e.SuppressKeyPress = true;
-                    }
-                };
-                controls.Controls.Add(loInputs[tuner]);
+                controls.Controls.Add(loText[tuner]);
 
                 Label mhz = new Label
                 {
                     Text = "MHz",
-                    Location = new Point(772, 10),
+                    Location = new Point(774, 10),
                     Size = new Size(34, 26),
                     TextAlign = ContentAlignment.MiddleLeft,
                     ForeColor = Color.FromArgb(142, 165, 190),
                     Font = new Font("Segoe UI", 8f)
                 };
                 controls.Controls.Add(mhz);
+
+                loEnabled[tuner].CheckedChanged += delegate
+                {
+                    if (loEnabled[captured].Checked)
+                    {
+                        CommitLoText(captured, backend, true);
+                    }
+                    else
+                    {
+                        backend.BackendSetOffset(captured, 0);
+                    }
+                };
+
+                loText[tuner].Leave += delegate { CommitLoText(captured, backend, loEnabled[captured].Checked); };
+                loText[tuner].KeyDown += delegate(object sender, KeyEventArgs e)
+                {
+                    if (e.KeyCode == Keys.Enter)
+                    {
+                        CommitLoText(captured, backend, loEnabled[captured].Checked);
+                        e.SuppressKeyPress = true;
+                    }
+                };
             }
+        }
+
+        private static void CommitFrequency(int tuner, NumericUpDown hidden)
+        {
+            if (hidden == null || freqText[tuner] == null) return;
+            decimal value;
+            if (!TryParseMHz(freqText[tuner].Text, out value) || value < hidden.Minimum || value > hidden.Maximum)
+            {
+                freqText[tuner].Text = hidden.Value.ToString("0.000", CultureInfo.InvariantCulture);
+                return;
+            }
+
+            hidden.Value = value;
+            freqText[tuner].Text = value.ToString("0.000", CultureInfo.InvariantCulture);
+        }
+
+        private static void CommitLoText(int tuner, MainForm backend, bool apply)
+        {
+            if (loText[tuner] == null) return;
+            decimal value;
+            if (!TryParseMHz(loText[tuner].Text, out value) || value < 0 || value > 15000)
+            {
+                loText[tuner].Text = preferredLo[tuner].ToString("0.###", CultureInfo.InvariantCulture);
+                return;
+            }
+
+            preferredLo[tuner] = value;
+            loText[tuner].Text = value.ToString("0.###", CultureInfo.InvariantCulture);
+            if (apply)
+                backend.BackendSetOffset(tuner, (long)Math.Round(value * 1000M));
+        }
+
+        private static bool TryParseMHz(string text, out decimal value)
+        {
+            string s = (text ?? string.Empty).Trim().Replace(',', '.');
+            return decimal.TryParse(s, NumberStyles.Number, CultureInfo.InvariantCulture, out value);
         }
 
         private static void HookReceiverDetails(ModernConceptForm form, MainForm backend)
