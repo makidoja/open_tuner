@@ -36,7 +36,6 @@ namespace opentuner.MediaPlayers.VLC
 
         private void LibVLC_Log(object sender, LogEventArgs e)
         {
-            //Log.Information("VLCMediaPlayer: " + e.FormattedLog);
         }
 
         public override string GetName()
@@ -44,32 +43,36 @@ namespace opentuner.MediaPlayers.VLC
             return "VLC";
         }
 
-        // update mediaplayer reference invoking if required
         private delegate void updateMediaPlayerDelegate(MediaPlayer newPlayer, bool play);
 
         private void updateVideoPlayer(MediaPlayer newPlayer, bool play)
         {
+            if (videoView == null || videoView.IsDisposed)
+                return;
+
             if (videoView.InvokeRequired)
             {
-                updateMediaPlayerDelegate ump = new updateMediaPlayerDelegate(updateVideoPlayer);
-
-                videoView.Invoke(ump, new object[] { newPlayer, play });
-            }
-            else
-            {
-                videoView.MediaPlayer = newPlayer;
-
-                if (play)
+                try
                 {
-                    Thread.Sleep(10);
-                    Log.Information("HWND: " + videoView.MediaPlayer.Hwnd.ToString());
-                    videoView.MediaPlayer.Play(media);
+                    // Do not synchronously Invoke from the receiver worker thread. VLC stop/play
+                    // callbacks can arrive while the UI is processing native video messages and a
+                    // synchronous Invoke here can deadlock the application.
+                    videoView.BeginInvoke(new updateMediaPlayerDelegate(updateVideoPlayer), new object[] { newPlayer, play });
                 }
+                catch (InvalidOperationException)
+                {
+                }
+                return;
+            }
+
+            videoView.MediaPlayer = newPlayer;
+
+            if (play && newPlayer != null && media != null)
+            {
+                Log.Information("HWND: " + newPlayer.Hwnd.ToString());
+                newPlayer.Play(media);
             }
         }
-
-
-
 
         private void MediaPlayer_EncounteredError(object sender, EventArgs e)
         {
@@ -86,11 +89,14 @@ namespace opentuner.MediaPlayers.VLC
             Log.Information("VLC: Stopped");
         }
         
-
         public override void Initialize(CircularBuffer TSDataQueue)
         {
             ts_data_queue = TSDataQueue;
+            CreatePlayerObjects();
+        }
 
+        private void CreatePlayerObjects()
+        {
             _mediaplayer = new MediaPlayer(libVLC);
             _mediaplayer.Stopped += MediaPlayer_Stopped;
             _mediaplayer.Playing += MediaPlayer_Playing;
@@ -110,7 +116,6 @@ namespace opentuner.MediaPlayers.VLC
             MediaConfiguration media_config = new MediaConfiguration();
             media_config.EnableHardwareDecoding = false;
             media.AddOption(media_config);
-
         }
 
         private void MediaPlayer_Vout(object sender, MediaPlayerVoutEventArgs e)
@@ -118,7 +123,6 @@ namespace opentuner.MediaPlayers.VLC
             if (videoView.MediaPlayer == null)
                 return;
 
-            // volume changes only take affect when media is playing
             videoView.MediaPlayer.Volume = player_volume;
 
             MediaStatus media_status = new MediaStatus();
@@ -141,72 +145,74 @@ namespace opentuner.MediaPlayers.VLC
             }
 
             if (onVideoOut != null)
-            {
                 onVideoOut(this, media_status);
-            }
-
         }
 
         public override void SnapShot(string FileName)
         {
-            videoView.MediaPlayer.TakeSnapshot(0, FileName, 0, 0);
+            if (videoView.MediaPlayer != null)
+                videoView.MediaPlayer.TakeSnapshot(0, FileName, 0, 0);
         }
-
 
         public override void Close()
         {
-            if (media_input != null)
-                media_input.Dispose();
-            if (media != null)
-                media.Dispose();
+            Stop();
+            try { libVLC?.Dispose(); } catch { }
         }
 
         public override void Stop()
         {
-            media_input.end = true;
-
             Log.Information("VLC: Stop Command");
 
-            if (_mediaplayer != null)
-                _mediaplayer.Dispose();
-            _mediaplayer = null;
-            GC.Collect();
-            GC.Collect();
+            try
+            {
+                if (media_input != null)
+                    media_input.end = true;
+            }
+            catch { }
 
-            updateVideoPlayer(null, false);
+            try { updateVideoPlayer(null, false); } catch { }
+
+            if (_mediaplayer != null)
+            {
+                try
+                {
+                    _mediaplayer.Stopped -= MediaPlayer_Stopped;
+                    _mediaplayer.Playing -= MediaPlayer_Playing;
+                    _mediaplayer.EncounteredError -= MediaPlayer_EncounteredError;
+                    _mediaplayer.Vout -= MediaPlayer_Vout;
+                }
+                catch { }
+                try { _mediaplayer.Dispose(); } catch { }
+                _mediaplayer = null;
+            }
+
+            if (media != null)
+            {
+                try { media.Dispose(); } catch { }
+                media = null;
+            }
+
+            if (media_input != null)
+            {
+                try { media_input.Dispose(); } catch { }
+                media_input = null;
+            }
         }
 
         public override void Play()
         {
-            ts_data_queue.Clear();
-
-            media_input.ts_sync = false;
-            media_input.end = false;
-
-            Stop();
-
             Log.Information("VLC: Play Command");
 
-            _mediaplayer = new MediaPlayer(libVLC);
-            _mediaplayer.Stopped += MediaPlayer_Stopped;
-            _mediaplayer.Playing += MediaPlayer_Playing;
-            _mediaplayer.EncounteredError += MediaPlayer_EncounteredError;
-            _mediaplayer.Vout += MediaPlayer_Vout;
-
-            _mediaplayer.EnableMouseInput = false;
-            _mediaplayer.EnableKeyInput = false;
-
-            _mediaplayer.SetMarqueeInt(VideoMarqueeOption.Size, 20);
-            _mediaplayer.SetMarqueeInt(VideoMarqueeOption.X, 10);
-            _mediaplayer.SetMarqueeInt(VideoMarqueeOption.Y, 10);
-
-            media_input = new TSStreamMediaInput(ts_data_queue);
-            media = new Media(libVLC, media_input);
-
-            MediaConfiguration mediaConfig1 = new MediaConfiguration();
-            mediaConfig1.EnableHardwareDecoding = false;
-            media.AddOption(mediaConfig1);
-
+            // Fully release the previous VLC input/player before creating the next one.
+            // The old code recreated these objects on every retune without disposing the
+            // previous Media/MediaInput and forced GC twice, which made rapid startup retunes
+            // prone to UI stalls and native VLC lockups.
+            Stop();
+            ts_data_queue.Clear();
+            CreatePlayerObjects();
+            media_input.ts_sync = false;
+            media_input.end = false;
             updateVideoPlayer(_mediaplayer, true);
         }
 
@@ -215,10 +221,7 @@ namespace opentuner.MediaPlayers.VLC
             player_volume = Volume;
 
             if (videoView.MediaPlayer != null)
-            {
                 videoView.MediaPlayer.Volume = player_volume;
-            }
-
         }
 
         public override int GetVolume()
