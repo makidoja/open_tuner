@@ -179,11 +179,12 @@ namespace opentuner
             using (Font f = new Font("Segoe UI Semibold", 7.5f))
             using (Brush b = new SolidBrush(Color.FromArgb(215, 220, 230, 240)))
             {
-                string text = "RX1 ABOVE   •   RX2 BELOW";
-                SizeF size = g.MeasureString(text, f);
-                float x = Math.Max(plot.Left + 4, plot.Right - size.Width - 6);
-                float y = Math.Max(plot.Top + 2, mid - size.Height - 2);
-                g.DrawString(text, f, b, x, y);
+                const float xPad = 5f;
+                float x = plot.Left + xPad;
+                float rx1Y = Math.Max(plot.Top + 1, mid - f.Height - 2);
+                float rx2Y = Math.Min(plot.Bottom - f.Height - 1, mid + 2);
+                g.DrawString("RX1", f, b, x, rx1Y);
+                g.DrawString("RX2", f, b, x, rx2Y);
             }
         }
 
