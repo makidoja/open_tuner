@@ -1,4 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <OutputType>WinExe</OutputType>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="ModernDashboard.cs" Condition="Exists('ModernDashboard.cs')" />
     <Compile Include="ModernTunerLayout.cs" Condition="Exists('ModernTunerLayout.cs')" />
