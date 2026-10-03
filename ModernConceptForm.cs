@@ -377,18 +377,52 @@ namespace opentuner
             if (data.frequency > 0) liveFreq[tuner].Text = (data.frequency / 1000M).ToString("0.000") + " MHz";
         }
 
+        private static bool IsVideoRenderer(Control control)
+        {
+            return control is LibVLCSharp.WinForms.VideoView ||
+                   control is FlyleafLib.Controls.WinForms.FlyleafHost ||
+                   control is PictureBox;
+        }
+
         private void AdoptVideoControls()
         {
             for (int i = 0; i < 2; i++)
             {
                 Control[] controls = backend.BackendTakeVideoControls(i);
                 if (controls == null) continue;
+
+                Control renderer = null;
+                List<Control> overlays = new List<Control>();
+
                 foreach (Control c in controls)
                 {
-                    if (c.Parent != videoHosts[i]) videoHosts[i].Controls.Add(c);
-                    if (!(c is Label) && !(c is TrackBar) && !(c is Button)) c.Dock = DockStyle.Fill;
-                    c.BringToFront();
+                    if (c == null || c.IsDisposed) continue;
+
+                    if (c.Parent != videoHosts[i])
+                        videoHosts[i].Controls.Add(c);
+
+                    if (IsVideoRenderer(c))
+                    {
+                        renderer = c;
+                        c.Dock = DockStyle.Fill;
+                        c.Visible = true;
+                    }
+                    else
+                    {
+                        // StreamInfoContainer and VolumeInfoContainer are overlays from the
+                        // legacy player. They must retain their own size/location. Docking
+                        // them Fill was covering the entire video surface while audio played.
+                        if (c.Dock == DockStyle.Fill)
+                            c.Dock = DockStyle.None;
+                        overlays.Add(c);
+                    }
                 }
+
+                if (renderer != null)
+                    renderer.SendToBack();
+
+                foreach (Control overlay in overlays)
+                    overlay.BringToFront();
             }
         }
 
