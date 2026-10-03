@@ -34,11 +34,12 @@ namespace opentuner
                 Panel controls = tunerBox.Parent as Panel;
                 if (controls == null) continue;
 
-                // Compact, aligned block on the bottom-right. The receiver state sits directly above it.
-                tunerBox.Size = new Size(350, 128);
+                // Keep the tuner block bottom-right, with a little extra height so the
+                // lower RF/LO row and checkbox are never clipped.
+                tunerBox.Size = new Size(350, 140);
                 tunerBox.Location = new Point(
                     Math.Max(445, controls.ClientSize.Width - tunerBox.Width - 4),
-                    Math.Max(58, controls.ClientSize.Height - tunerBox.Height - 4));
+                    Math.Max(42, controls.ClientSize.Height - tunerBox.Height - 4));
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
 
                 LayoutTunerBox(tunerBox, tuner);
@@ -130,6 +131,28 @@ namespace opentuner
             if (snapshot != null) { snapshot.Location = new Point(330, 4); snapshot.Size = new Size(100, 30); }
             if (fullscreen != null) { fullscreen.Location = new Point(436, 4); fullscreen.Size = new Size(42, 30); }
 
+            // Put receiver state on the SAME top line as MUTE/RECORD/SNAPSHOT/FULLSCREEN.
+            // This keeps the tuner block clear and removes the compressed status row above it.
+            int stateX = fullscreen != null ? fullscreen.Right + 12 : 490;
+            Label locked = FindLabelContains(controls, "LOCK");
+            if (locked != null)
+            {
+                locked.Location = new Point(stateX, 4);
+                locked.Size = new Size(88, 30);
+                locked.TextAlign = ContentAlignment.MiddleLeft;
+            }
+
+            Label service = FindServiceLabel(controls, locked);
+            if (service != null)
+            {
+                int serviceX = stateX + 94;
+                service.Location = new Point(serviceX, 4);
+                service.Size = new Size(Math.Max(120, controls.ClientSize.Width - serviceX - 4), 30);
+                service.Font = new Font("Segoe UI Semibold", 11.5f);
+                service.ForeColor = Color.White;
+                service.TextAlign = ContentAlignment.MiddleLeft;
+            }
+
             // Main frequency plus larger MER/Margin readout remain grouped on the left.
             Label freq = FindLargestFrequencyLabel(controls);
             if (freq != null)
@@ -171,25 +194,6 @@ namespace opentuner
                     p.Location = new Point(325, 71);
                     p.Size = new Size(112, 12);
                 }
-            }
-
-            // LOCKED and callsign are deliberately positioned immediately above TUNER CONTROL.
-            int stateY = Math.Max(36, tunerBox.Top - 31);
-            Label locked = FindLabelContains(controls, "LOCK");
-            if (locked != null)
-            {
-                locked.Location = new Point(tunerBox.Left, stateY);
-                locked.Size = new Size(100, 27);
-            }
-
-            Label service = FindServiceLabel(controls, locked);
-            if (service != null)
-            {
-                service.Location = new Point(tunerBox.Left + 108, stateY);
-                service.Size = new Size(Math.Max(120, tunerBox.Width - 108), 27);
-                service.Font = new Font("Segoe UI Semibold", 11.5f);
-                service.ForeColor = Color.White;
-                service.TextAlign = ContentAlignment.MiddleLeft;
             }
 
             // Pin the receiver detail/status line to the absolute bottom-left of the section.
