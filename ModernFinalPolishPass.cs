@@ -41,15 +41,12 @@ namespace opentuner
                 {
                     string text = label.Text ?? "";
 
-                    // Bottom receiver telemetry: make it easier to read without making
-                    // it dominate the tuning controls. The station/callsign strip is left
-                    // at its original size as requested.
                     if (text.IndexOf("MODCOD", StringComparison.OrdinalIgnoreCase) >= 0 ||
                         text.IndexOf("receiver details", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        label.Font = new Font("Segoe UI Semibold", 10.25f);
+                        label.Font = new Font("Segoe UI Semibold", 9.25f);
                         label.ForeColor = Color.FromArgb(215, 228, 240);
-                        label.AutoSize = true;
+                        label.AutoSize = false;
                     }
                 }
 
