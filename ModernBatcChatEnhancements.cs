@@ -22,8 +22,8 @@ namespace opentuner
             {
                 try
                 {
-                    ImproveNickDisplay(form, settings);
-                    AddLoginControl(form, settings);
+                    ImproveNickDisplay(form);
+                    AddLoginControl(form);
                 }
                 catch
                 {
@@ -44,7 +44,7 @@ namespace opentuner
             return field == null ? null : field.GetValue(form) as TextBox;
         }
 
-        private static void ImproveNickDisplay(WebChatForm form, WebChatSettings settings)
+        private static void ImproveNickDisplay(WebChatForm form)
         {
             FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
@@ -93,7 +93,7 @@ namespace opentuner
             nickLabel.ToolTipText = "Click to set or change BATC chat nickname";
         }
 
-        private static void AddLoginControl(WebChatForm form, WebChatSettings settings)
+        private static void AddLoginControl(WebChatForm form)
         {
             FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
@@ -124,12 +124,18 @@ namespace opentuner
                 ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            login.Click += delegate { ShowLoginDialog(form, settings, login, nickLabel); };
+            // Use the exact original nickname click path. This is the same working path as
+            // clicking the blue NONICK/M0CKE label at the bottom-left of the chat window.
+            login.Click += delegate
+            {
+                if (nickLabel != null && !nickLabel.IsDisposed)
+                    nickLabel.PerformClick();
+            };
 
             status.Items.Add(spacer);
             status.Items.Add(login);
 
-            Timer stateTimer = new Timer { Interval = 500 };
+            Timer stateTimer = new Timer { Interval = 300 };
             stateTimer.Tick += delegate
             {
                 if (form.IsDisposed)
@@ -144,154 +150,9 @@ namespace opentuner
                                 !string.IsNullOrWhiteSpace(nickLabel.Text) &&
                                 !string.Equals(nickLabel.Text.Trim(), "NONICK", StringComparison.OrdinalIgnoreCase);
 
-                if (!string.Equals(login.Text, "LOGGING IN...", StringComparison.OrdinalIgnoreCase))
-                    login.Text = loggedIn ? "LOGGED IN  •  CHANGE NICK" : "LOGIN TO BATC CHAT";
+                login.Text = loggedIn ? "LOGGED IN  •  CHANGE NICK" : "LOGIN TO BATC CHAT";
             };
             stateTimer.Start();
-        }
-
-        private static void ShowLoginDialog(WebChatForm form, WebChatSettings settings, ToolStripStatusLabel login, ToolStripStatusLabel nickLabel)
-        {
-            using (Form dialog = new Form())
-            {
-                dialog.Text = "BATC Chat Login";
-                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
-                dialog.StartPosition = FormStartPosition.CenterParent;
-                dialog.MinimizeBox = false;
-                dialog.MaximizeBox = false;
-                dialog.ShowInTaskbar = false;
-                dialog.ClientSize = new Size(360, 132);
-                dialog.BackColor = Surface;
-                dialog.ForeColor = Text;
-                dialog.Font = new Font("Segoe UI", 9f);
-
-                Label prompt = new Label
-                {
-                    Text = "Callsign / nickname",
-                    Location = new Point(16, 16),
-                    AutoSize = true,
-                    ForeColor = dialog.ForeColor
-                };
-
-                string current = nickLabel == null ? "" : nickLabel.Text;
-                if (string.Equals(current, "NONICK", StringComparison.OrdinalIgnoreCase)) current = "";
-
-                TextBox nick = new TextBox
-                {
-                    Location = new Point(18, 42),
-                    Width = 324,
-                    CharacterCasing = CharacterCasing.Upper,
-                    BackColor = Surface2,
-                    ForeColor = dialog.ForeColor,
-                    BorderStyle = BorderStyle.FixedSingle,
-                    Font = new Font("Segoe UI Semibold", 11f),
-                    Text = current
-                };
-
-                Button ok = new Button
-                {
-                    Text = "LOGIN",
-                    DialogResult = DialogResult.OK,
-                    Location = new Point(182, 82),
-                    Size = new Size(76, 30),
-                    BackColor = Color.FromArgb(28, 139, 253),
-                    ForeColor = Color.White,
-                    FlatStyle = FlatStyle.Flat
-                };
-
-                Button cancel = new Button
-                {
-                    Text = "CANCEL",
-                    DialogResult = DialogResult.Cancel,
-                    Location = new Point(266, 82),
-                    Size = new Size(76, 30),
-                    BackColor = Surface2,
-                    ForeColor = dialog.ForeColor,
-                    FlatStyle = FlatStyle.Flat
-                };
-
-                dialog.Controls.Add(prompt);
-                dialog.Controls.Add(nick);
-                dialog.Controls.Add(ok);
-                dialog.Controls.Add(cancel);
-                dialog.AcceptButton = ok;
-                dialog.CancelButton = cancel;
-
-                ModernWindowTheme.Apply(dialog);
-
-                if (dialog.ShowDialog(form) != DialogResult.OK) return;
-
-                string value = (nick.Text ?? "").Trim().ToUpperInvariant();
-                if (value.Length == 0) return;
-
-                if (settings != null) settings.nickname = value;
-                if (nickLabel != null)
-                {
-                    nickLabel.Text = value;
-                    nickLabel.LinkColor = Cyan;
-                }
-
-                login.Text = "LOGGING IN...";
-                LoginWhenSocketReady(form, value, login, nickLabel);
-            }
-        }
-
-        private static void LoginWhenSocketReady(WebChatForm form, string value, ToolStripStatusLabel login, ToolStripStatusLabel nickLabel)
-        {
-            MethodInfo setNick = typeof(WebChatForm).GetMethod("setNick", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (setNick == null)
-            {
-                login.Text = "LOGIN TO BATC CHAT";
-                return;
-            }
-
-            Timer retry = new Timer { Interval = 250 };
-            int attempts = 0;
-
-            EventHandler tryLogin = null;
-            tryLogin = delegate
-            {
-                if (form.IsDisposed)
-                {
-                    retry.Stop();
-                    retry.Dispose();
-                    return;
-                }
-
-                attempts++;
-                try
-                {
-                    // Use the original WebChatForm login routine directly. setNick() already
-                    // checks client.Connected itself, so there is no need to reflect the
-                    // SocketIO Connected property (which was the unreliable part here).
-                    if (nickLabel != null) nickLabel.Text = value;
-                    setNick.Invoke(form, null);
-
-                    TextBox message = GetMessageBox(form);
-                    if (message != null && message.Enabled)
-                    {
-                        login.Text = "LOGGED IN  •  CHANGE NICK";
-                        retry.Stop();
-                        retry.Dispose();
-                        return;
-                    }
-                }
-                catch
-                {
-                    // Retry while the socket/form finishes initialising.
-                }
-
-                if (attempts >= 40)
-                {
-                    login.Text = "LOGIN TO BATC CHAT";
-                    retry.Stop();
-                    retry.Dispose();
-                }
-            };
-
-            retry.Tick += tryLogin;
-            retry.Start();
-            tryLogin(null, EventArgs.Empty);
         }
     }
 }
