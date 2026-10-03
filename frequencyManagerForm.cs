@@ -76,9 +76,9 @@ namespace opentuner
             if (index < 0 || index >= stored_frequencies.Count)
                 return;
 
-            lblFreq.Text = stored_frequencies[index].Frequency.ToString() + " kHz";
+            lblFreq.Text = FormatStoredMHz(stored_frequencies[index].Frequency) + " MHz";
             lblName.Text = stored_frequencies[index].Name.ToString();
-            lblOffset.Text = stored_frequencies[index].Offset.ToString() + " kHz";
+            lblOffset.Text = FormatStoredMHz(stored_frequencies[index].Offset) + " MHz";
             lblSymbolRate.Text = stored_frequencies[index].SymbolRate.ToString() + " kS";
             lblRFInput.Text = stored_frequencies[index].RFInput == 1 ? "A" : "B";
         }
@@ -113,29 +113,28 @@ namespace opentuner
 
                 editStoredFrequencyForm editForm = new editStoredFrequencyForm();
                 ModernTheme.ApplyToForm(editForm);
-                editForm.txtName.Text = (stored_frequencies[index].Frequency / 1000M).ToString("0.###", CultureInfo.InvariantCulture);
-                editForm.txtFreq.Text = (stored_frequencies[index].Frequency / 1000M).ToString("0.###", CultureInfo.InvariantCulture);
-                editForm.txtOffset.Text = (stored_frequencies[index].Offset / 1000M).ToString("0.###", CultureInfo.InvariantCulture);
+                editForm.txtName.Text = stored_frequencies[index].Name;
+                editForm.txtFreq.Text = FormatStoredMHz(stored_frequencies[index].Frequency);
+                editForm.txtOffset.Text = FormatStoredMHz(stored_frequencies[index].Offset);
                 editForm.txtSR.Text = stored_frequencies[index].SymbolRate.ToString();
                 editForm.comboRFInput.SelectedIndex = stored_frequencies[index].RFInput - 1;
-                editForm.txtName.Text = stored_frequencies[index].Name;
 
                 if (editForm.ShowDialog() == DialogResult.OK)
                 {
-                    uint frequencyKHz;
-                    uint offsetKHz;
+                    uint frequencyValue;
+                    uint offsetValue;
                     uint symbolRate;
-                    if (!TryParsePresetMHz(editForm.txtFreq.Text, false, out frequencyKHz) ||
-                        !TryParsePresetMHz(editForm.txtOffset.Text, true, out offsetKHz) ||
+                    if (!TryParsePresetValue(editForm.txtFreq.Text, false, out frequencyValue) ||
+                        !TryParsePresetValue(editForm.txtOffset.Text, true, out offsetValue) ||
                         !uint.TryParse(editForm.txtSR.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out symbolRate))
                     {
-                        MessageBox.Show("Please enter frequency and LO offset in MHz (for example 10491.500 and 9750) and SR as a whole number in kS.", "Invalid preset values", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show("Please enter frequency/LO in MHz. Whole values such as 10491 or decimal values such as 10491.500 are both accepted. SR must be a whole number in kS.", "Invalid preset values", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
 
                     stored_frequencies[index].Name = editForm.txtName.Text;
-                    stored_frequencies[index].Frequency = frequencyKHz;
-                    stored_frequencies[index].Offset = offsetKHz;
+                    stored_frequencies[index].Frequency = frequencyValue;
+                    stored_frequencies[index].Offset = offsetValue;
                     stored_frequencies[index].SymbolRate = symbolRate;
                     stored_frequencies[index].RFInput = Convert.ToByte(editForm.comboRFInput.SelectedIndex + 1);
                     load_frequencies();
@@ -150,21 +149,21 @@ namespace opentuner
 
             if (editForm.ShowDialog() == DialogResult.OK)
             {
-                uint frequencyKHz;
-                uint offsetKHz;
+                uint frequencyValue;
+                uint offsetValue;
                 uint symbolRate;
-                if (!TryParsePresetMHz(editForm.txtFreq.Text, false, out frequencyKHz) ||
-                    !TryParsePresetMHz(editForm.txtOffset.Text, true, out offsetKHz) ||
+                if (!TryParsePresetValue(editForm.txtFreq.Text, false, out frequencyValue) ||
+                    !TryParsePresetValue(editForm.txtOffset.Text, true, out offsetValue) ||
                     !uint.TryParse(editForm.txtSR.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out symbolRate))
                 {
-                    MessageBox.Show("Please enter frequency and LO offset in MHz (for example 10491.500 and 9750) and SR as a whole number in kS.", "Invalid preset values", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("Please enter frequency/LO in MHz. Whole values such as 10491 or decimal values such as 10491.500 are both accepted. SR must be a whole number in kS.", "Invalid preset values", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
                 StoredFrequency sf = new StoredFrequency();
                 sf.Name = editForm.txtName.Text;
-                sf.Frequency = frequencyKHz;
-                sf.Offset = offsetKHz;
+                sf.Frequency = frequencyValue;
+                sf.Offset = offsetValue;
                 sf.SymbolRate = symbolRate;
                 sf.RFInput = Convert.ToByte(editForm.comboRFInput.SelectedIndex + 1);
                 stored_frequencies.Add(sf);
@@ -172,21 +171,37 @@ namespace opentuner
             }
         }
 
-        private static bool TryParsePresetMHz(string text, bool allowZero, out uint valueKHz)
+        // Preserve the original whole-number preset convention (for example 10491),
+        // while also accepting decimal MHz entries such as 10491.500. Decimal entries
+        // are stored in kHz so no precision is lost; the modern preset loader already
+        // understands both representations.
+        private static bool TryParsePresetValue(string text, bool allowZero, out uint storedValue)
         {
-            valueKHz = 0;
-            string value = (text ?? string.Empty).Trim().Replace(',', '.');
+            storedValue = 0;
+            string raw = (text ?? string.Empty).Trim();
+            string normalised = raw.Replace(',', '.');
             decimal mhz;
-            if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out mhz))
+            if (!decimal.TryParse(normalised, NumberStyles.Number, CultureInfo.InvariantCulture, out mhz))
                 return false;
             if (mhz < 0 || (!allowZero && mhz == 0) || mhz > 15000M)
                 return false;
 
-            decimal khz = decimal.Round(mhz * 1000M, 0, MidpointRounding.AwayFromZero);
-            if (khz > uint.MaxValue)
+            bool hasDecimal = normalised.IndexOf('.') >= 0;
+            decimal value = hasDecimal ? decimal.Round(mhz * 1000M, 0, MidpointRounding.AwayFromZero) : mhz;
+            if (value < 0 || value > uint.MaxValue)
                 return false;
-            valueKHz = (uint)khz;
+
+            storedValue = (uint)value;
             return true;
+        }
+
+        private static string FormatStoredMHz(uint storedValue)
+        {
+            if (storedValue == 0)
+                return "0";
+            if (storedValue <= 15000)
+                return storedValue.ToString(CultureInfo.InvariantCulture);
+            return (storedValue / 1000M).ToString("0.###", CultureInfo.InvariantCulture);
         }
 
         private void frequencyManagerForm_Load(object sender, EventArgs e)
