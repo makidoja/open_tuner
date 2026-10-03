@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Windows.Forms;
 using opentuner.MediaSources;
+using opentuner.MediaSources.Minitiouner;
 using opentuner.MediaSources.WinterHill;
 using Serilog;
 
@@ -58,6 +59,7 @@ namespace opentuner
 
             BackendSelectedSourceIndex = sourceIndex;
             backendStartupRetuneDone = false;
+            ModernTunerDiagnostics.Clear();
 
             // The visible modern UI owns BATC spectrum/chat/quick-tune. Do not let the
             // hidden legacy MainForm create a second copy of those extras.
@@ -120,11 +122,6 @@ namespace opentuner
 
             if (source_connected && videoSource != null)
             {
-                // On a cold start a stale configured host can point at the Windows PC
-                // itself. In that state no PicoTuner status packets arrive, so waiting for
-                // status to learn the correct IP can never work. PicoTuner broadcasts its
-                // address on UDP 9997, so discover it first and immediately resend the
-                // receiver setup to the hardware.
                 WinterHillSource winterHill = videoSource as WinterHillSource;
                 if (winterHill != null && winterHill.ModernIsPicoTunerEthernet)
                 {
@@ -152,8 +149,6 @@ namespace opentuner
 
         private void BackendForwardSourceData(int videoNr, OTSourceData data, string description)
         {
-            // Re-send once more after the first live status packet. At that point
-            // WinterHillUDP has also learned the actual sender address directly.
             if (!backendStartupRetuneDone)
             {
                 WinterHillSource winterHill = videoSource as WinterHillSource;
@@ -169,9 +164,55 @@ namespace opentuner
                 }
             }
 
+            EnrichModernSourceData(videoNr, data);
+
             var handler = BackendSourceData;
             if (handler != null)
                 handler(videoNr, data, description);
+        }
+
+        private void EnrichModernSourceData(int videoNr, OTSourceData data)
+        {
+            if (data == null) return;
+
+            if (string.IsNullOrWhiteSpace(data.delivery_system))
+            {
+                try { data.delivery_system = BackendGetDeliverySystem(videoNr); }
+                catch { }
+            }
+
+            MinitiounerSource nativeTuner = videoSource as MinitiounerSource;
+            if (nativeTuner != null)
+            {
+                ModernTunerDiagnosticSnapshot snapshot = ModernTunerDiagnostics.GetSnapshot(videoNr);
+                if (snapshot != null)
+                {
+                    if (string.IsNullOrWhiteSpace(data.delivery_system))
+                    {
+                        if (snapshot.DemodStatus == 2) data.delivery_system = "DVB-S2";
+                        else if (snapshot.DemodStatus == 3) data.delivery_system = "DVB-S";
+                    }
+
+                    if (string.IsNullOrWhiteSpace(data.modcode) && data.demod_locked)
+                    {
+                        string text;
+                        if (snapshot.DemodStatus == 2 && lookups.modcod_lookup_dvbs2.TryGetValue(snapshot.Modcode, out text))
+                            data.modcode = text;
+                        else if (snapshot.DemodStatus == 3 && lookups.modcod_lookup_dvbs.TryGetValue(snapshot.Modcode, out text))
+                            data.modcode = text;
+                    }
+
+                    if (data.constellation == null)
+                        data.constellation = snapshot.Constellation;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(data.modcode) &&
+                string.Equals(data.delivery_system, "DVB-S", StringComparison.OrdinalIgnoreCase))
+                data.modcode = "QPSK";
+
+            if (string.IsNullOrWhiteSpace(data.demode_state))
+                data.demode_state = data.demod_locked ? "LOCKED" : "SEARCHING";
         }
 
         public void BackendShowSourceSettings(int sourceIndex)
