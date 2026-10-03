@@ -54,6 +54,12 @@ namespace opentuner
             if (wh != null) wh.ModernSetOffset(tuner, offsetKHz);
         }
 
+        public string BackendGetDeliverySystem(int tuner)
+        {
+            WinterHillSource wh = BackendWinterHill();
+            return wh == null ? "DVB" : wh.ModernGetDeliverySystem(tuner);
+        }
+
         public string BackendHardwareName
         {
             get
