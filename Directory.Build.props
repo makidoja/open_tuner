@@ -28,5 +28,6 @@
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
     <Compile Include="MediaSources\Winterhill\WinterHillModernSupport.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernSupport.cs')" />
     <Compile Include="MediaSources\Winterhill\WinterHillModernHardware.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernHardware.cs')" />
+    <Compile Include="MediaSources\Winterhill\WinterHillModernSignalInfo.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernSignalInfo.cs')" />
   </ItemGroup>
 </Project>
