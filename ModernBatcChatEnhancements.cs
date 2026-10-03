@@ -59,8 +59,6 @@ namespace opentuner
             ToolStripStatusLabel nickLabel = GetNickLabel(form);
             if (nickLabel == null) return;
 
-            // txtNick is also the actual value used by WebChatForm.setNick(). Never put
-            // captions or decorative text into this item; keep it as the raw nickname.
             string nick = nickLabel.Text;
             if (string.IsNullOrWhiteSpace(nick)) nick = "NONICK";
             nickLabel.Text = nick.Trim().ToUpperInvariant();
@@ -93,8 +91,6 @@ namespace opentuner
             nickLabel.Padding = new Padding(2, 3, 10, 3);
             nickLabel.Margin = new Padding(0, 2, 4, 2);
             nickLabel.ToolTipText = "Click to set or change BATC chat nickname";
-            // Keep the original txtNick_Click handler intact. It is a known-good fallback
-            // and must not be double-wired to our modern login dialog.
         }
 
         private static void AddLoginControl(WebChatForm form, WebChatSettings settings)
@@ -133,9 +129,6 @@ namespace opentuner
             status.Items.Add(spacer);
             status.Items.Add(login);
 
-            // Reflect the real chat state, not merely the saved nickname. The original
-            // form enables txtMessage only after setNick() has actually been accepted for
-            // this connection, making it a reliable indicator that login was attempted.
             Timer stateTimer = new Timer { Interval = 500 };
             stateTimer.Tick += delegate
             {
@@ -246,7 +239,6 @@ namespace opentuner
         private static void LoginWhenSocketReady(WebChatForm form, string value, ToolStripStatusLabel login, ToolStripStatusLabel nickLabel)
         {
             MethodInfo setNick = typeof(WebChatForm).GetMethod("setNick", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo clientField = typeof(WebChatForm).GetField("client", BindingFlags.Instance | BindingFlags.NonPublic);
             if (setNick == null)
             {
                 login.Text = "LOGIN TO BATC CHAT";
@@ -255,7 +247,9 @@ namespace opentuner
 
             Timer retry = new Timer { Interval = 250 };
             int attempts = 0;
-            retry.Tick += delegate
+
+            EventHandler tryLogin = null;
+            tryLogin = delegate
             {
                 if (form.IsDisposed)
                 {
@@ -265,32 +259,26 @@ namespace opentuner
                 }
 
                 attempts++;
-                bool connected = false;
                 try
                 {
-                    object client = clientField == null ? null : clientField.GetValue(form);
-                    PropertyInfo connectedProperty = client == null ? null : client.GetType().GetProperty("Connected", BindingFlags.Instance | BindingFlags.Public);
-                    connected = connectedProperty != null && Convert.ToBoolean(connectedProperty.GetValue(client, null));
-                }
-                catch { }
+                    // Use the original WebChatForm login routine directly. setNick() already
+                    // checks client.Connected itself, so there is no need to reflect the
+                    // SocketIO Connected property (which was the unreliable part here).
+                    if (nickLabel != null) nickLabel.Text = value;
+                    setNick.Invoke(form, null);
 
-                if (connected)
-                {
-                    try
+                    TextBox message = GetMessageBox(form);
+                    if (message != null && message.Enabled)
                     {
-                        if (nickLabel != null) nickLabel.Text = value;
-                        setNick.Invoke(form, null);
-
-                        TextBox message = GetMessageBox(form);
-                        if (message != null && message.Enabled)
-                        {
-                            login.Text = "LOGGED IN  •  CHANGE NICK";
-                            retry.Stop();
-                            retry.Dispose();
-                            return;
-                        }
+                        login.Text = "LOGGED IN  •  CHANGE NICK";
+                        retry.Stop();
+                        retry.Dispose();
+                        return;
                     }
-                    catch { }
+                }
+                catch
+                {
+                    // Retry while the socket/form finishes initialising.
                 }
 
                 if (attempts >= 40)
@@ -301,27 +289,9 @@ namespace opentuner
                 }
             };
 
+            retry.Tick += tryLogin;
             retry.Start();
-            // Run one attempt immediately rather than always waiting for the first tick.
-            try
-            {
-                object client = clientField == null ? null : clientField.GetValue(form);
-                PropertyInfo connectedProperty = client == null ? null : client.GetType().GetProperty("Connected", BindingFlags.Instance | BindingFlags.Public);
-                bool connected = connectedProperty != null && Convert.ToBoolean(connectedProperty.GetValue(client, null));
-                if (connected)
-                {
-                    if (nickLabel != null) nickLabel.Text = value;
-                    setNick.Invoke(form, null);
-                    TextBox message = GetMessageBox(form);
-                    if (message != null && message.Enabled)
-                    {
-                        login.Text = "LOGGED IN  •  CHANGE NICK";
-                        retry.Stop();
-                        retry.Dispose();
-                    }
-                }
-            }
-            catch { }
+            tryLogin(null, EventArgs.Empty);
         }
     }
 }
