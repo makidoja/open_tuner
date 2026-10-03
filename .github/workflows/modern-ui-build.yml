@@ -24,7 +24,7 @@ jobs:
         run: nuget restore opentuner.sln
 
       - name: Build Release x64
-        run: msbuild opentuner.csproj /m /p:Configuration=Release /p:Platform=AnyCPU /p:RestorePackages=false
+        run: msbuild opentuner.csproj /m /p:Configuration=Release /p:Platform=AnyCPU /p:OutputType=WinExe /p:RestorePackages=false
 
       - name: Add official OpenTuner FFmpeg runtime
         shell: pwsh
