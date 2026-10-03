@@ -93,9 +93,10 @@ namespace opentuner
 
                 foreach (StoredFrequency p in presets)
                 {
-                    string rf = p.Frequency >= 10000000
-                        ? (p.Frequency / 1000M).ToString("0.000") + " MHz RF"
-                        : (p.Frequency / 1000M).ToString("0.000") + " MHz";
+                    uint displayFrequencyKHz = NormalisePresetFrequencyKHz(p.Frequency);
+                    string rf = displayFrequencyKHz >= 10000000
+                        ? (displayFrequencyKHz / 1000M).ToString("0.000") + " MHz RF"
+                        : (displayFrequencyKHz / 1000M).ToString("0.000") + " MHz";
                     string input = p.RFInput > 0 ? "  IN " + (p.RFInput == 1 ? "A" : "B") : "";
                     list.Items.Add(p.Name + "   |   " + rf + "   |   " + p.SymbolRate + " kS" + input);
                 }
@@ -148,13 +149,33 @@ namespace opentuner
                 int tuner = tunerB.Checked ? 1 : 0;
                 StoredFrequency preset = presets[list.SelectedIndex];
 
-                if (preset.Offset <= 15000000)
-                    BackendSetOffset(tuner, preset.Offset);
+                uint frequencyKHz = NormalisePresetFrequencyKHz(preset.Frequency);
+                uint offsetKHz = NormalisePresetOffsetKHz(preset.Offset);
+
+                if (offsetKHz <= 15000000)
+                    BackendSetOffset(tuner, offsetKHz);
                 if (preset.RFInput == 1 || preset.RFInput == 2)
                     BackendSetRfInput(tuner, preset.RFInput - 1);
 
-                BackendTune(tuner, preset.Frequency, preset.SymbolRate);
+                BackendTune(tuner, frequencyKHz, preset.SymbolRate);
             }
+        }
+
+        // Older preset dialogs store values in kHz, but the modern UI naturally
+        // encourages users to type values such as 1310 and 9750 as MHz. Accept
+        // both forms so existing presets and newly-entered modern presets work.
+        private static uint NormalisePresetFrequencyKHz(uint value)
+        {
+            if (value >= 400 && value <= 15000)
+                return checked(value * 1000U);
+            return value;
+        }
+
+        private static uint NormalisePresetOffsetKHz(uint value)
+        {
+            if (value > 0 && value <= 15000)
+                return checked(value * 1000U);
+            return value;
         }
 
         public void BackendShowSpectrum()
