@@ -3,13 +3,13 @@
     public class WinterHillSettings
     {
         // websocket
-        public string WinterHillWSHost = "192.168.0.122";
+        public string WinterHillWSHost = "192.168.1.91";
         public int WinterHillWSPort = 8080;
         public int WinterHillWSUdpBasePort = 9900;
 
         public byte DefaultInterface = 1;
 
-        public string WinterHillUdpHost = "192.168.0.124";
+        public string WinterHillUdpHost = "192.168.1.91";
         public int WinterHillUdpBasePort = 9900;
 
 
