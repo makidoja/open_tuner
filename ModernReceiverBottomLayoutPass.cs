@@ -34,11 +34,11 @@ namespace opentuner
                 Panel controls = tunerBox.Parent as Panel;
                 if (controls == null) continue;
 
-                // Keep the tuner controls as a tidy block on the bottom-right.
-                tunerBox.Size = new Size(390, 122);
+                // Compact, aligned block on the bottom-right. The receiver state sits directly above it.
+                tunerBox.Size = new Size(350, 128);
                 tunerBox.Location = new Point(
-                    Math.Max(525, controls.ClientSize.Width - tunerBox.Width - 4),
-                    Math.Max(42, controls.ClientSize.Height - tunerBox.Height - 4));
+                    Math.Max(445, controls.ClientSize.Width - tunerBox.Width - 4),
+                    Math.Max(58, controls.ClientSize.Height - tunerBox.Height - 4));
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
 
                 LayoutTunerBox(tunerBox, tuner);
@@ -49,40 +49,41 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner)
         {
-            MoveLabel(box, "TUNER CONTROL", 8, 2, 130, 18, 8.5f, Muted);
-            MoveLabel(box, "FREQ", 8, 24, 42, 32, 8.5f, Muted);
-            MoveLabel(box, "SR", 194, 24, 24, 32, 8.5f, Muted);
-            MoveLabel(box, "TUNER", 8, 60, 48, 32, 8.5f, Muted);
-            MoveLabel(box, "LO FREQ", 194, 60, 58, 32, 8.5f, Muted);
+            // Labels sit above the fields; the fields themselves form the alignment grid.
+            MoveLabel(box, "TUNER CONTROL", 10, 2, 130, 17, 8.5f, Muted);
+            MoveLabel(box, "FREQ", 10, 20, 150, 16, 8.5f, Muted);
+            MoveLabel(box, "SR", 175, 20, 80, 16, 8.5f, Muted);
+            MoveLabel(box, "TUNER", 10, 72, 150, 16, 8.5f, Muted);
+            MoveLabel(box, "LO FREQ", 175, 72, 90, 16, 8.5f, Muted);
 
             Panel freqBorder = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
             if (freqBorder != null)
             {
-                freqBorder.Location = new Point(52, 24);
-                freqBorder.Size = new Size(130, 32);
+                freqBorder.Location = new Point(10, 37);
+                freqBorder.Size = new Size(150, 32);
                 StyleEntry(freqBorder, 10.5f);
             }
 
             ComboBox sr = FindByName<ComboBox>(box, "ModernSrCombo" + tuner);
             if (sr != null)
             {
-                sr.Location = new Point(220, 24);
-                sr.Size = new Size(100, 32);
+                sr.Location = new Point(175, 37);
+                sr.Size = new Size(80, 32);
                 sr.Font = new Font("Segoe UI Semibold", 10f);
             }
 
             ComboBox rf = FindByName<ComboBox>(box, "ModernRfInput" + tuner);
             if (rf != null)
             {
-                rf.Location = new Point(58, 60);
-                rf.Size = new Size(124, 32);
+                rf.Location = new Point(10, 89);
+                rf.Size = new Size(150, 32);
                 rf.Font = new Font("Segoe UI Semibold", 10f);
             }
 
             Panel loBorder = FindByName<Panel>(box, "ModernLoBorder" + tuner);
             if (loBorder != null)
             {
-                loBorder.Location = new Point(254, 60);
+                loBorder.Location = new Point(175, 89);
                 loBorder.Size = new Size(90, 32);
                 StyleEntry(loBorder, 10.5f);
             }
@@ -90,16 +91,17 @@ namespace opentuner
             CheckBox lo = FindByName<CheckBox>(box, "ModernLoEnabled" + tuner);
             if (lo != null)
             {
-                lo.Location = new Point(350, 64);
-                lo.Size = new Size(38, 24);
-                lo.Font = new Font("Segoe UI Semibold", 8.5f);
+                lo.Text = "LO";
+                lo.Location = new Point(274, 93);
+                lo.Size = new Size(50, 24);
+                lo.Font = new Font("Segoe UI Semibold", 9f);
             }
 
             Button tune = FindButtonExact(box, "TUNE");
             if (tune != null)
             {
-                tune.Location = new Point(280, 94);
-                tune.Size = new Size(102, 25);
+                tune.Location = new Point(265, 37);
+                tune.Size = new Size(75, 32);
                 tune.Font = new Font("Segoe UI Semibold", 9f);
             }
         }
@@ -108,12 +110,12 @@ namespace opentuner
         {
             // One clean media-control row immediately below the RX picture.
             Label volIcon = FindLabelExact(controls, "🔊");
-            if (volIcon != null) { volIcon.Location = new Point(4, 5); volIcon.Size = new Size(24, 30); }
+            if (volIcon != null) { volIcon.Location = new Point(4, 4); volIcon.Size = new Size(24, 30); }
 
             TrackBar volume = FindFirst<TrackBar>(controls);
             if (volume != null)
             {
-                volume.Location = new Point(28, 4);
+                volume.Location = new Point(28, 3);
                 volume.Size = new Size(124, 32);
             }
 
@@ -123,17 +125,17 @@ namespace opentuner
             Button snapshot = FindButtonContains(controls, "SNAPSHOT");
             Button fullscreen = FindButtonExact(controls, "⛶");
 
-            if (mute != null) { mute.Location = new Point(158, 5); mute.Size = new Size(72, 30); }
-            if (record != null) { record.Location = new Point(236, 5); record.Size = new Size(88, 30); }
-            if (snapshot != null) { snapshot.Location = new Point(330, 5); snapshot.Size = new Size(100, 30); }
-            if (fullscreen != null) { fullscreen.Location = new Point(436, 5); fullscreen.Size = new Size(42, 30); }
+            if (mute != null) { mute.Location = new Point(158, 4); mute.Size = new Size(72, 30); }
+            if (record != null) { record.Location = new Point(236, 4); record.Size = new Size(88, 30); }
+            if (snapshot != null) { snapshot.Location = new Point(330, 4); snapshot.Size = new Size(100, 30); }
+            if (fullscreen != null) { fullscreen.Location = new Point(436, 4); fullscreen.Size = new Size(42, 30); }
 
-            // Drop the main readout, MER and Margin below the media-control row.
+            // Main frequency plus larger MER/Margin readout remain grouped on the left.
             Label freq = FindLargestFrequencyLabel(controls);
             if (freq != null)
             {
-                freq.Location = new Point(4, 43);
-                freq.Size = new Size(225, 42);
+                freq.Location = new Point(4, 42);
+                freq.Size = new Size(195, 42);
                 freq.Font = new Font("Segoe UI Semibold", 21f);
             }
 
@@ -141,51 +143,89 @@ namespace opentuner
             Label margin = FindLabelStarts(controls, "Margin");
             if (mer != null)
             {
-                mer.Location = new Point(235, 45);
-                mer.Size = new Size(130, 24);
+                mer.Location = new Point(205, 44);
+                mer.Size = new Size(112, 24);
                 mer.Font = new Font("Segoe UI Semibold", 11.5f);
                 mer.ForeColor = Text;
             }
             if (margin != null)
             {
-                margin.Location = new Point(375, 45);
-                margin.Size = new Size(145, 24);
+                margin.Location = new Point(325, 44);
+                margin.Size = new Size(116, 24);
                 margin.Font = new Font("Segoe UI Semibold", 11.5f);
                 margin.ForeColor = Text;
             }
 
-            // Existing MER/Margin bargraph panels created by ModernReceiverUiPass.
             foreach (Control c in controls.Controls)
             {
                 Panel p = c as Panel;
                 if (p == null || p == tunerBox || p.Height != 11) continue;
-                if (p.Width == 124) p.Location = new Point(235, 72);
-                else if (p.Width == 134) p.Location = new Point(375, 72);
+
+                if (IsMerBar(p))
+                {
+                    p.Location = new Point(205, 71);
+                    p.Size = new Size(108, 12);
+                }
+                else if (IsMarginBar(p))
+                {
+                    p.Location = new Point(325, 71);
+                    p.Size = new Size(112, 12);
+                }
             }
 
+            // LOCKED and callsign are deliberately positioned immediately above TUNER CONTROL.
+            int stateY = Math.Max(36, tunerBox.Top - 31);
             Label locked = FindLabelContains(controls, "LOCK");
             if (locked != null)
             {
-                locked.Location = new Point(4, 88);
-                locked.Size = new Size(100, 28);
+                locked.Location = new Point(tunerBox.Left, stateY);
+                locked.Size = new Size(100, 27);
             }
 
             Label service = FindServiceLabel(controls, locked);
             if (service != null)
             {
-                service.Location = new Point(114, 88);
-                service.Size = new Size(200, 28);
+                service.Location = new Point(tunerBox.Left + 108, stateY);
+                service.Size = new Size(Math.Max(120, tunerBox.Width - 108), 27);
                 service.Font = new Font("Segoe UI Semibold", 11.5f);
                 service.ForeColor = Color.White;
+                service.TextAlign = ContentAlignment.MiddleLeft;
             }
 
+            // Pin the receiver detail/status line to the absolute bottom-left of the section.
             Label details = FindDetailsLabel(controls);
             if (details != null)
             {
-                details.Location = new Point(4, 119);
+                details.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
+                details.Location = new Point(4, Math.Max(0, controls.ClientSize.Height - 22));
                 details.Size = new Size(Math.Max(290, tunerBox.Left - 12), 20);
                 details.Font = new Font("Segoe UI Semibold", 9.25f);
+                details.ForeColor = Text;
             }
+        }
+
+        private static bool IsMerBar(Panel p)
+        {
+            foreach (Control c in p.Controls)
+            {
+                Panel fill = c as Panel;
+                if (fill != null && fill.BackColor.R > fill.BackColor.G && fill.BackColor.B > fill.BackColor.G)
+                    return true;
+                if (fill != null && fill.BackColor.B > 180 && fill.BackColor.G > 90)
+                    return true;
+            }
+            return p.Width == 124;
+        }
+
+        private static bool IsMarginBar(Panel p)
+        {
+            foreach (Control c in p.Controls)
+            {
+                Panel fill = c as Panel;
+                if (fill != null && fill.BackColor.G > fill.BackColor.R && fill.BackColor.G > fill.BackColor.B)
+                    return true;
+            }
+            return p.Width == 134;
         }
 
         private static void StyleEntry(Panel border, float fontSize)
@@ -211,6 +251,7 @@ namespace opentuner
             l.Size = new Size(w, h);
             l.Font = new Font("Segoe UI Semibold", size);
             l.ForeColor = colour;
+            l.TextAlign = ContentAlignment.MiddleLeft;
         }
 
         private static Label FindLargestFrequencyLabel(Control root)
