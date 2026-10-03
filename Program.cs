@@ -92,6 +92,7 @@ namespace opentuner
                 ModernSelectorFixPass.Attach(mainForm);
                 ModernFinalPolishPass.Attach(mainForm);
                 ModernReceiverBottomLayoutPass.Attach(mainForm);
+                ModernReceiverStatusPass.Attach(mainForm);
                 ModernBatcSpectrumPass.Attach(mainForm);
 
                 if (!FFmpegEngineAvailable)
