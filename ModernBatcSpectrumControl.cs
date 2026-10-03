@@ -136,6 +136,7 @@ namespace opentuner
                 using (Font f = new Font("Segoe UI Semibold", 9f))
                 using (Brush b = new SolidBrush(Muted))
                     g.DrawString("BATC wideband spectrum — connecting…", f, b, plot.Left + 10, plot.Top + 10);
+                DrawReceiverSplit(g, plot);
                 DrawAxis(g, plot);
                 return;
             }
@@ -143,6 +144,7 @@ namespace opentuner
             DrawGrid(g, plot);
             DrawSpectrum(g, plot, localFft);
             DrawSignals(g, plot, localSignals);
+            DrawReceiverSplit(g, plot);
             DrawTunedMarkers(g, plot);
             DrawAxis(g, plot);
         }
@@ -162,6 +164,26 @@ namespace opentuner
                     int x = plot.Left + (plot.Width * i / 9);
                     g.DrawLine(p, x, plot.Top, x, plot.Bottom);
                 }
+            }
+        }
+
+        private void DrawReceiverSplit(Graphics g, Rectangle plot)
+        {
+            int mid = plot.Top + plot.Height / 2;
+            using (Pen p = new Pen(Color.FromArgb(150, 190, 205, 220), 1f))
+            {
+                p.DashStyle = DashStyle.Dash;
+                g.DrawLine(p, plot.Left, mid, plot.Right, mid);
+            }
+
+            using (Font f = new Font("Segoe UI Semibold", 7.5f))
+            using (Brush b = new SolidBrush(Color.FromArgb(215, 220, 230, 240)))
+            {
+                string text = "RX1 ABOVE   •   RX2 BELOW";
+                SizeF size = g.MeasureString(text, f);
+                float x = Math.Max(plot.Left + 4, plot.Right - size.Width - 6);
+                float y = Math.Max(plot.Top + 2, mid - size.Height - 2);
+                g.DrawString(text, f, b, x, y);
             }
         }
 
