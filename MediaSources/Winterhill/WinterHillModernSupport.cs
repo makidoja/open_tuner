@@ -79,11 +79,9 @@ namespace opentuner.MediaSources.WinterHill
             ModernSetVolume(tuner, volume);
         }
 
-        // PicoTuner sends a regular discovery broadcast on UDP 9997 containing its
-        // current IP address. Listen briefly before the first tune command so a stale
-        // WinterHillUdpHost (for example the Windows PC's own address) cannot create a
-        // chicken-and-egg situation where no status arrives and therefore the correct
-        // receiver address is never learned.
+        // PicoTuner sends a regular discovery broadcast on UDP 9997. The UDP sender
+        // address is authoritative and is safer than parsing the human-readable payload,
+        // which some firmware versions can format in a way that drops part of the address.
         public bool ModernDiscoverPicoTuner(int timeoutMs)
         {
             if (!ModernIsPicoTunerEthernet)
@@ -99,39 +97,36 @@ namespace opentuner.MediaSources.WinterHill
                 byte[] bytes = listener.Receive(ref remote);
                 string text = Encoding.ASCII.GetString(bytes);
 
-                string detectedIp = null;
-                string[] lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string raw in lines)
+                string detectedIp = remote != null && remote.Address != null
+                    ? remote.Address.ToString()
+                    : null;
+
+                if (string.IsNullOrWhiteSpace(detectedIp))
                 {
-                    string line = raw.Trim();
-                    if (line.IndexOf("IP address", StringComparison.OrdinalIgnoreCase) >= 0)
+                    string[] lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string raw in lines)
                     {
+                        string line = raw.Trim();
+                        if (line.IndexOf("IP address", StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+
                         int colon = line.IndexOf(':');
                         if (colon >= 0 && colon + 1 < line.Length)
                             detectedIp = line.Substring(colon + 1).Trim();
-                        else if (line.Length > 17)
-                            detectedIp = line.Substring(17).Trim();
+                        break;
                     }
                 }
 
                 IPAddress parsed;
                 if (string.IsNullOrWhiteSpace(detectedIp) || !IPAddress.TryParse(detectedIp, out parsed))
-                {
-                    // The sender address is also authoritative for the PicoTuner broadcast.
-                    detectedIp = remote.Address.ToString();
-                }
+                    return false;
 
-                if (!string.IsNullOrWhiteSpace(detectedIp))
-                {
-                    runtimeUdpHost = detectedIp;
-                    Serilog.Log.Warning("PicoTuner discovered at " + detectedIp + " - using this address for startup control");
-                    return true;
-                }
+                runtimeUdpHost = detectedIp;
+                Serilog.Log.Warning("PicoTuner discovered at " + detectedIp + " - using this address for startup control");
+                return true;
             }
             catch (SocketException ex)
             {
-                // Timeout or another listener already using 9997: retain configured host
-                // and allow the normal live-status learning path to correct it later.
                 Serilog.Log.Information("PicoTuner discovery did not complete: " + ex.Message);
             }
             catch (Exception ex)
@@ -146,10 +141,6 @@ namespace opentuner.MediaSources.WinterHill
             return false;
         }
 
-        // PicoTuner status packets teach the modern build the receiver's real IP address.
-        // Once the correct host is known we must resend BOTH LNB power and tuning. On a
-        // cold start the original voltage commands may have gone to a stale configured IP,
-        // leaving the tuner correctly addressed but with no RF at the NIM.
         public void ModernReapplyStartupTune()
         {
             if (!ModernIsPicoTunerEthernet)
