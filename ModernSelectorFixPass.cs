@@ -28,6 +28,35 @@ namespace opentuner
             };
         }
 
+        internal static void StyleDialogSelectors(Form form)
+        {
+            if (form == null || form.IsDisposed) return;
+            StyleDialogSelectorsRecursive(form.Controls);
+        }
+
+        private static void StyleDialogSelectorsRecursive(Control.ControlCollection controls)
+        {
+            foreach (Control c in controls)
+            {
+                ComboBox combo = c as ComboBox;
+                if (combo != null && combo.Visible)
+                {
+                    string safeName = string.IsNullOrWhiteSpace(combo.Name)
+                        ? "Combo" + combo.GetHashCode().ToString("X")
+                        : combo.Name;
+                    Button button = ReplaceSelector(combo, "ModernDialog_" + safeName, false);
+                    if (button != null)
+                    {
+                        button.Height = Math.Max(30, combo.Height + 4);
+                        button.Width = combo.Width;
+                    }
+                }
+
+                if (c.HasChildren)
+                    StyleDialogSelectorsRecursive(c.Controls);
+            }
+        }
+
         private static void FixTopToolbar(ModernConceptForm form)
         {
             FlowLayoutPanel bar = FindControl<FlowLayoutPanel>(form, "ModernTopToolbar");
