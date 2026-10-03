@@ -34,8 +34,6 @@ namespace opentuner
                 Panel controls = tunerBox.Parent as Panel;
                 if (controls == null) continue;
 
-                // Keep the tuner block bottom-right, with a little extra height so the
-                // lower RF/LO row and checkbox are never clipped.
                 tunerBox.Size = new Size(350, 140);
                 tunerBox.Location = new Point(
                     Math.Max(445, controls.ClientSize.Width - tunerBox.Width - 4),
@@ -50,7 +48,6 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner)
         {
-            // Labels sit above the fields; the fields themselves form the alignment grid.
             MoveLabel(box, "TUNER CONTROL", 10, 2, 130, 17, 8.5f, Muted);
             MoveLabel(box, "FREQ", 10, 20, 150, 16, 8.5f, Muted);
             MoveLabel(box, "SR", 175, 20, 80, 16, 8.5f, Muted);
@@ -109,7 +106,6 @@ namespace opentuner
 
         private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox)
         {
-            // One clean media-control row immediately below the RX picture.
             Label volIcon = FindLabelExact(controls, "🔊");
             if (volIcon != null) { volIcon.Location = new Point(4, 4); volIcon.Size = new Size(24, 30); }
 
@@ -131,29 +127,30 @@ namespace opentuner
             if (snapshot != null) { snapshot.Location = new Point(330, 4); snapshot.Size = new Size(100, 30); }
             if (fullscreen != null) { fullscreen.Location = new Point(436, 4); fullscreen.Size = new Size(42, 30); }
 
-            // Put receiver state on the SAME top line as MUTE/RECORD/SNAPSHOT/FULLSCREEN.
-            // This keeps the tuner block clear and removes the compressed status row above it.
-            int stateX = fullscreen != null ? fullscreen.Right + 12 : 490;
+            // Centre receiver state directly above the tuner control panel.
             Label locked = FindLabelContains(controls, "LOCK");
+            Label service = FindServiceLabel(controls, locked);
+            int stateWidth = Math.Min(tunerBox.Width, 340);
+            int stateLeft = tunerBox.Left + Math.Max(0, (tunerBox.Width - stateWidth) / 2);
+            int lockWidth = 88;
+            int serviceWidth = Math.Max(120, stateWidth - lockWidth - 8);
+
             if (locked != null)
             {
-                locked.Location = new Point(stateX, 4);
-                locked.Size = new Size(88, 30);
-                locked.TextAlign = ContentAlignment.MiddleLeft;
+                locked.Location = new Point(stateLeft, 4);
+                locked.Size = new Size(lockWidth, 30);
+                locked.TextAlign = ContentAlignment.MiddleCenter;
             }
 
-            Label service = FindServiceLabel(controls, locked);
             if (service != null)
             {
-                int serviceX = stateX + 94;
-                service.Location = new Point(serviceX, 4);
-                service.Size = new Size(Math.Max(120, controls.ClientSize.Width - serviceX - 4), 30);
+                service.Location = new Point(stateLeft + lockWidth + 8, 4);
+                service.Size = new Size(serviceWidth, 30);
                 service.Font = new Font("Segoe UI Semibold", 11.5f);
                 service.ForeColor = Color.White;
-                service.TextAlign = ContentAlignment.MiddleLeft;
+                service.TextAlign = ContentAlignment.MiddleCenter;
             }
 
-            // Main frequency plus larger MER/Margin readout remain grouped on the left.
             Label freq = FindLargestFrequencyLabel(controls);
             if (freq != null)
             {
@@ -196,7 +193,6 @@ namespace opentuner
                 }
             }
 
-            // Pin the receiver detail/status line to the absolute bottom-left of the section.
             Label details = FindDetailsLabel(controls);
             if (details != null)
             {
