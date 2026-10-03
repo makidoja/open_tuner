@@ -9,6 +9,8 @@ namespace opentuner
 {
     public partial class MainForm
     {
+        public event Action<int, uint, uint> BackendPresetLoaded;
+
         public void BackendShowBatcChat()
         {
             if (videoSource == null)
@@ -156,6 +158,13 @@ namespace opentuner
                     BackendSetOffset(tuner, offsetKHz);
                 if (preset.RFInput == 1 || preset.RFInput == 2)
                     BackendSetRfInput(tuner, preset.RFInput - 1);
+
+                // Tell the modern UI about the recalled values before tuning. The modern
+                // visible FREQ/SR controls are proxies over hidden legacy controls, so without
+                // this notification the receiver tuned but the control box kept stale values.
+                var presetLoaded = BackendPresetLoaded;
+                if (presetLoaded != null)
+                    presetLoaded(tuner, frequencyKHz, preset.SymbolRate);
 
                 BackendTune(tuner, frequencyKHz, preset.SymbolRate);
             }
