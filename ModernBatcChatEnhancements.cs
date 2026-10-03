@@ -100,6 +100,9 @@ namespace opentuner
             if (status == null || status.Items["ModernBatcLogin"] != null) return;
 
             ToolStripStatusLabel nickLabel = GetNickLabel(form);
+            MethodInfo originalNickClick = typeof(WebChatForm).GetMethod(
+                "txtNick_Click",
+                BindingFlags.Instance | BindingFlags.NonPublic);
 
             ToolStripStatusLabel spacer = new ToolStripStatusLabel
             {
@@ -124,12 +127,20 @@ namespace opentuner
                 ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            // Use the exact original nickname click path. This is the same working path as
-            // clicking the blue NONICK/M0CKE label at the bottom-left of the chat window.
+            // Invoke the original txtNick_Click event handler directly. The blue NONICK link
+            // is wired to this method by the original designer and the user has confirmed that
+            // path works correctly. ToolStripStatusLabel.PerformClick() did not reliably raise it.
             login.Click += delegate
             {
-                if (nickLabel != null && !nickLabel.IsDisposed)
-                    nickLabel.PerformClick();
+                try
+                {
+                    if (originalNickClick != null)
+                        originalNickClick.Invoke(form, new object[] { nickLabel, EventArgs.Empty });
+                }
+                catch
+                {
+                    // Keep the original NONICK link available as a fallback.
+                }
             };
 
             status.Items.Add(spacer);
