@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
+using opentuner.MediaSources;
 
 namespace opentuner
 {
@@ -12,6 +13,7 @@ namespace opentuner
         private static bool spectrumResizeHooked;
         private static bool quickTuneHooked;
         private static bool navigationHooked;
+        private static bool videoOwnershipHooked;
         private static Timer connectionStatusTimer;
 
         public static void Attach(ModernConceptForm form)
@@ -26,6 +28,7 @@ namespace opentuner
                 ApplyCompactSpectrumLayout(form);
                 HookQuickTune(form);
                 HookNavigation(form);
+                StabiliseVideoOwnership(form);
                 StartConnectionStatusCorrection(form);
             };
 
@@ -42,6 +45,12 @@ namespace opentuner
         {
             FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
             return boxField == null ? null : boxField.GetValue(form) as PictureBox;
+        }
+
+        private static Panel[] GetVideoHosts(ModernConceptForm form)
+        {
+            FieldInfo hostField = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
+            return hostField == null ? null : hostField.GetValue(form) as Panel[];
         }
 
         private static IEnumerable<Button> FindButtons(Control root)
@@ -106,6 +115,67 @@ namespace opentuner
             navigationHooked = true;
         }
 
+        private static void StabiliseVideoOwnership(ModernConceptForm form)
+        {
+            if (videoOwnershipHooked || form == null) return;
+
+            MainForm backend = GetBackend(form);
+            Panel[] hosts = GetVideoHosts(form);
+            MethodInfo adoptMethod = typeof(ModernConceptForm).GetMethod("AdoptVideoControls", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo timerField = typeof(ModernConceptForm).GetField("uiTimer", BindingFlags.Instance | BindingFlags.NonPublic);
+            Timer legacyTimer = timerField == null ? null : timerField.GetValue(form) as Timer;
+
+            if (backend == null || hosts == null || adoptMethod == null) return;
+
+            // The legacy modern form polled every 300 ms and repeatedly attempted to
+            // re-parent player controls. That could cross thread ownership boundaries.
+            // Stop that poller and attach video controls only from the UI thread when
+            // the backend actually starts producing receiver data.
+            if (legacyTimer != null)
+                legacyTimer.Stop();
+
+            Action attachIfNeeded = delegate
+            {
+                if (form.IsDisposed) return;
+                bool needsAttach = false;
+                for (int i = 0; i < Math.Min(2, hosts.Length); i++)
+                {
+                    if (hosts[i] != null && hosts[i].Controls.Count == 0)
+                    {
+                        needsAttach = true;
+                        break;
+                    }
+                }
+
+                if (!needsAttach) return;
+                try { adoptMethod.Invoke(form, null); } catch { }
+            };
+
+            attachIfNeeded();
+
+            backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
+            {
+                if (form.IsDisposed) return;
+                try
+                {
+                    form.BeginInvoke((MethodInvoker)delegate { attachIfNeeded(); });
+                }
+                catch { }
+            };
+
+            form.FormClosed += delegate
+            {
+                if (connectionStatusTimer != null)
+                {
+                    connectionStatusTimer.Stop();
+                    connectionStatusTimer.Dispose();
+                    connectionStatusTimer = null;
+                }
+            };
+
+            videoOwnershipHooked = true;
+        }
+
         private static void ApplyCompactSpectrumLayout(ModernConceptForm form)
         {
             try
@@ -126,9 +196,6 @@ namespace opentuner
                     int height = 126;
                     int left = Math.Max(12, (card.ClientSize.Width - width) / 2);
 
-                    // Render BATCSpectrum directly into the modern-sized PictureBox.
-                    // This removes the legacy bitmap proxy, prevents stretched text,
-                    // and keeps BATCSpectrum's own mouse hit-testing exact.
                     nativeBox.Visible = true;
                     nativeBox.Anchor = AnchorStyles.Top;
                     nativeBox.SizeMode = PictureBoxSizeMode.Normal;
