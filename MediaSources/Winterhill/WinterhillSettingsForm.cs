@@ -20,6 +20,14 @@ namespace opentuner.MediaSources.WinterHill
 
             txtUDPBasePort.Text = _settings.WinterHillUdpBasePort.ToString();
             txtUDPIP.Text = _settings.WinterHillUdpHost.ToString();
+
+            Shown += delegate
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    ModernSelectorFixPass.StyleDialogSelectors(this);
+                });
+            };
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
