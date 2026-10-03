@@ -11,12 +11,12 @@ namespace opentuner
         private static bool attached;
         private static int presetTargetTuner;
         private static Label presetTargetLabel;
-        private static Label[] detailLabels = new Label[2];
-        private static Button[] recordButtons = new Button[2];
-        private static Panel[] merBarFill = new Panel[2];
-        private static Panel[] marginBarFill = new Panel[2];
-        private static Panel[] merBarBack = new Panel[2];
-        private static Panel[] marginBarBack = new Panel[2];
+        private static readonly Label[] detailLabels = new Label[2];
+        private static readonly Button[] recordButtons = new Button[2];
+        private static readonly Panel[] merBarFill = new Panel[2];
+        private static readonly Panel[] marginBarFill = new Panel[2];
+        private static readonly Panel[] merBarBack = new Panel[2];
+        private static readonly Panel[] marginBarBack = new Panel[2];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -56,6 +56,36 @@ namespace opentuner
             return f == null ? null : f.GetValue(form) as NumericUpDown[];
         }
 
+        private static Label[] LiveFreqLabels(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("liveFreq", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as Label[];
+        }
+
+        private static Label[] ServiceLabels(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("serviceLabels", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as Label[];
+        }
+
+        private static Label[] LockLabels(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("lockLabels", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as Label[];
+        }
+
+        private static TrackBar[] VolumeBars(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("volumeBars", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as TrackBar[];
+        }
+
+        private static Button[] MuteButtons(ModernConceptForm form)
+        {
+            FieldInfo f = typeof(ModernConceptForm).GetField("muteButtons", BindingFlags.Instance | BindingFlags.NonPublic);
+            return f == null ? null : f.GetValue(form) as Button[];
+        }
+
         private static FlowLayoutPanel PresetList(ModernConceptForm form)
         {
             FieldInfo f = typeof(ModernConceptForm).GetField("presetList", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -66,6 +96,11 @@ namespace opentuner
         {
             MainForm backend = Backend(form);
             Panel[] hosts = VideoHosts(form);
+            Label[] liveFreq = LiveFreqLabels(form);
+            Label[] service = ServiceLabels(form);
+            Label[] locked = LockLabels(form);
+            TrackBar[] volume = VolumeBars(form);
+            Button[] mute = MuteButtons(form);
             if (backend == null || hosts == null) return;
 
             for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
@@ -102,12 +137,26 @@ namespace opentuner
                     };
                 }
 
+                Button fullscreen = FindButton(card, "⛶");
                 Label detail = FindHintLabel(card);
                 if (detail != null)
                 {
                     detailLabels[tuner] = detail;
                     detail.Text = "Waiting for receiver details";
+                    detail.AutoSize = false;
+                    detail.Location = new Point(4, 149);
+                    detail.Size = new Size(292, 19);
+                    detail.Font = new Font("Segoe UI Semibold", 9.25f);
+                    detail.ForeColor = Color.FromArgb(215, 228, 240);
                 }
+
+                LayoutReceiverControls(card, tuner,
+                    liveFreq != null && tuner < liveFreq.Length ? liveFreq[tuner] : null,
+                    service != null && tuner < service.Length ? service[tuner] : null,
+                    locked != null && tuner < locked.Length ? locked[tuner] : null,
+                    volume != null && tuner < volume.Length ? volume[tuner] : null,
+                    mute != null && tuner < mute.Length ? mute[tuner] : null,
+                    record, snapshot, fullscreen);
 
                 BuildSignalBars(card, tuner);
             }
@@ -133,21 +182,92 @@ namespace opentuner
             };
         }
 
+        private static void LayoutReceiverControls(Control card, int tuner, Label liveFreq, Label service, Label locked,
+            TrackBar volume, Button mute, Button record, Button snapshot, Button fullscreen)
+        {
+            Panel controls = FindBottomPanel(card);
+            if (controls == null) return;
+
+            if (liveFreq != null)
+            {
+                liveFreq.Location = new Point(4, 3);
+                liveFreq.Size = new Size(225, 42);
+                liveFreq.Font = new Font("Segoe UI Semibold", 21f);
+            }
+
+            if (locked != null)
+            {
+                locked.Location = new Point(4, 49);
+                locked.Size = new Size(100, 28);
+            }
+
+            if (service != null)
+            {
+                service.Location = new Point(114, 49);
+                service.Size = new Size(180, 28);
+                service.Font = new Font("Segoe UI Semibold", 11.5f);
+                service.ForeColor = Color.White;
+                service.TextAlign = ContentAlignment.MiddleLeft;
+            }
+
+            Label volIcon = FindLabelExact(controls, "🔊");
+            if (volIcon != null)
+            {
+                volIcon.Location = new Point(4, 84);
+                volIcon.Size = new Size(24, 28);
+            }
+
+            if (volume != null)
+            {
+                volume.Location = new Point(28, 83);
+                volume.Width = 125;
+            }
+
+            if (mute != null)
+            {
+                mute.Location = new Point(158, 82);
+                mute.Size = new Size(72, 30);
+            }
+
+            if (record != null)
+            {
+                record.Location = new Point(4, 116);
+                record.Size = new Size(86, 30);
+            }
+
+            if (snapshot != null)
+            {
+                snapshot.Location = new Point(96, 116);
+                snapshot.Size = new Size(98, 30);
+            }
+
+            if (fullscreen != null)
+            {
+                fullscreen.Location = new Point(200, 116);
+                fullscreen.Size = new Size(42, 30);
+            }
+        }
+
         private static void BuildSignalBars(Control card, int tuner)
         {
             Label mer = FindLabel(card, "MER");
             Label margin = FindLabel(card, "Margin");
             if (mer == null || margin == null || mer.Parent == null || margin.Parent == null) return;
 
-            mer.Location = new Point(350, 48);
-            mer.Size = new Size(92, 19);
-            margin.Location = new Point(445, 48);
-            margin.Size = new Size(100, 19);
+            mer.Location = new Point(235, 4);
+            mer.Size = new Size(130, 24);
+            mer.Font = new Font("Segoe UI Semibold", 11.5f);
+            mer.ForeColor = Color.FromArgb(242, 247, 252);
+
+            margin.Location = new Point(375, 4);
+            margin.Size = new Size(145, 24);
+            margin.Font = new Font("Segoe UI Semibold", 11.5f);
+            margin.ForeColor = Color.FromArgb(242, 247, 252);
 
             merBarBack[tuner] = new Panel
             {
-                Location = new Point(350, 69),
-                Size = new Size(88, 8),
+                Location = new Point(235, 30),
+                Size = new Size(124, 11),
                 BackColor = Color.FromArgb(25, 47, 68)
             };
             merBarFill[tuner] = new Panel
@@ -162,8 +282,8 @@ namespace opentuner
 
             marginBarBack[tuner] = new Panel
             {
-                Location = new Point(445, 69),
-                Size = new Size(92, 8),
+                Location = new Point(375, 30),
+                Size = new Size(134, 11),
                 BackColor = Color.FromArgb(25, 47, 68)
             };
             marginBarFill[tuner] = new Panel
@@ -279,6 +399,16 @@ namespace opentuner
             }
         }
 
+        private static Panel FindBottomPanel(Control card)
+        {
+            foreach (Control c in card.Controls)
+            {
+                Panel p = c as Panel;
+                if (p != null && p.Dock == DockStyle.Bottom) return p;
+            }
+            return null;
+        }
+
         private static Button FindButton(Control root, string contains)
         {
             foreach (Control c in root.Controls)
@@ -305,6 +435,22 @@ namespace opentuner
                 if (c.HasChildren)
                 {
                     Label nested = FindLabel(c, startsWith);
+                    if (nested != null) return nested;
+                }
+            }
+            return null;
+        }
+
+        private static Label FindLabelExact(Control root, string text)
+        {
+            foreach (Control c in root.Controls)
+            {
+                Label l = c as Label;
+                if (l != null && string.Equals((l.Text ?? string.Empty).Trim(), text, StringComparison.Ordinal))
+                    return l;
+                if (c.HasChildren)
+                {
+                    Label nested = FindLabelExact(c, text);
                     if (nested != null) return nested;
                 }
             }
