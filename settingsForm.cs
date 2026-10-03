@@ -46,6 +46,14 @@ namespace opentuner
             txtVideoPath.Text = _settings.media_video_path;
 
             checkBoxMuted.Checked = _settings.mute_at_startup;
+
+            Shown += delegate
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    ModernSelectorFixPass.StyleDialogSelectors(this);
+                });
+            };
         }
 
         private void ApplyModernSettingsStyle()
