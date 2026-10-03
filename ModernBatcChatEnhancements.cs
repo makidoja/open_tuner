@@ -13,6 +13,7 @@ namespace opentuner
         private static readonly Color Surface = Color.FromArgb(13, 28, 45);
         private static readonly Color Surface2 = Color.FromArgb(18, 38, 60);
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
+        private const BindingFlags InstanceFields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
         public static void Attach(WebChatForm form, WebChatSettings settings)
         {
@@ -34,19 +35,19 @@ namespace opentuner
 
         private static ToolStripStatusLabel GetNickLabel(WebChatForm form)
         {
-            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo nickField = typeof(WebChatForm).GetField("txtNick", InstanceFields);
             return nickField == null ? null : nickField.GetValue(form) as ToolStripStatusLabel;
         }
 
         private static TextBox GetMessageBox(WebChatForm form)
         {
-            FieldInfo field = typeof(WebChatForm).GetField("txtMessage", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo field = typeof(WebChatForm).GetField("txtMessage", InstanceFields);
             return field == null ? null : field.GetValue(form) as TextBox;
         }
 
         private static void ImproveNickDisplay(WebChatForm form)
         {
-            FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", InstanceFields);
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
             if (status == null) return;
 
@@ -95,12 +96,12 @@ namespace opentuner
 
         private static void AddLoginControl(WebChatForm form)
         {
-            FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo statusField = typeof(WebChatForm).GetField("statusStrip1", InstanceFields);
             StatusStrip status = statusField == null ? null : statusField.GetValue(form) as StatusStrip;
             if (status == null || status.Items["ModernBatcLogin"] != null) return;
 
             ToolStripStatusLabel nickLabel = GetNickLabel(form);
-            MethodInfo setNickMethod = typeof(WebChatForm).GetMethod("setNick", BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo originalNickClick = typeof(WebChatForm).GetMethod("txtNick_Click", BindingFlags.Instance | BindingFlags.NonPublic);
 
             ToolStripStatusLabel spacer = new ToolStripStatusLabel
             {
@@ -125,27 +126,27 @@ namespace opentuner
                 ToolTipText = "Set or change the BATC chat nickname"
             };
 
-            // Do not try to simulate a click on the NONICK ToolStrip label. Open the exact
-            // original nickname dialog here, copy its result into txtNick, then invoke the
-            // original private setNick() routine which emits the Socket.IO setnick event.
+            // Use the exact original nickname-click path. That dialog and handler already
+            // perform the working setNick() call and Socket.IO setnick emission.
             login.Click += delegate
             {
                 if (nickLabel == null || nickLabel.IsDisposed) return;
 
                 try
                 {
-                    using (setnickdialog nickDialog = new setnickdialog())
-                    {
-                        nickDialog.txtNick.Text = nickLabel.Text;
-                        if (nickDialog.ShowDialog(form) != DialogResult.OK) return;
+                    if (originalNickClick == null)
+                        throw new MissingMethodException("WebChatForm.txtNick_Click was not found.");
 
-                        string nick = (nickDialog.txtNick.Text ?? string.Empty).Trim();
-                        if (nick.Length == 0 || string.Equals(nick, "NONICK", StringComparison.OrdinalIgnoreCase)) return;
-
-                        nickLabel.Text = nick;
-                        if (setNickMethod != null)
-                            setNickMethod.Invoke(form, null);
-                    }
+                    originalNickClick.Invoke(form, new object[] { nickLabel, EventArgs.Empty });
+                }
+                catch (TargetInvocationException ex)
+                {
+                    Exception inner = ex.InnerException ?? ex;
+                    MessageBox.Show(
+                        "BATC chat nickname could not be set.\r\n\r\n" + inner.Message,
+                        "OpenTuner - BATC Chat",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 }
                 catch (Exception ex)
                 {
