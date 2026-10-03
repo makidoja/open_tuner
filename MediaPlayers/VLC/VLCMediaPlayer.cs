@@ -54,9 +54,6 @@ namespace opentuner.MediaPlayers.VLC
             {
                 try
                 {
-                    // Do not synchronously Invoke from the receiver worker thread. VLC stop/play
-                    // callbacks can arrive while the UI is processing native video messages and a
-                    // synchronous Invoke here can deadlock the application.
                     videoView.BeginInvoke(new updateMediaPlayerDelegate(updateVideoPlayer), new object[] { newPlayer, play });
                 }
                 catch (InvalidOperationException)
@@ -65,11 +62,36 @@ namespace opentuner.MediaPlayers.VLC
                 return;
             }
 
+            // LibVLC can decode audio without a usable video target. Make sure the WinForms
+            // VideoView has a live native handle before attaching the MediaPlayer, then bind
+            // the player explicitly to that HWND. This avoids the audio-only condition seen
+            // when the view is created inside a SplitterPanel before playback begins.
+            if (!videoView.IsHandleCreated)
+            {
+                IntPtr createHandle = videoView.Handle;
+            }
+
+            videoView.Visible = true;
             videoView.MediaPlayer = newPlayer;
+
+            if (newPlayer != null)
+            {
+                IntPtr targetHwnd = videoView.Handle;
+                if (targetHwnd != IntPtr.Zero)
+                {
+                    newPlayer.Hwnd = targetHwnd;
+                    Log.Information("VLC video target HWND: " + targetHwnd.ToInt64().ToString());
+                }
+
+                // Keep the video surface above any themed background panels. The info/volume
+                // overlays are re-added by OpenTuner as required and do not own the VLC HWND.
+                videoView.BringToFront();
+            }
 
             if (play && newPlayer != null && media != null)
             {
-                Log.Information("HWND: " + newPlayer.Hwnd.ToString());
+                Thread.Sleep(10);
+                Log.Information("VLC: starting playback on HWND " + newPlayer.Hwnd.ToString());
                 newPlayer.Play(media);
             }
         }
@@ -140,6 +162,7 @@ namespace opentuner.MediaPlayers.VLC
                         media_status.VideoCodec = media.CodecDescription(TrackType.Video, track.Codec);
                         media_status.VideoWidth = track.Data.Video.Width;
                         media_status.VideoHeight = track.Data.Video.Height;
+                        Log.Information("VLC video track: " + media_status.VideoCodec + " " + media_status.VideoWidth.ToString() + "x" + media_status.VideoHeight.ToString());
                         break;
                 }
             }
@@ -204,10 +227,6 @@ namespace opentuner.MediaPlayers.VLC
         {
             Log.Information("VLC: Play Command");
 
-            // Fully release the previous VLC input/player before creating the next one.
-            // The old code recreated these objects on every retune without disposing the
-            // previous Media/MediaInput and forced GC twice, which made rapid startup retunes
-            // prone to UI stalls and native VLC lockups.
             Stop();
             ts_data_queue.Clear();
             CreatePlayerObjects();
