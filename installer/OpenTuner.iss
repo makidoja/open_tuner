@@ -1,6 +1,6 @@
 #define MyAppName "OpenTuner"
 #define MyAppDisplayName "Open Tuner (ZR6TG)"
-#define MyAppVersion "M0CKE 0.C.21026"
+#define MyAppVersion "1.0.0"\n#define MyAppDisplayVersion "M0CKE 0.C.v1.0.0"
 #define MyAppPublisher "ZR6TG / M0CKE"
 #define MyAppExeName "opentuner.exe"
 
@@ -8,7 +8,7 @@
 AppId={{D97138B4-F2BA-584D-827A-A40489C26C66}
 AppName={#MyAppDisplayName}
 AppVersion={#MyAppVersion}
-AppVerName={#MyAppDisplayName} Version {#MyAppVersion}
+AppVerName={#MyAppDisplayName} Version {#MyAppDisplayVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL=https://github.com/makidoja/open_tuner
 AppSupportURL=https://github.com/makidoja/open_tuner/issues
@@ -20,7 +20,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\installer-output
-OutputBaseFilename=OpenTuner-M0CKE-0.C.21026-Setup
+OutputBaseFilename=OpenTuner-M0CKE-0.C.v1.0.0-Setup
 SetupIconFile=..\tv.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 LicenseFile=..\LICENSE
