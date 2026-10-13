@@ -7,13 +7,17 @@ Audit date: 2026-10-13. Scope: tracked repository files and selected build confi
 - Removed duplicate `ModernDashboard.cs` and `ModernTunerLayout.cs` Compile declarations from `Directory.Build.targets`; they remain in `Directory.Build.props`.
 - Updated `MODERN_UI.md` to describe the current installer and regression checks.
 
+## Stage 2 completed (2026-10-13)
+
+- Removed `ModernDashboardStartup.cs`, an empty partial MainForm placeholder.
+- Removed duplicate `tools/GenerateModernIcon.ps1`; `build/GenerateBrandIcon.ps1` remains the workflow's active icon generator.
+- Simplified `Directory.Build.targets` by removing the placeholder Compile item and redundant Release OutputType override. `Directory.Build.props` continues to specify WinExe and the Modern UI Compile entries.
+- These changes have **not yet passed Windows CI or playback regression testing**.
+
 ## Candidates requiring validation
 
 | Item | Finding | Before removal |
 |---|---|---|
-| `tools/GenerateModernIcon.ps1` | A second generator alongside actively used `build/GenerateBrandIcon.ps1` | Check references in workflows and developer instructions; compare icon output |
-| `ModernDashboardStartup.cs` | Empty partial `MainForm` placeholder included from `Directory.Build.targets` | Verify no external/build dependency, remove file and Compile item together |
-| `Directory.Build.targets` Release OutputType | May be redundant with `Directory.Build.props` | Verify both Debug and Release effective MSBuild properties |
 | `README.md` | Minimal upstream introduction | Expand project fork/build instructions without losing upstream attribution |
 | `packages.config` | Many direct and transitive .NET Framework packages; usage uncertain | Establish NuGet dependency graph and compare actual project references and Windows build output |
 | `FTD2XX_NET.XML` | API documentation shipped in source tree | Check whether useful to developers; installer should not include source-only docs |
