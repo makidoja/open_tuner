@@ -64,7 +64,7 @@
     <StartupObject>opentuner.Program</StartupObject>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>tv.ico</ApplicationIcon>
+    <ApplicationIcon>OpenTunerModern.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="CoreAudio, Version=2023.2.28.120, Culture=neutral, processorArchitecture=MSIL">
@@ -636,5 +636,9 @@
     <ItemGroup>
       <Compile Include="$(IntermediateOutputPath)gen.cs" />
     </ItemGroup>
+  </Target>
+
+  <Target Name="GenerateModernApplicationIcon" BeforeTargets="CoreCompile" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\GenerateModernIcon.ps1&quot; -OutputPath &quot;$(ProjectDir)OpenTunerModern.ico&quot;" />
   </Target>
 </Project>
