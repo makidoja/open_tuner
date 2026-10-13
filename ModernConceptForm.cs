@@ -313,6 +313,10 @@ namespace opentuner
         {
             if (sourceCombo.SelectedIndex < 0) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
+
+            // Give the backend the final visible video destinations before it creates
+            // the media players. This avoids native renderer HWND re-parenting.
+            backend.BackendSetVideoHosts(videoHosts.Cast<Control>().ToArray());
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
             if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
             visibleTuners = Math.Max(1, Math.Min(2, backend.BackendTunerCount));
