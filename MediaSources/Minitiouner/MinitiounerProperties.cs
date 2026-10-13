@@ -514,6 +514,7 @@ namespace opentuner.MediaSources.Minitiouner
             }
             
             source_data.demod_locked = (new_status.T1P2_demod_status >  1);
+            source_data.constellation = source_data.demod_locked ? new_status.T1P2_constellation : null;
 
             OnSourceData?.Invoke(0, source_data, "Tuner 1");
 
@@ -621,6 +622,7 @@ namespace opentuner.MediaSources.Minitiouner
                 source_data_2.db_margin = dbmargin;
                 source_data_2.service_name = _tuner2_properties.GetValue("service_name");
                 source_data_2.demod_locked = (new_status.T2P1_demod_status > 1);
+                source_data_2.constellation = source_data_2.demod_locked ? new_status.T2P1_constellation : null;
                 source_data_2.symbol_rate = (int)(new_status.T2P1_symbol_rate / 1000);
 
                 if (_media_player.Count > 1)
