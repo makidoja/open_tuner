@@ -304,6 +304,28 @@ namespace opentuner
             }
         }
 
+        public void BackendSetVideoHosts(Control[] hosts)
+        {
+            external_video_panels = new Control[4];
+
+            if (hosts == null)
+                return;
+
+            for (int i = 0; i < external_video_panels.Length && i < hosts.Length; i++)
+            {
+                external_video_panels[i] = hosts[i];
+
+                if (hosts[i] != null && !hosts[i].IsDisposed)
+                {
+                    // Force creation of the final visible parent HWND before VLC/Flyleaf
+                    // are initialised. Native video renderers must not bind to the hidden
+                    // legacy MainForm and then be moved afterwards.
+                    long hwnd = hosts[i].Handle.ToInt64();
+                    Log.Information("Modern video host {Host} registered HWND {Hwnd}", i + 1, hwnd);
+                }
+            }
+        }
+
         public Control[] BackendTakeVideoControls(int tuner)
         {
             if (tuner < 0 || tuner >= video_panels.Length || video_panels[tuner] == null)
