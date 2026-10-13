@@ -15,7 +15,7 @@ AppPublisherURL=https://github.com/makidoja/open_tuner
 AppSupportURL=https://github.com/makidoja/open_tuner/issues
 AppUpdatesURL=https://github.com/makidoja/open_tuner
 DefaultDirName={localappdata}\Programs\OpenTuner
-DefaultGroupName=OpenTuner
+DefaultGroupName=Open Tuner (ZR6TG)
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -46,11 +46,12 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "..\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\OpenTunerModern.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{group}\OpenTuner"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{group}\Open Tuner (ZR6TG)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\OpenTunerModern.ico"
 Name: "{group}\Uninstall OpenTuner"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\OpenTuner"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{autodesktop}\Open Tuner (ZR6TG)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\OpenTunerModern.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "Launch OpenTuner"; Flags: nowait postinstall skipifsilent
