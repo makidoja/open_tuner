@@ -1,91 +1,107 @@
 using System;
+using System.Drawing;
 using System.Reflection;
 using System.Windows.Forms;
 using opentuner.MediaSources;
 
 namespace opentuner
 {
+    // Keep diagnostics out of the native video renderer's host.
     internal static class ModernConstellationPass
     {
-        private static bool attached;
         private static readonly ModernConstellationControl[] displays = new ModernConstellationControl[2];
-        private static Panel[] videoHosts;
+        private static readonly CheckBox[] toggles = new CheckBox[2];
+        private static readonly Panel[] statusHosts = new Panel[2];
+        private static bool attached;
 
         public static void Attach(ModernConceptForm form)
         {
             if (attached || form == null) return;
             attached = true;
-
             form.Shown += delegate
             {
                 MainForm backend = GetBackend(form);
-                videoHosts = GetVideoHosts(form);
-                if (backend == null || videoHosts == null) return;
+                Panel[] videos = GetVideoHosts(form);
+                if (backend == null || videos == null) return;
 
-                // Do not place an empty diagnostics control into the video host at startup.
-                // The video ownership pass uses an empty host as the signal that the real
-                // VLC/Flyleaf player control still needs to be attached.  Create the
-                // constellation overlay lazily only when a source supplies genuine IQ
-                // symbol coordinates.
+                for (int tuner = 0; tuner < 2; tuner++)
+                {
+                    int index = tuner;
+                    Panel video = videos[tuner];
+                    if (video == null || video.Parent == null) continue;
+                    Panel status = null;
+                    foreach (Control sibling in video.Parent.Controls)
+                    {
+                        Panel candidate = sibling as Panel;
+                        if (candidate != null && candidate != video && candidate.Dock == DockStyle.Bottom)
+                        {
+                            status = candidate;
+                            break;
+                        }
+                    }
+                    if (status == null) continue;
+                    statusHosts[tuner] = status;
+                    ModernConstellationControl plot = new ModernConstellationControl
+                    {
+                        Name = "ModernConstellation" + tuner,
+                        Size = new Size(108, 108),
+                        Visible = false
+                    };
+                    CheckBox toggle = new CheckBox
+                    {
+                        Name = "ModernShowConstellation" + tuner,
+                        Text = "Constellation",
+                        Checked = true,
+                        AutoSize = false,
+                        Size = new Size(113, 19),
+                        ForeColor = Color.FromArgb(220, 230, 242),
+                        BackColor = status.BackColor,
+                        Font = new Font("Segoe UI", 8f)
+                    };
+                    status.Controls.Add(plot);
+                    status.Controls.Add(toggle);
+                    displays[tuner] = plot;
+                    toggles[tuner] = toggle;
+                    toggle.CheckedChanged += delegate { plot.Visible = toggle.Checked && plot.HasPoints; };
+                    status.Resize += delegate { Position(index); };
+                    Position(index);
+                }
+
                 backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
                 {
-                    if (data == null || tuner < 0 || tuner > 1 || form.IsDisposed) return;
-                    if (data.constellation == null || data.constellation.Length == 0) return;
-
+                    if (tuner < 0 || tuner >= 2 || form.IsDisposed) return;
+                    byte[,] constellation = data != null && data.demod_locked ? data.constellation : null;
+                    string mode = data == null ? "" : data.delivery_system;
+                    if (data != null && !string.IsNullOrWhiteSpace(data.modcode))
+                        mode = string.IsNullOrWhiteSpace(mode) ? data.modcode : mode + "  " + data.modcode;
                     try
                     {
                         form.BeginInvoke((MethodInvoker)delegate
                         {
                             if (form.IsDisposed) return;
-
-                            ModernConstellationControl display = EnsureDisplay(tuner);
-                            if (display == null || display.IsDisposed) return;
-
-                            string mode = data.delivery_system;
-                            if (!string.IsNullOrWhiteSpace(data.modcode))
-                                mode = string.IsNullOrWhiteSpace(mode) ? data.modcode : mode + "  " + data.modcode;
-                            if (string.IsNullOrWhiteSpace(mode)) mode = "CONSTELLATION";
-
-                            display.UpdateData(data.constellation, mode);
-                            display.BringToFront();
+                            ModernConstellationControl plot = displays[tuner];
+                            if (plot == null || plot.IsDisposed) return;
+                            plot.UpdateData(constellation, mode);
+                            plot.Visible = toggles[tuner] != null && toggles[tuner].Checked && plot.HasPoints;
                         });
                     }
-                    catch
-                    {
-                    }
+                    catch (InvalidOperationException) { }
+                    catch (ObjectDisposedException) { }
                 };
             };
         }
 
-        private static ModernConstellationControl EnsureDisplay(int tuner)
+        private static void Position(int tuner)
         {
-            if (videoHosts == null || tuner < 0 || tuner >= videoHosts.Length) return null;
-            Panel host = videoHosts[tuner];
-            if (host == null || host.IsDisposed) return null;
-
-            ModernConstellationControl existing = displays[tuner];
-            if (existing != null && !existing.IsDisposed) return existing;
-
-            ModernConstellationControl display = new ModernConstellationControl
-            {
-                Name = "ModernConstellation" + tuner,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                Visible = false
-            };
-            display.Location = new System.Drawing.Point(Math.Max(8, host.ClientSize.Width - display.Width - 10), 10);
-            host.Controls.Add(display);
-            display.BringToFront();
-            displays[tuner] = display;
-
-            int capturedTuner = tuner;
-            host.Resize += delegate
-            {
-                ModernConstellationControl d = displays[capturedTuner];
-                if (d != null && !d.IsDisposed)
-                    d.Location = new System.Drawing.Point(Math.Max(8, host.ClientSize.Width - d.Width - 10), 10);
-            };
-
-            return display;
+            Panel host = statusHosts[tuner];
+            ModernConstellationControl plot = displays[tuner];
+            CheckBox toggle = toggles[tuner];
+            if (host == null || plot == null || toggle == null || host.IsDisposed) return;
+            // Reserve the area between the stacked signal metrics and tuner controls.
+            plot.Location = new Point(328, 40);
+            toggle.Location = new Point(326, 151);
+            plot.BringToFront();
+            toggle.BringToFront();
         }
 
         private static MainForm GetBackend(ModernConceptForm form)
