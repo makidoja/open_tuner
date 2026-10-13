@@ -169,6 +169,29 @@ namespace opentuner
 
             nim_status.T1P2_constellation = constellation_data;
 
+            // Collect the second STV0910 demodulator independently. A failure on
+            // either tuner must not publish stale or partially read coordinates.
+            byte[,] constellation_data_2 = null;
+            if (err == 0 && nim_status.T2P1_demod_status > 1)
+            {
+                byte[,] samples2 = new byte[16, 2];
+                bool valid2 = true;
+                for (int count = 0; count < 16; count++)
+                {
+                    byte con_i = 0;
+                    byte con_q = 0;
+                    if (_stv0910.stv0910_read_constellation(stv0910.STV0910_DEMOD_BOTTOM, ref con_i, ref con_q) != 0)
+                    {
+                        valid2 = false;
+                        break;
+                    }
+                    samples2[count, 0] = con_i;
+                    samples2[count, 1] = con_q;
+                }
+                if (valid2) constellation_data_2 = samples2;
+            }
+            nim_status.T2P1_constellation = constellation_data_2;
+
             /* LDPC Error Count */
             UInt32 errors_ldpc_count = 0;
             if (err == 0) err = _stv0910.stv0910_read_errors_ldpc_count(stv0910.STV0910_DEMOD_TOP, ref errors_ldpc_count);
