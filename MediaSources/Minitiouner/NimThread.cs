@@ -146,18 +146,25 @@ namespace opentuner
             nim_status.T1P2_power_i = power_i;
             nim_status.T1P2_power_q = power_q;
 
-            byte[,] constellation_data = new byte[16, 2];
-
-            byte con_i = 0;
-            byte con_q = 0;
-            if (err == 0)
+            // Publish only complete, valid samples while the demodulator is locked.
+            byte[,] constellation_data = null;
+            if (err == 0 && nim_status.T1P2_demod_status > 1)
             {
-                for (byte count = 0; count < 16; count++)
+                byte[,] samples = new byte[16, 2];
+                bool valid = true;
+                for (int count = 0; count < 16; count++)
                 {
-                    _stv0910.stv0910_read_constellation(stv0910.STV0910_DEMOD_TOP, ref con_i, ref con_q);
-                    constellation_data[count,0] = con_i;
-                    constellation_data[count,1] = con_q;
+                    byte con_i = 0;
+                    byte con_q = 0;
+                    if (_stv0910.stv0910_read_constellation(stv0910.STV0910_DEMOD_TOP, ref con_i, ref con_q) != 0)
+                    {
+                        valid = false;
+                        break;
+                    }
+                    samples[count, 0] = con_i;
+                    samples[count, 1] = con_q;
                 }
+                if (valid) constellation_data = samples;
             }
 
             nim_status.T1P2_constellation = constellation_data;
