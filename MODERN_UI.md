@@ -19,3 +19,10 @@ After changes to dependencies, packaging or source files, test hardware detectio
 ## Repository cleanup
 
 See `CODEBASE_AUDIT.md` for the cleanup inventory, risk classifications and deferred items. Do not remove codecs, hardware interfaces, firmware or NuGet packages solely because a search suggests they are unused. Confirm the dependency graph and run Windows/hardware regression tests first.
+
+## USB MiniTiouner constellation validation
+
+- The optional constellation is now in the receiver-status panel, not over video. MER and margin are stacked to free plot space.
+- The MiniTiouner status event passes sampled STV0910 I/Q symbols to the display when locked. Failed USB register reads invalidate a sample rather than displaying stale coordinates.
+- **Hardware verification outstanding:** connect a known DVB-S QPSK and DVB-S2 QPSK signal on USB MiniTiouner, inspect clustering and tuner assignment, and compare with a known-good analyser. Raw register coordinates are diagnostic and may require centring/scaling adjustment.
+- Verify layout at typical window widths and Windows scaling, and ensure video and audio remain unaffected.
