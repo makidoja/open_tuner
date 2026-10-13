@@ -10,6 +10,8 @@ namespace opentuner
         private byte[,] points;
         private string modeText = "CONSTELLATION";
 
+        public bool HasPoints { get { return points != null && points.Rank == 2 && points.GetLength(0) > 0 && points.GetLength(1) >= 2; } }
+
         public ModernConstellationControl()
         {
             DoubleBuffered = true;
@@ -23,12 +25,7 @@ namespace opentuner
         {
             points = constellation == null ? null : (byte[,])constellation.Clone();
             modeText = string.IsNullOrWhiteSpace(mode) ? "CONSTELLATION" : mode.Trim();
-            Visible = points != null && points.GetLength(0) > 0;
-            if (Visible)
-            {
-                BringToFront();
-                Invalidate();
-            }
+            Invalidate();
         }
 
         protected override void OnPaint(PaintEventArgs e)
