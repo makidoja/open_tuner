@@ -56,10 +56,42 @@ jobs:
           if ($dlls.Count -lt 3) { throw 'ffmpeg runtime appears incomplete.' }
           Write-Host "FFmpeg runtime contains $($dlls.Count) DLLs"
 
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            $cmd = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+            if ($cmd) { $iscc = $cmd.Source }
+          }
+          if (-not (Test-Path $iscc)) { throw 'Inno Setup compiler (ISCC.exe) was not found.' }
+
+          New-Item -ItemType Directory -Path 'installer-output' -Force | Out-Null
+          & $iscc 'installer\OpenTuner.iss'
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup compiler failed with exit code $LASTEXITCODE." }
+
+          $installer = Get-ChildItem 'installer-output' -Filter 'OpenTuner-*-Setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'OpenTuner installer EXE was not produced.' }
+          Write-Host "Installer created: $($installer.FullName)"
+          Write-Host "Installer size: $([math]::Round($installer.Length / 1MB, 1)) MB"
+
       - name: Upload Release build
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: OpenTuner-modern-ui
           path: bin/Release/**
+          if-no-files-found: error
+
+      - name: Upload Windows installer
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenTuner-Windows-Installer
+          path: installer-output/*.exe
           if-no-files-found: error
