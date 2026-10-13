@@ -1,24 +1,21 @@
-# OpenTuner Modern UI
+# OpenTuner Modern UI (M0CKE)
 
-This branch is an incremental visual and usability redesign of OpenTuner while retaining the existing receiver, transport, media-player and hardware code.
+This branch modernises the Windows interface while retaining the existing receiver, transport, media-player and hardware code paths. The last user-tested build had working video and audio; changes affecting playback must be separately verified on Windows.
 
-## Current test build
+## Build and installer
 
-- Dark modern application shell using Segoe UI typography.
-- Persistent source selector, Connect, Presets and Settings controls in the header.
-- Live connected/ready state in the header and selected-source status in the footer.
-- Existing WinForms controls automatically receive the modern palette.
-- Controls created dynamically after tuner connection are themed automatically.
-- Existing MiniTiouner, Longmynd, WinterHill, BATC, MQTT, QuickTune, DATV Reporter, recording and UDP behaviour remains in the original code path.
+- Open `opentuner.sln` in Visual Studio on Windows or use the GitHub Actions workflow `.github/workflows/modern-ui-build.yml`.
+- The project targets **.NET Framework 4.7.2**, Release / x64.
+- The workflow restores NuGet packages, generates `OpenTunerModern.ico`, compiles the application, packages the official OpenTuner FFmpeg runtime and builds the Inno Setup installer.
+- Installer configuration: `installer/OpenTuner.iss`.
+- Installer branding: **Open Tuner (ZR6TG) Version M0CKE 0.C.v1.0.0**.
+- The generated icon is embedded in the EXE and installer and copied for the Start Menu and optional desktop shortcut.
+- Successful workflow artifacts include `OpenTuner-modern-ui` (portable build) and `OpenTuner-Windows-Installer-v1.0.0`.
 
-## Build
+## Functional regression checks
 
-Open `opentuner.sln` in Visual Studio on Windows, restore NuGet packages, select Release / x64 and build.
+After changes to dependencies, packaging or source files, test hardware detection, source switching, tuner connection, live video and audio, recording, UDP output, and optional BATC, MQTT and DATV Reporter functions. Test the installed build as well as the portable build.
 
-GitHub Actions on this branch also performs a Windows Release build and uploads `OpenTuner-modern-ui` as a workflow artifact when Actions is enabled for the fork.
+## Repository cleanup
 
-## Hardware testing
-
-Test source discovery/connection first, then video/audio playback, tuner controls, recording, UDP output and optional integrations. Report any layout issue with a screenshot and display scaling percentage.
-
-Build validation is run automatically for every push to `modern-ui`.
+See `CODEBASE_AUDIT.md` for the cleanup inventory, risk classifications and deferred items. Do not remove codecs, hardware interfaces, firmware or NuGet packages solely because a search suggests they are unused. Confirm the dependency graph and run Windows/hardware regression tests first.
