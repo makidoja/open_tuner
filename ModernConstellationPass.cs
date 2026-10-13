@@ -86,7 +86,6 @@ namespace opentuner
                         });
                     }
                     catch (InvalidOperationException) { }
-                    catch (ObjectDisposedException) { }
                 };
             };
         }
