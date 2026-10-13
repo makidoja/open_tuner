@@ -8,7 +8,7 @@ namespace opentuner
     public static class GlobalDefines
     {
         public const int CircularBufferStartingCapacity = 250000;
-        public const string Version = "0.B-modern";
+        public const string Version = "M0CKE 0.C.v1.0.0";
     }
 
     /// <summary>
