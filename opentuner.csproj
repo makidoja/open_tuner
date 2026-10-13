@@ -639,6 +639,6 @@
   </Target>
 
   <Target Name="GenerateModernApplicationIcon" BeforeTargets="CoreCompile" Condition="'$(OS)' == 'Windows_NT'">
-    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\GenerateModernIcon.ps1&quot; -OutputPath &quot;$(ProjectDir)OpenTunerModern.ico&quot;" />
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)build\GenerateBrandIcon.ps1&quot; -OutputPath &quot;$(ProjectDir)OpenTunerModern.ico&quot;" />
   </Target>
 </Project>
