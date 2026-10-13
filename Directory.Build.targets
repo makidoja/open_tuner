@@ -1,9 +1,3 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
-    <OutputType>WinExe</OutputType>
-  </PropertyGroup>
-  <ItemGroup>
-    <!-- The other modern UI files are already included by Directory.Build.props. -->
-    <Compile Include="ModernDashboardStartup.cs" Condition="Exists('ModernDashboardStartup.cs')" />
-  </ItemGroup>
+  <!-- Modern UI source files and WinExe output are configured in Directory.Build.props. -->
 </Project>
