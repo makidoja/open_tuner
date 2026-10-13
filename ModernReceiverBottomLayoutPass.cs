@@ -170,7 +170,7 @@ namespace opentuner
             }
             if (margin != null)
             {
-                margin.Location = new Point(325, 44);
+                margin.Location = new Point(205, 94);
                 margin.Size = new Size(116, 24);
                 margin.Font = new Font("Segoe UI Semibold", 11.5f);
                 margin.ForeColor = Text;
@@ -188,7 +188,7 @@ namespace opentuner
                 }
                 else if (IsMarginBar(p))
                 {
-                    p.Location = new Point(325, 71);
+                    p.Location = new Point(205, 121);
                     p.Size = new Size(112, 12);
                 }
             }
