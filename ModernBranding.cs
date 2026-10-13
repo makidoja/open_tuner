@@ -8,7 +8,7 @@ namespace opentuner
 {
     internal static class ModernBranding
     {
-        public const string ProductTitle = "Open Tuner (ZR6TG) Version M0CKE 0.C.21026";
+        public const string ProductTitle = "Open Tuner (ZR6TG) Version M0CKE 0.C.v1.0.0";
 
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern bool DestroyIcon(IntPtr handle);
