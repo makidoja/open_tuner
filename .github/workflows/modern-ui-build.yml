@@ -23,6 +23,13 @@ jobs:
       - name: Restore packages
         run: nuget restore opentuner.sln
 
+      - name: Generate OpenTuner brand icon
+        shell: pwsh
+        run: |
+          & '.\build\GenerateBrandIcon.ps1' -OutputPath '.\OpenTunerModern.ico'
+          if (-not (Test-Path '.\OpenTunerModern.ico')) { throw 'OpenTunerModern.ico was not generated.' }
+          if ((Get-Item '.\OpenTunerModern.ico').Length -lt 500) { throw 'Generated OpenTuner icon is unexpectedly small.' }
+
       - name: Build Release x64
         run: msbuild opentuner.csproj /m /p:Configuration=Release /p:Platform=AnyCPU /p:OutputType=WinExe /p:RestorePackages=false
 
