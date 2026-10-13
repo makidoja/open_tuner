@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("Open Tuner")]
-[assembly: AssemblyDescription("Frontend for Minitiouner Variants")]
+[assembly: AssemblyTitle("Open Tuner (ZR6TG)")]
+[assembly: AssemblyDescription("Modern DATV receiver frontend for Minitiouner, PicoTuner and compatible variants")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Amateur Radio - ZR6TG")]
-[assembly: AssemblyProduct("Open Tuner")]
+[assembly: AssemblyCompany("ZR6TG / M0CKE")]
+[assembly: AssemblyProduct("Open Tuner (ZR6TG) Version M0CKE 0.C.v1.0.0")]
 [assembly: AssemblyCopyright("Copyright ©  2023 - Tom Van den Bon")]
 [assembly: AssemblyTrademark("Open Tuner")]
 [assembly: AssemblyCulture("")]
