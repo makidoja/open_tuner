@@ -98,7 +98,7 @@ namespace opentuner
             if (host == null || plot == null || toggle == null || host.IsDisposed) return;
             // Reserve the area between the stacked signal metrics and tuner controls.
             plot.Location = new Point(328, 40);
-            toggle.Location = new Point(326, 151);
+            toggle.Location = new Point(205, 145);
             plot.BringToFront();
             toggle.BringToFront();
         }
