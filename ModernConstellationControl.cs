@@ -7,10 +7,12 @@ namespace opentuner
 {
     internal sealed class ModernConstellationControl : Control
     {
-        private byte[,] points;
+        private readonly System.Collections.Generic.Queue<PointF> history = new System.Collections.Generic.Queue<PointF>();
+        private const int MaxHistory = 512;
+        private bool hasPoints;
         private string modeText = "CONSTELLATION";
 
-        public bool HasPoints { get { return points != null && points.Rank == 2 && points.GetLength(0) > 0 && points.GetLength(1) >= 2; } }
+        public bool HasPoints { get { return hasPoints; } }
 
         public ModernConstellationControl()
         {
@@ -23,7 +25,24 @@ namespace opentuner
 
         public void UpdateData(byte[,] constellation, string mode)
         {
-            points = constellation == null ? null : (byte[,])constellation.Clone();
+            if (constellation == null || constellation.Rank != 2 || constellation.GetLength(1) < 2 || constellation.GetLength(0) == 0)
+            {
+                history.Clear();
+                hasPoints = false;
+            }
+            else
+            {
+                // STV0910 ISYMB/QSYMB are signed 8-bit values. Convert to signed
+                // coordinates before plotting so the axes cross at zero.
+                for (int index = 0; index < constellation.GetLength(0); index++)
+                {
+                    float x = unchecked((sbyte)constellation[index, 0]);
+                    float y = unchecked((sbyte)constellation[index, 1]);
+                    history.Enqueue(new PointF(x, y));
+                    while (history.Count > MaxHistory) history.Dequeue();
+                }
+                hasPoints = history.Count > 0;
+            }
             modeText = string.IsNullOrWhiteSpace(mode) ? "CONSTELLATION" : mode.Trim();
             Invalidate();
         }
@@ -48,17 +67,11 @@ namespace opentuner
                 g.DrawLine(axis, plot.Left, cy, plot.Right, cy);
                 g.DrawString(modeText, Font, text, 8, 5);
 
-                if (points == null || points.Rank != 2) return;
-
-                int rows = points.GetLength(0);
-                int cols = points.GetLength(1);
-                if (cols < 2) return;
-
-                for (int i = 0; i < rows; i++)
+                foreach (PointF sample in history)
                 {
-                    float x = plot.Left + (points[i, 0] / 255f) * plot.Width;
-                    float y = plot.Bottom - (points[i, 1] / 255f) * plot.Height;
-                    g.FillEllipse(dot, x - 1.5f, y - 1.5f, 3f, 3f);
+                    float x = cx + (sample.X / 128f) * (plot.Width / 2f);
+                    float y = cy - (sample.Y / 128f) * (plot.Height / 2f);
+                    g.FillEllipse(dot, x - 1.1f, y - 1.1f, 2.2f, 2.2f);
                 }
             }
         }
