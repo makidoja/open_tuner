@@ -69,7 +69,8 @@ namespace opentuner
 
         private bool source_connected = false;
 
-        SplitterPanel[] video_panels = new SplitterPanel[4];
+        Control[] video_panels = new Control[4];
+        Control[] external_video_panels = null;
 
         bool properties_hidden = false;
         bool ExtraTool_hidden = false;
@@ -877,6 +878,9 @@ namespace opentuner
         {
             List<OTMediaPlayer> mediaPlayers = new List<OTMediaPlayer>();
 
+            // Start with the original destinations so the classic UI still works.
+            // The modern UI may register its visible video hosts before connecting;
+            // those destinations then replace the hidden legacy panels.
             if (amount == 4)
             {
                 video_panels[0] = splitContainer4.Panel1;
@@ -892,13 +896,32 @@ namespace opentuner
                 video_panels[3] = splitContainer5.Panel2;
             }
 
+            bool usingExternalVideoHost = false;
+            if (external_video_panels != null)
+            {
+                for (int c = 0; c < amount && c < external_video_panels.Length; c++)
+                {
+                    if (external_video_panels[c] != null && !external_video_panels[c].IsDisposed)
+                    {
+                        video_panels[c] = external_video_panels[c];
+                        usingExternalVideoHost = true;
+
+                        // Access Handle now so the final visible HWND exists before a
+                        // native VLC/Flyleaf renderer is constructed.
+                        long hwnd = external_video_panels[c].Handle.ToInt64();
+                        Log.Information("Media player {Player} using modern video host HWND {Hwnd}", c + 1, hwnd);
+                    }
+                }
+            }
+
             for (int c = 0; c < amount; c++)
             {
                 var media_player = ConfigureVideoPlayer(c, playerPreference[c], windowed[c]);
                 mediaPlayers.Add(media_player);
             }
 
-            ConfigureVideoLayout(amount);
+            if (!usingExternalVideoHost)
+                ConfigureVideoLayout(amount);
 
             return mediaPlayers;
         }
