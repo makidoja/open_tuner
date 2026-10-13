@@ -163,15 +163,15 @@ namespace opentuner
             Label margin = FindLabelStarts(controls, "Margin");
             if (mer != null)
             {
-                mer.Location = new Point(205, 44);
-                mer.Size = new Size(112, 24);
+                mer.Location = new Point(236, 44);
+                mer.Size = new Size(92, 24);
                 mer.Font = new Font("Segoe UI Semibold", 11.5f);
                 mer.ForeColor = Text;
             }
             if (margin != null)
             {
-                margin.Location = new Point(205, 94);
-                margin.Size = new Size(116, 24);
+                margin.Location = new Point(236, 94);
+                margin.Size = new Size(92, 24);
                 margin.Font = new Font("Segoe UI Semibold", 11.5f);
                 margin.ForeColor = Text;
             }
@@ -183,13 +183,13 @@ namespace opentuner
 
                 if (IsMerBar(p))
                 {
-                    p.Location = new Point(205, 71);
-                    p.Size = new Size(108, 12);
+                    p.Location = new Point(236, 71);
+                    p.Size = new Size(88, 12);
                 }
                 else if (IsMarginBar(p))
                 {
-                    p.Location = new Point(205, 121);
-                    p.Size = new Size(112, 12);
+                    p.Location = new Point(236, 121);
+                    p.Size = new Size(88, 12);
                 }
             }
 
