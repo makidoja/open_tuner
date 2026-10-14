@@ -35,7 +35,7 @@ namespace opentuner
 
         public ModernMainForm(string[] args)
         {
-            Text = "OpenTuner Modern - " + GlobalDefines.Version;
+            Text = ModernBranding.ProductTitle;
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(1180, 720);
             Size = new Size(1540, 900);
@@ -636,7 +636,7 @@ namespace opentuner
                 connectionPill.BackColor = Color.FromArgb(22, 48, 37);
                 string device = backend.BackendDeviceName;
                 if (!string.IsNullOrWhiteSpace(device))
-                    Text = "OpenTuner Modern - " + device;
+                    Text = ModernBranding.ProductTitle + " - " + device;
             }
             else if (connectRequested)
             {
