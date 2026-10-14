@@ -99,6 +99,6 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: OpenTuner-Windows-Installer-v1.0.1
+          name: OpenTuner-Windows-Installer-v1.0.2
           path: installer-output/*.exe
           if-no-files-found: error
