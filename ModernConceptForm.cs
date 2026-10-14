@@ -46,7 +46,7 @@ namespace opentuner
 
         public ModernConceptForm(string[] args)
         {
-            base.Text = "OpenTuner Modern - " + GlobalDefines.Version;
+            base.Text = ModernBranding.ProductTitle;
             StartPosition = FormStartPosition.CenterScreen;
             WindowState = FormWindowState.Maximized;
             MinimumSize = new Size(1280, 760);
@@ -158,7 +158,7 @@ namespace opentuner
         private Panel BuildHeader()
         {
             Panel p = Card();
-            Label title = new Label { Text = "Open Tuner (ZR6TG) Version M0CKE 0.C.v1.0.0", AutoSize = true, Location = new Point(16, 17), ForeColor = Text, Font = new Font("Segoe UI Semibold", 12f) };
+            Label title = new Label { Text = ModernBranding.ProductTitle, AutoSize = true, Location = new Point(16, 17), ForeColor = Text, Font = new Font("Segoe UI Semibold", 12f) };
             p.Controls.Add(title);
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
