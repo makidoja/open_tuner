@@ -106,7 +106,11 @@ namespace opentuner
             int available = tunerLeft - metricsRight;
             int plotLeft = metricsRight + (available - plot.Width) / 2;
             plot.Location = new Point(Math.Max(metricsRight + 2, plotLeft), 40);
-            toggle.Location = new Point(236, 147);
+            // Keep the selector centred directly beneath the plot, clear of
+            // the receiver-details text along the bottom of the status panel.
+            toggle.Location = new Point(
+                plot.Left + (plot.Width - toggle.Width) / 2,
+                plot.Bottom + 1);
             plot.BringToFront();
             toggle.BringToFront();
         }
