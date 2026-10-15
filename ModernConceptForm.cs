@@ -26,7 +26,7 @@ namespace opentuner
         private readonly int[] savedVolume = new int[] { 60, 60, 60, 60 };
 
         private ComboBox sourceCombo;
-        private Label connectionPill;
+        private Button connectionPill;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -174,7 +174,18 @@ namespace opentuner
             Button settings = FlatButton("SETTINGS", false); settings.Width = 82; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
             p.Controls.Add(settings);
 
-            connectionPill = new Label { Text = "READY", Size = new Size(106, 30), TextAlign = ContentAlignment.MiddleCenter, BackColor = Surface2, ForeColor = Muted, Font = new Font("Segoe UI Semibold", 9f) };
+            connectionPill = FlatButton("READY", false);
+            connectionPill.Size = new Size(112, 30);
+            connectionPill.Click += delegate
+            {
+                if (backend.BackendUsesPicoEthernet && backend.BackendSourceInitialised)
+                {
+                    connectionPill.Text = "RETRYING";
+                    backend.BackendRetryPicoEthernet();
+                    RefreshConnectionState();
+                }
+                else Connect();
+            };
             p.Controls.Add(connectionPill);
 
             p.Resize += delegate
@@ -432,12 +443,34 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
-            if (backend.BackendSourceInitialised)
+            bool initialised = backend.BackendSourceInitialised;
+            bool live = backend.BackendTransportConnected;
+            if (initialised && live)
             {
-                connectRequested = false; connectionPill.Text = "● CONNECTED"; connectionPill.ForeColor = Green; connectionPill.BackColor = Color.FromArgb(17,56,44);
+                connectRequested = false;
+                connectionPill.Text = "● CONNECTED";
+                connectionPill.ForeColor = Green;
+                connectionPill.BackColor = Color.FromArgb(17, 56, 44);
             }
-            else if (connectRequested) { connectionPill.Text = "CONNECTING"; connectionPill.ForeColor = Muted; }
-            else { connectionPill.Text = "READY"; connectionPill.ForeColor = Muted; }
+            else if (initialised && backend.BackendUsesPicoEthernet)
+            {
+                connectRequested = false;
+                connectionPill.Text = "● OFFLINE";
+                connectionPill.ForeColor = Color.FromArgb(255, 190, 100);
+                connectionPill.BackColor = Color.FromArgb(65, 42, 27);
+            }
+            else if (connectRequested)
+            {
+                connectionPill.Text = "CONNECTING";
+                connectionPill.ForeColor = Muted;
+                connectionPill.BackColor = Surface2;
+            }
+            else
+            {
+                connectionPill.Text = "READY";
+                connectionPill.ForeColor = Muted;
+                connectionPill.BackColor = Surface2;
+            }
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
