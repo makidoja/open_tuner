@@ -65,6 +65,7 @@ namespace opentuner.MediaSources.WinterHill
                 }
             }
 
+            if (e == null || e.Length == 0) return;
             var data = Encoding.ASCII.GetString(e);
 
             int udp_base_port = _settings.WinterHillUdpBasePort;
@@ -96,7 +97,13 @@ namespace opentuner.MediaSources.WinterHill
                     case "$0":
                         if (dt.Length < 2) break;
                         int receiver_num = udp_base_port % 100;
-                        receiver = Convert.ToInt32(dt[1]) - receiver_num;
+                        int reportedReceiver;
+                        if (!int.TryParse(dt[1].Trim(), out reportedReceiver))
+                        {
+                            Log.Warning("Ignoring malformed PicoTuner receiver ID in UDP status: '{Id}'", dt[1]);
+                            return;
+                        }
+                        receiver = reportedReceiver - receiver_num;
                         if (receiver < 1 || receiver > 2)
                             return;
                         break;
