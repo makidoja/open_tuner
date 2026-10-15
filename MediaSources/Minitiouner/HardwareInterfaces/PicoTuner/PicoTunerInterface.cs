@@ -655,10 +655,11 @@ namespace opentuner
 
             foreach (UsbRegistry usbRegistry in allDevices)
             {
-                string Name = usbRegistry.Name;
-                if (Name.Contains("PicoTuner"))
+                string name = usbRegistry.Name ?? string.Empty;
+                Log.Information("PicoTuner USB scan: {DeviceName}", name);
+                if (name.IndexOf("PicoTuner", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    if (Name.Contains("i2c"))
+                    if (name.IndexOf("i2c", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         if (!usbRegistry.Open(out i2c_pt_device))
                         {
@@ -667,7 +668,7 @@ namespace opentuner
                             return 1;
                         }
                     }
-                    else if (Name.Contains("TS"))
+                    else if (name.IndexOf("TS", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         if (!usbRegistry.Open(out ts_pt_device))
                         {
@@ -680,14 +681,14 @@ namespace opentuner
             }
             if (i2c_pt_device == null)
             {
-                Log.Error("PicoTuner I2C device not found");
+                Log.Error("PicoTuner I2C interface not found. Check firmware, Windows driver and device enumeration.");
                 hw_close();
                 return 1;
             }
 
             if (ts_pt_device == null)
             {
-                Log.Error("PicoTuner TS device not found");
+                Log.Error("PicoTuner TS interface not found. Check firmware, Windows driver and device enumeration.");
                 hw_close();
                 return 1;
             }
