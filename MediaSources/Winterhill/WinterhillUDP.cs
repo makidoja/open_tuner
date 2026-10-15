@@ -44,6 +44,7 @@ namespace opentuner.MediaSources.WinterHill
 
         public void DisconnectWinterHillUDP()
         {
+            System.Threading.Interlocked.Exchange(ref lastPicoStatusTicks, 0);
             longmynd_status?.Close();
         }
 
@@ -182,6 +183,8 @@ namespace opentuner.MediaSources.WinterHill
 
             mm.rx[receiver].rx = receiver;
             UpdateInfo(mm);
+            if (ModernIsPicoTunerEthernet)
+                System.Threading.Interlocked.Exchange(ref lastPicoStatusTicks, DateTime.UtcNow.Ticks);
             }
             catch (Exception ex)
             {
