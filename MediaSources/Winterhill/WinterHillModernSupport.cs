@@ -7,6 +7,24 @@ namespace opentuner.MediaSources.WinterHill
 {
     public partial class WinterHillSource
     {
+        private long lastPicoStatusTicks;
+
+        public bool ModernPicoStatusLive
+        {
+            get
+            {
+                long ticks = System.Threading.Interlocked.Read(ref lastPicoStatusTicks);
+                return ticks > 0 && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromSeconds(5).Ticks;
+            }
+        }
+
+        public void ModernRetryPicoConnection()
+        {
+            if (!ModernIsPicoTunerEthernet) return;
+            ModernDiscoverPicoTuner(1200);
+            ModernReapplyStartupTune();
+        }
+
         public bool ModernIsPicoTunerEthernet
         {
             get { return _settings != null && _settings.DefaultInterface == 2; }
