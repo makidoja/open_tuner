@@ -17,12 +17,23 @@ namespace opentuner
                     // PicoTuner Ethernet is UDP and has no persistent remote socket;
                     // successful source initialisation means the local UDP control/status
                     // paths are ready. The ZR6TG WebSocket transport must report alive.
-                    return winterHill.ModernIsPicoTunerEthernet || winterHill.DeviceConnected;
+                    return winterHill.ModernIsPicoTunerEthernet ? winterHill.ModernPicoStatusLive : winterHill.DeviceConnected;
                 }
 
                 try { return videoSource.DeviceConnected; }
                 catch { return source_connected; }
             }
+        }
+
+        public bool BackendUsesPicoEthernet
+        {
+            get { WinterHillSource wh = videoSource as WinterHillSource; return wh != null && wh.ModernIsPicoTunerEthernet; }
+        }
+
+        public void BackendRetryPicoEthernet()
+        {
+            WinterHillSource wh = videoSource as WinterHillSource;
+            if (wh != null && wh.ModernIsPicoTunerEthernet) wh.ModernRetryPicoConnection();
         }
 
         public string BackendInterfaceDescription
