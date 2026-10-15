@@ -66,6 +66,8 @@ namespace opentuner.MediaSources.WinterHill
             }
 
             if (e == null || e.Length == 0) return;
+            try
+            {
             var data = Encoding.ASCII.GetString(e);
 
             int udp_base_port = _settings.WinterHillUdpBasePort;
@@ -180,6 +182,11 @@ namespace opentuner.MediaSources.WinterHill
 
             mm.rx[receiver].rx = receiver;
             UpdateInfo(mm);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Ignoring invalid PicoTuner UDP status packet during startup/reception");
+            }
         }
 
         public void UDPSetVoltage(int plug, uint voltage)
