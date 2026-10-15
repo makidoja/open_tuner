@@ -1,4 +1,5 @@
 using opentuner.MediaSources.WinterHill;
+using opentuner.MediaSources.Minitiouner;
 
 namespace opentuner
 {
@@ -33,13 +34,17 @@ namespace opentuner
         public string BackendGetRfInput(int tuner)
         {
             WinterHillSource wh = BackendWinterHill();
-            return wh == null ? "—" : wh.ModernGetRfInput(tuner);
+            if (wh != null) return wh.ModernGetRfInput(tuner);
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            return usb == null ? "—" : usb.ModernGetRfInput(tuner);
         }
 
         public void BackendSetRfInput(int tuner, int input)
         {
             WinterHillSource wh = BackendWinterHill();
-            if (wh != null) wh.ModernSetRfInput(tuner, input);
+            if (wh != null) { wh.ModernSetRfInput(tuner, input); return; }
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            if (usb != null) usb.ModernSetRfInput(tuner, input);
         }
 
         public long BackendGetOffset(int tuner)
