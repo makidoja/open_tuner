@@ -369,6 +369,26 @@ namespace opentuner.MediaSources.Minitiouner
             UpdateTunerProperties(nim_status);
         }
 
+        // Modern UI RF input bridge. The USB MiniTiouner uses NIM_INPUT_TOP
+        // and NIM_INPUT_BOTTOM rather than WinterHill's input numbering.
+        public string ModernGetRfInput(int tuner)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return "—";
+            uint value = tuner == 0 ? current_rf_input_0 : current_rf_input_1;
+            return value == nim.NIM_INPUT_BOTTOM ? "B" : "A";
+        }
+
+        public void ModernSetRfInput(int tuner, int input)
+        {
+            if (!hardware_connected || tuner < 0 || tuner >= GetVideoSourceCount()) return;
+            if (input != 0 && input != 1) return;
+
+            uint requested = input == 1 ? nim.NIM_INPUT_BOTTOM : nim.NIM_INPUT_TOP;
+            uint current = tuner == 0 ? current_rf_input_0 : current_rf_input_1;
+            if (requested != current)
+                ChangeRFInput((byte)tuner, requested);
+        }
+
         private void ChangeRFInput(byte Tuner, uint RFInput)
         {
             switch(Tuner)
