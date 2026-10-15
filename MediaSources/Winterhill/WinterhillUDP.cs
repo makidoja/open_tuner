@@ -193,7 +193,14 @@ namespace opentuner.MediaSources.WinterHill
         {
             int base_port = _settings.WinterHillUdpBasePort;
             string controlHost = GetRuntimeUdpHost();
-            IPEndPoint WinterHill_end_point = new IPEndPoint(IPAddress.Parse(controlHost), base_port + 21);
+            IPEndPoint WinterHill_end_point = null;
+            IPAddress hostAddress;
+            if (!IPAddress.TryParse(controlHost, out hostAddress))
+            {
+                Log.Warning("PicoTuner UDP voltage command deferred: invalid/unresolved host '{Host}'", controlHost);
+                return;
+            }
+            WinterHill_end_point = new IPEndPoint(hostAddress, base_port + 21);
 
             string command2 = "";
             string vg = plug == 0 ? "vgx" : "vgy";
@@ -223,7 +230,13 @@ namespace opentuner.MediaSources.WinterHill
             int base_port = _settings.WinterHillUdpBasePort + (device == 0 ? 21 : 22);
             int receiver_num = (_settings.WinterHillUdpBasePort % 100) + 1 + device;
             string controlHost = GetRuntimeUdpHost();
-            IPEndPoint WinterHill_end_point = new IPEndPoint(IPAddress.Parse(controlHost), base_port);
+            IPAddress hostAddress;
+            if (!IPAddress.TryParse(controlHost, out hostAddress))
+            {
+                Log.Warning("PicoTuner UDP tuning command deferred: invalid/unresolved host '{Host}'", controlHost);
+                return;
+            }
+            IPEndPoint WinterHill_end_point = new IPEndPoint(hostAddress, base_port);
 
             Log.Information("UDP Set Frequency Device: " + device + " : " + controlHost + " : " + base_port.ToString());
 
