@@ -314,9 +314,15 @@ namespace opentuner
             OnSignalSelected?.Invoke(receiver, freqKHz, srKs);
         }
 
-        internal List<signal.Sig> DetectedSignalsSnapshot()
+        internal bool TryDetectedSignalsSnapshot(out List<signal.Sig> snapshot)
         {
-            lock (sync) return new List<signal.Sig>(signals);
+            lock (sync)
+            {
+                snapshot = new List<signal.Sig>(signals);
+                // Never retune from stale FFT data or an offline BATC feed.
+                return connected && lastFrame != DateTime.MinValue &&
+                    (DateTime.Now - lastFrame).TotalSeconds < 5;
+            }
         }
 
         public void UpdateSignalCallsign(string callsign, double freqMHz, float srMs)
