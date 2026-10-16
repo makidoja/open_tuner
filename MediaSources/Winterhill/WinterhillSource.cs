@@ -103,7 +103,7 @@ namespace opentuner.MediaSources.WinterHill
                     break;
                 case 2: // udp pico wh
                     udp_port = _settings.WinterHillUdpBasePort;
-                    ConnectWinterHillUDP(udp_port + 1);
+                    // Start receiving status only after source initialisation is complete.
 
                     UDPSetVoltage(0, _settings.LNBVoltage[0]);
                     UDPSetVoltage(1, _settings.LNBVoltage[1]);
@@ -174,6 +174,10 @@ namespace opentuner.MediaSources.WinterHill
                 }
                 Log.Warning("Multiple IP's detected, using " + _LocalIp);
             }
+
+            // Previously a live PicoTuner could deliver status during setup.
+            if (defaultInterface == 2)
+                ConnectWinterHillUDP(udp_port + 1);
 
             return ts_devices;
         }
