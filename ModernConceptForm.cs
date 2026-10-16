@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
@@ -420,12 +419,12 @@ namespace opentuner
         // A fresh discovery broadcast proves the PicoTuner is back online.
         private void WaitForPicoReturn()
         {
-            int generation = Interlocked.Increment(ref picoResetGeneration);
+            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
             Task.Run(delegate
             {
                 // Allow the old firmware session to shut down before trusting
                 // any fresh discovery advertisement.
-                Thread.Sleep(3000);
+                System.Threading.Thread.Sleep(3000);
                 bool returned = false;
                 try
                 {
