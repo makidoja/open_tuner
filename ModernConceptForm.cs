@@ -79,9 +79,20 @@ namespace opentuner
             uiTimer = new Timer { Interval = 300 };
             uiTimer.Tick += delegate
             {
-                AdoptVideoControls();
-                RefreshConnectionState();
-                CheckQuickTuneAutoScan();
+                // Scan must run independently of video adoption and status UI.
+                // An exception in those paths previously left Auto Scan ARMED.
+                try { CheckQuickTuneAutoScan(); }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "QO100 Auto Scan tick failed");
+                    for (int rx = 0; rx < 2; rx++)
+                        if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked)
+                            SetAutoScanState(rx, "SCAN ERROR");
+                }
+                try { AdoptVideoControls(); }
+                catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
+                try { RefreshConnectionState(); }
+                catch (Exception ex) { Serilog.Log.Warning(ex, "Connection status refresh failed"); }
             };
             uiTimer.Start();
         }
