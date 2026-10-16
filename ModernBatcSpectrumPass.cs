@@ -140,7 +140,7 @@ namespace opentuner
                         };
                         scanChecks[rx] = check;
                     }
-                    display.Controls.Add(check);
+                    card.Controls.Add(check);
                     check.BringToFront();
                 }
             }
@@ -173,19 +173,22 @@ namespace opentuner
                 spectrumTitle.Width = Math.Max(100, card.ClientSize.Width - 24);
             }
 
-            int available = Math.Max(300, card.ClientSize.Width - 24);
-            int width = Math.Min(1140, available);
+            // Reserve a dedicated control strip to the right of the actual
+            // spectrum, so checkboxes never obscure the upper or lower RX plot.
+            const int stripWidth = 150;
+            int usableWidth = Math.Max(300, card.ClientSize.Width - 36 - stripWidth);
+            int width = Math.Min(1140, usableWidth);
             int height = 108;
+            int totalWidth = width + stripWidth;
+            int left = Math.Max(12, (card.ClientSize.Width - totalWidth) / 2);
 
             display.Size = new Size(width, height);
-            display.Location = new Point(Math.Max(12, (card.ClientSize.Width - width) / 2), 31);
-            // Controls collection is in reverse z-order (BringToFront), so
-            // position explicitly by receiver identity, never enumeration order.
+            display.Location = new Point(left, 31);
             CheckBox[] checkboxes = GetField<CheckBox[]>(FindOwnerForm(card), "autoScanEnabled");
             if (checkboxes != null)
                 for (int rx = 0; rx < Math.Min(2, checkboxes.Length); rx++)
                     if (checkboxes[rx] != null && !checkboxes[rx].IsDisposed)
-                        checkboxes[rx].Location = new Point(Math.Max(4, display.Width - checkboxes[rx].Width - 8), rx == 0 ? 9 : 55);
+                        checkboxes[rx].Location = new Point(display.Right + 8, display.Top + (rx == 0 ? 10 : 57));
         }
     }
 }
