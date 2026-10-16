@@ -36,6 +36,7 @@ namespace opentuner
         private readonly DateTime[] lastAutoTune = new DateTime[2];
         private readonly DateTime[] lastSignalStatus = new DateTime[2];
         private readonly double[] lastAutoFrequency = new double[2];
+        private readonly string[] autoScanState = new string[] { "OFF", "OFF" };
         private readonly DateTime[] spectrumMissingSince = new DateTime[2];
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
@@ -481,18 +482,29 @@ namespace opentuner
             if (!any) return;
 
             List<signal.Sig> detected;
-            if (!activeQuickTuneSpectrum.TryDetectedSignalsSnapshot(out detected)) return;
+            if (!activeQuickTuneSpectrum.TryDetectedSignalsSnapshot(out detected))
+            {
+                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "NO BATC DATA");
+                return;
+            }
             var candidates = detected
                 .Where(sig => sig.frequency > 10490.5 && sig.frequency < 10500.0 &&
                               Math.Abs(sig.frequency - 10491.5) > 0.10 &&
                               sig.sr >= 0.065f)
                 .OrderBy(sig => sig.frequency).ToList();
-            if (candidates.Count == 0) return;
+            if (candidates.Count == 0)
+            {
+                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "NO SIGNALS");
+                return;
+            }
 
             for (int rx = 0; rx < Math.Min(2, visibleTuners); rx++)
             {
                 if (autoScanEnabled[rx] == null || !autoScanEnabled[rx].Checked)
+                {
+                    SetAutoScanState(rx, "OFF");
                     continue;
+                }
                 // Do not act on stale lock information or while the receiver
                 // is being initialised and awaiting its first status message.
                 // Some PicoTuner firmware versions do not send periodic status
@@ -512,22 +524,30 @@ namespace opentuner
                     {
                         spectrumMissingSince[rx] = DateTime.MinValue;
                         noLockSince[rx] = DateTime.MinValue;
+                        SetAutoScanState(rx, "LOCKED");
                         continue;
                     }
                     if (spectrumMissingSince[rx] == DateTime.MinValue)
                         spectrumMissingSince[rx] = now;
                     if ((now - spectrumMissingSince[rx]).TotalSeconds < 12)
+                    {
+                        SetAutoScanState(rx, "CHECK SIGNAL");
                         continue;
+                    }
                 }
                 else spectrumMissingSince[rx] = DateTime.MinValue;
                 if (noLockSince[rx] == DateTime.MinValue)
                 {
                     noLockSince[rx] = now;
+                    SetAutoScanState(rx, "WAIT");
                     continue;
                 }
-                if ((now - noLockSince[rx]).TotalSeconds < 10 ||
-                    (now - lastAutoTune[rx]).TotalSeconds < 12)
+                if ((now - noLockSince[rx]).TotalSeconds < 8 ||
+                    (now - lastAutoTune[rx]).TotalSeconds < 10)
+                {
+                    SetAutoScanState(rx, "WAIT");
                     continue;
+                }
 
                 // Avoid retuning onto the same frequency as an already locked
                 // receiver, and cycle onward after an unsuccessful trial.
@@ -544,7 +564,7 @@ namespace opentuner
                     !((now - lastAutoTune[other]).TotalSeconds < 18 &&
                       Math.Abs(sig.frequency - lastAutoFrequency[other]) < 0.075))
                     .ToList();
-                if (available.Count == 0) continue;
+                if (available.Count == 0) { SetAutoScanState(rx, "NO FREE SIGNAL"); continue; }
                 var selected = available.FirstOrDefault(sig => sig.frequency > lastAutoFrequency[rx] + 0.05);
                 if (selected.frequency <= 0) selected = available[0];
                 uint freqKHz = Convert.ToUInt32(Math.Round(selected.frequency * 1000.0));
@@ -552,15 +572,26 @@ namespace opentuner
                 decimal mhz = freqKHz / 1000M;
                 if (mhz < freqInputs[rx].Minimum || mhz > freqInputs[rx].Maximum ||
                     srKs < srInputs[rx].Minimum || srKs > srInputs[rx].Maximum)
-                    continue;
+                { SetAutoScanState(rx, "INVALID SR"); continue; }
 
                 Serilog.Log.Information("QO100 Auto Scan RX{Receiver}: trying {FreqMHz:F3} MHz / {SymbolRate} kS", rx + 1, selected.frequency, srKs);
                 lastAutoFrequency[rx] = selected.frequency;
                 lastAutoTune[rx] = now;
                 freqInputs[rx].Value = mhz;
                 srInputs[rx].Value = srKs;
+                SetAutoScanState(rx, "TUNING " + selected.frequency.ToString("0.000", CultureInfo.InvariantCulture));
                 Tune(rx);
             }
+        }
+
+        private void SetAutoScanState(int receiver, string state)
+        {
+            if (receiver < 0 || receiver > 1) return;
+            if (autoScanState[receiver] == state) return;
+            autoScanState[receiver] = state;
+            CheckBox cb = autoScanEnabled[receiver];
+            if (cb != null && !cb.IsDisposed)
+                cb.Text = "RX" + (receiver + 1) + " Scan: " + state;
         }
 
         private static bool IsVideoRenderer(Control control)
