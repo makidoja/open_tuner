@@ -847,42 +847,65 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
-            if (picoResetPending)
+            bool resetting = picoResetPending;
+            bool initialised = backend.BackendSourceInitialised;
+            bool live = initialised && backend.BackendTransportConnected;
+            bool connected = initialised && live;
+            bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
+            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
+
+            // Set the colours explicitly; a FlatStyle.Flat button does not
+            // reliably change its background when Enabled becomes false.
+            Color grey = Color.FromArgb(75, 84, 95);
+            Color greyBorder = Color.FromArgb(108, 119, 131);
+            if (connectButton != null)
+            {
+                connectButton.Enabled = ready;
+                connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
+                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
+                connectButton.BackColor = ready ? Accent : grey;
+                connectButton.ForeColor = ready ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.FlatAppearance.BorderColor = ready ? Accent : greyBorder;
+                connectButton.Cursor = ready ? Cursors.Hand : Cursors.Default;
+            }
+
+            connectionPill.Enabled = !resetting && !switchingConnection;
+            connectionPill.Cursor = connectionPill.Enabled ? Cursors.Hand : Cursors.Default;
+            if (resetting)
             {
                 connectionPill.Text = "RESETTING";
-                connectionPill.ForeColor = Muted;
-                connectionPill.BackColor = Surface2;
-                connectionPill.Enabled = false;
-                if (connectButton != null) connectButton.Enabled = false;
-                return;
+                connectionPill.ForeColor = Color.FromArgb(210, 216, 223);
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
             }
-            bool initialised = backend.BackendSourceInitialised;
-            bool live = backend.BackendTransportConnected;
-            if (initialised && live)
+            else if (connected)
             {
                 connectRequested = false;
                 connectionPill.Text = "● CONNECTED";
                 connectionPill.ForeColor = Green;
                 connectionPill.BackColor = Color.FromArgb(17, 56, 44);
+                connectionPill.FlatAppearance.BorderColor = Color.FromArgb(38, 112, 83);
             }
-            else if (initialised && backend.BackendUsesPicoEthernet)
+            else if (offline)
             {
-                connectRequested = false;
                 connectionPill.Text = "● OFFLINE";
-                connectionPill.ForeColor = Color.FromArgb(255, 190, 100);
-                connectionPill.BackColor = Color.FromArgb(65, 42, 27);
+                connectionPill.ForeColor = Color.FromArgb(210, 216, 223);
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
             }
             else if (connectRequested)
             {
                 connectionPill.Text = "CONNECTING";
                 connectionPill.ForeColor = Muted;
-                connectionPill.BackColor = Surface2;
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
             }
             else
             {
                 connectionPill.Text = "READY";
                 connectionPill.ForeColor = Muted;
                 connectionPill.BackColor = Surface2;
+                connectionPill.FlatAppearance.BorderColor = Border;
             }
         }
 
