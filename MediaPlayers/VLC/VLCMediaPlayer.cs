@@ -20,6 +20,7 @@ namespace opentuner.MediaPlayers.VLC
         LibVLCSharp.WinForms.VideoView videoView;
 
         MediaPlayer _mediaplayer;
+        private int videoUpdateGeneration;
 
         int player_volume;
 
@@ -43,57 +44,53 @@ namespace opentuner.MediaPlayers.VLC
             return "VLC";
         }
 
-        private delegate void updateMediaPlayerDelegate(MediaPlayer newPlayer, bool play);
-
         private void updateVideoPlayer(MediaPlayer newPlayer, bool play)
         {
-            if (videoView == null || videoView.IsDisposed)
-                return;
+            // Invalidate queued UI updates whenever a newer tune or Stop occurs.
+            int generation = System.Threading.Interlocked.Increment(ref videoUpdateGeneration);
+            if (videoView == null || videoView.IsDisposed) return;
+
+            MethodInvoker attach = delegate
+            {
+                if (generation != System.Threading.Volatile.Read(ref videoUpdateGeneration) ||
+                    videoView == null || videoView.IsDisposed) return;
+                // A retune may have disposed the former MediaPlayer while the
+                // UI callback waited in the message queue.
+                if (newPlayer != null && !Object.ReferenceEquals(newPlayer, _mediaplayer))
+                    return;
+                if (!videoView.IsHandleCreated) return;
+
+                try
+                {
+                    // VideoView itself owns and binds the native HWND.
+                    // Never set MediaPlayer.Hwnd separately: doing so races
+                    // handle recreation when the renderer is reparented.
+                    videoView.MediaPlayer = newPlayer;
+                    if (newPlayer != null)
+                    {
+                        videoView.Visible = true;
+                        videoView.BringToFront();
+                    }
+                    if (play && newPlayer != null && media != null &&
+                        Object.ReferenceEquals(newPlayer, _mediaplayer))
+                        newPlayer.Play(media);
+                }
+                catch (ObjectDisposedException ex)
+                {
+                    Log.Warning(ex, "VLC: VideoView disposed during player switch");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    Log.Warning(ex, "VLC: VideoView not available during player switch");
+                }
+            };
 
             if (videoView.InvokeRequired)
             {
-                try
-                {
-                    videoView.BeginInvoke(new updateMediaPlayerDelegate(updateVideoPlayer), new object[] { newPlayer, play });
-                }
-                catch (InvalidOperationException)
-                {
-                }
-                return;
+                try { videoView.BeginInvoke(attach); }
+                catch (InvalidOperationException) { }
             }
-
-            // LibVLC can decode audio without a usable video target. Make sure the WinForms
-            // VideoView has a live native handle before attaching the MediaPlayer, then bind
-            // the player explicitly to that HWND. This avoids the audio-only condition seen
-            // when the view is created inside a SplitterPanel before playback begins.
-            if (!videoView.IsHandleCreated)
-            {
-                IntPtr createHandle = videoView.Handle;
-            }
-
-            videoView.Visible = true;
-            videoView.MediaPlayer = newPlayer;
-
-            if (newPlayer != null)
-            {
-                IntPtr targetHwnd = videoView.Handle;
-                if (targetHwnd != IntPtr.Zero)
-                {
-                    newPlayer.Hwnd = targetHwnd;
-                    Log.Information("VLC video target HWND: " + targetHwnd.ToInt64().ToString());
-                }
-
-                // Keep the video surface above any themed background panels. The info/volume
-                // overlays are re-added by OpenTuner as required and do not own the VLC HWND.
-                videoView.BringToFront();
-            }
-
-            if (play && newPlayer != null && media != null)
-            {
-                Thread.Sleep(10);
-                Log.Information("VLC: starting playback on HWND " + newPlayer.Hwnd.ToString());
-                newPlayer.Play(media);
-            }
+            else attach();
         }
 
         private void MediaPlayer_EncounteredError(object sender, EventArgs e)
