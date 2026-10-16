@@ -43,6 +43,7 @@ namespace opentuner
         private Timer uiTimer;
         private Timer autoScanTimer;
         private int visibleTuners = 2;
+        private TableLayoutPanel receiverGrid;
         private bool connectRequested;
         private bool audioInitialised;
 
@@ -154,6 +155,7 @@ namespace opentuner
 
             tunerGrid.Controls.Add(BuildTunerCard(0), 0, 0);
             tunerGrid.Controls.Add(BuildTunerCard(1), 1, 0);
+            receiverGrid = tunerGrid;
         }
 
         private Panel BuildNav()
@@ -379,6 +381,8 @@ namespace opentuner
                     bool resetOk = backend.BackendDisconnectSource(backend.BackendUsesPicoEthernet);
                     connectRequested = false;
                     audioInitialised = false;
+                    visibleTuners = 2;
+                    ApplyReceiverCount();
                     for (int i = 0; i < 2; i++)
                     {
                         lastData[i] = null;
@@ -410,12 +414,32 @@ namespace opentuner
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
             if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
             visibleTuners = Math.Max(1, Math.Min(2, backend.BackendTunerCount));
+            ApplyReceiverCount();
             if (!audioInitialised)
             {
                 for (int i = 0; i < visibleTuners; i++) { backend.BackendEnsureAudible(i); int v = backend.BackendGetVolume(i); if (v <= 0) v = 60; volumeBars[i].Value = Math.Max(0, Math.Min(100, v)); savedVolume[i] = volumeBars[i].Value; }
                 audioInitialised = true;
             }
         }
+
+        private void ApplyReceiverCount()
+        {
+            bool dual = visibleTuners > 1;
+            if (receiverGrid != null)
+            {
+                Control second = receiverGrid.GetControlFromPosition(1, 0);
+                if (second != null) second.Visible = dual;
+                receiverGrid.ColumnStyles[0].Width = dual ? 50f : 100f;
+                receiverGrid.ColumnStyles[1].Width = dual ? 50f : 0f;
+                receiverGrid.PerformLayout();
+            }
+            if (activeQuickTuneSpectrum != null)
+                activeQuickTuneSpectrum.SetReceiverCount(visibleTuners);
+            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = dual;
+            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = dual;
+        }
+
+        internal int ModernReceiverCount { get { return visibleTuners; } }
 
         private void Tune(int tuner)
         {
