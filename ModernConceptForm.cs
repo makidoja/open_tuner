@@ -453,6 +453,11 @@ namespace opentuner
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
             if (data.demod_locked) noLockSince[tuner] = DateTime.MinValue;
+            if (data.demod_locked && activeQuickTuneSpectrum != null && data.frequency > 0)
+            {
+                activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
+                    tuner, data.frequency / 1000.0, data.symbol_rate / 1000f);
+            }
             lockLabels[tuner].Text = data.demod_locked ? "● LOCKED" : "NO LOCK";
             lockLabels[tuner].ForeColor = data.demod_locked ? Green : Muted;
             lockLabels[tuner].BackColor = data.demod_locked ? Color.FromArgb(17, 56, 44) : Surface2;
