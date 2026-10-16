@@ -21,6 +21,7 @@ namespace opentuner
         private List<signal.Sig> signals = new List<signal.Sig>();
         private readonly signal.Sig?[] tuned = new signal.Sig?[2];
         private bool connected;
+        private int receiverCount = 2;
         private DateTime lastFrame = DateTime.MinValue;
         private readonly Timer watchdog;
 
@@ -167,9 +168,22 @@ namespace opentuner
             }
         }
 
+        internal void SetReceiverCount(int count)
+        {
+            receiverCount = Math.Max(1, Math.Min(2, count));
+            Invalidate();
+        }
+
         private void DrawReceiverSplit(Graphics g, Rectangle plot)
         {
             int mid = plot.Top + plot.Height / 2;
+            if (receiverCount == 1)
+            {
+                using (Font f = new Font("Segoe UI Semibold", 7.5f))
+                using (Brush b = new SolidBrush(Color.FromArgb(215, 220, 230, 240)))
+                    g.DrawString("RX1", f, b, plot.Left + 5, plot.Bottom - f.Height - 2);
+                return;
+            }
             using (Pen p = new Pen(Color.FromArgb(150, 190, 205, 220), 1f))
             {
                 p.DashStyle = DashStyle.Dash;
@@ -240,7 +254,7 @@ namespace opentuner
 
         private void DrawTunedMarkers(Graphics g, Rectangle plot)
         {
-            for (int rx = 0; rx < 2; rx++)
+            for (int rx = 0; rx < receiverCount; rx++)
             {
                 signal.Sig? item = tuned[rx];
                 if (!item.HasValue) continue;
@@ -303,7 +317,7 @@ namespace opentuner
             }
             if (!best.HasValue) return;
 
-            int receiver = e.Y < plot.Top + plot.Height / 2 ? 0 : 1;
+            int receiver = receiverCount == 1 || e.Y < plot.Top + plot.Height / 2 ? 0 : 1;
             signal.Sig selected = best.Value;
             tuned[receiver] = selected;
             detector.set_tuned(selected, receiver);
