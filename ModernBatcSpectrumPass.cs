@@ -123,11 +123,11 @@ namespace opentuner
             {
                 for (int rx = 0; rx < Math.Min(2, scanChecks.Length); rx++)
                 {
+                    int index = rx;
                     CheckBox check = scanChecks[rx];
                     if (check == null || check.IsDisposed)
                     {
                         // Original controls may have been disposed with the old box.
-                        int index = rx;
                         check = new CheckBox
                         {
                             Text = "RX" + (rx + 1) + " Auto Scan",
