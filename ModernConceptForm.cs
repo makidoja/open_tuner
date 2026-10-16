@@ -617,13 +617,11 @@ namespace opentuner
                     // Never take the beacon, including wide detected blocks that
                     // overlap its centre even when their measured centre differs.
                     Math.Abs(sig.frequency - 10491.5) > (0.10 + sig.sr / 2.0) &&
-                    // Do not collide with another receiver's valid lock.
-                    !(lastData[other] != null && lastData[other].demod_locked &&
-                      Math.Abs(sig.frequency * 1000.0 - lastData[other].frequency) < 75) &&
-                    // Nor choose the same signal while the other receiver is
-                    // actively attempting to acquire it.
-                    !((now - lastAutoTune[other]).TotalSeconds < 18 &&
-                      Math.Abs(sig.frequency - lastAutoFrequency[other]) < 0.075))
+                    // Reserve the whole occupied signal bandwidth, not merely a
+                    // fixed 75 kHz around the other tuner. This covers 333/500/
+                    // 1500 kS transmissions, slight frequency offsets, and
+                    // the case where the other receiver is still acquiring lock.
+                    !AutoScanCandidateOccupiedByOther(rx, sig))
                     .ToList();
                 if (available.Count == 0) { SetAutoScanState(rx, "NO FREE SIGNAL"); continue; }
                 var selected = available.FirstOrDefault(sig => sig.frequency > lastAutoFrequency[rx] + 0.05);
@@ -643,6 +641,39 @@ namespace opentuner
                 SetAutoScanState(rx, "TUNING " + selected.frequency.ToString("0.000", CultureInfo.InvariantCulture));
                 Tune(rx);
             }
+        }
+
+        private bool AutoScanCandidateOccupiedByOther(int receiver, signal.Sig candidate)
+        {
+            int other = 1 - receiver;
+            if (other >= visibleTuners) return false;
+
+            // Prefer the confirmed hardware lock, since the backend can report
+            // a slightly different centre frequency from the BATC detector.
+            if (lastData[other] != null && lastData[other].demod_locked &&
+                lastData[other].frequency > 0)
+            {
+                double lockedMHz = lastData[other].frequency / 1000.0;
+                double lockedSrMHz = lastData[other].symbol_rate / 1000.0;
+                double guardMHz = Math.Max(0.10, (candidate.sr + lockedSrMHz) / 2.0 + 0.05);
+                if (Math.Abs(candidate.frequency - lockedMHz) < guardMHz)
+                    return true;
+            }
+
+            // Once Auto Scan has assigned a signal to the other receiver, keep
+            // it reserved for as long as it remains tuned there, including
+            // while waiting to acquire lock. Do not expire this reservation
+            // after an arbitrary number of seconds.
+            if (autoScanEnabled[other] != null && autoScanEnabled[other].Checked &&
+                lastAutoTune[other] != DateTime.MinValue && lastAutoFrequency[other] > 0)
+            {
+                double otherSrMHz = (double)srInputs[other].Value / 1000.0;
+                double guardMHz = Math.Max(0.10, (candidate.sr + otherSrMHz) / 2.0 + 0.05);
+                if (Math.Abs(candidate.frequency - lastAutoFrequency[other]) < guardMHz)
+                    return true;
+            }
+
+            return false;
         }
 
         internal void ModernAutoScanChanged(int receiver, bool enabled)
