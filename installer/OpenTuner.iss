@@ -1,7 +1,7 @@
 #define MyAppName "OpenTuner"
 #define MyAppDisplayName "Open Tuner (ZR6TG)"
-#define MyAppVersion "1.0.2"
-#define MyAppDisplayVersion "M0CKE 0.C.v1.0.2"
+#define MyAppVersion "1.0.3"
+#define MyAppDisplayVersion "M0CKE 0.C.v1.0.3"
 #define MyAppPublisher "ZR6TG / M0CKE"
 #define MyAppExeName "opentuner.exe"
 
@@ -21,7 +21,7 @@ PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\installer-output
-OutputBaseFilename=OpenTuner-M0CKE-0.C.v1.0.2-Setup
+OutputBaseFilename=OpenTuner-M0CKE-0.C.v1.0.3-Setup
 SetupIconFile=..\OpenTunerModern.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppDisplayName} Version {#MyAppDisplayVersion}
@@ -32,11 +32,11 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 ChangesAssociations=no
-VersionInfoVersion=1.0.2.0
+VersionInfoVersion=1.0.3.0
 VersionInfoCompany={#MyAppPublisher}
 VersionInfoDescription={#MyAppDisplayName} Version {#MyAppDisplayVersion}
 VersionInfoProductName={#MyAppDisplayName}
-VersionInfoProductVersion=1.0.2.0
+VersionInfoProductVersion=1.0.3.0
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
