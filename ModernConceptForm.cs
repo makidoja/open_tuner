@@ -452,7 +452,6 @@ namespace opentuner
             if (tuner > 1) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
-            if (data.demod_locked) noLockSince[tuner] = DateTime.MinValue;
             if (data.demod_locked && activeQuickTuneSpectrum != null && data.frequency > 0)
             {
                 activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
