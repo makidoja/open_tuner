@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
 using opentuner.MediaSources;
@@ -27,6 +31,9 @@ namespace opentuner
 
         private ComboBox sourceCombo;
         private Button connectionPill;
+        private Button connectButton;
+        private volatile bool picoResetPending;
+        private int picoResetGeneration;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -192,6 +199,7 @@ namespace opentuner
             p.Controls.Add(source);
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
+            connectButton = connect;
             p.Controls.Add(connect);
 
             Button settings = FlatButton("SETTINGS", false); settings.Width = 82; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
@@ -370,15 +378,18 @@ namespace opentuner
 
         private void ToggleConnection()
         {
-            if (switchingConnection) return;
+            if (switchingConnection || picoResetPending) return;
             switchingConnection = true;
             try
             {
                 if (backend.BackendSourceInitialised)
                 {
+                    bool resetPico = backend.BackendUsesPicoEthernet;
+                    if (resetPico) picoResetPending = true;
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
-                    bool resetOk = backend.BackendDisconnectSource(backend.BackendUsesPicoEthernet);
+                    if (connectButton != null) connectButton.Enabled = false;
+                    bool resetOk = backend.BackendDisconnectSource(resetPico);
                     connectRequested = false;
                     audioInitialised = false;
                     visibleTuners = 2;
@@ -390,6 +401,7 @@ namespace opentuner
                         noLockSince[i] = DateTime.MinValue;
                         spectrumMissingSince[i] = DateTime.MinValue;
                     }
+                    if (resetPico) WaitForPicoReturn();
                     if (!resetOk)
                         MessageBox.Show("Disconnected locally, but the PicoTuner RESET could not be confirmed. Check the device address and connection.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
@@ -398,13 +410,84 @@ namespace opentuner
             finally
             {
                 switchingConnection = false;
-                connectionPill.Enabled = true;
+                connectionPill.Enabled = !picoResetPending;
+                if (connectButton != null) connectButton.Enabled = !picoResetPending;
                 RefreshConnectionState();
             }
         }
 
+        // The device drops its control/status transport during a hardware reset.
+        // A fresh discovery broadcast proves the PicoTuner is back online.
+        private void WaitForPicoReturn()
+        {
+            int generation = Interlocked.Increment(ref picoResetGeneration);
+            Task.Run(delegate
+            {
+                // Allow the old firmware session to shut down before trusting
+                // any fresh discovery advertisement.
+                Thread.Sleep(3000);
+                bool returned = false;
+                try
+                {
+                    using (UdpClient listener = new UdpClient(9997))
+                    {
+                        listener.Client.ReceiveTimeout = 1500;
+                        DateTime deadline = DateTime.UtcNow.AddSeconds(90);
+                        while (DateTime.UtcNow < deadline && generation == picoResetGeneration)
+                        {
+                            try
+                            {
+                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                                byte[] message = listener.Receive(ref remote);
+                                if (message != null && message.Length > 0)
+                                {
+                                    returned = true;
+                                    break;
+                                }
+                            }
+                            catch (SocketException ex)
+                            {
+                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
+                }
+
+                if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
+                    return;
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (generation != picoResetGeneration || IsDisposed) return;
+                        if (returned)
+                        {
+                            picoResetPending = false;
+                            connectionPill.Enabled = true;
+                            if (connectButton != null) connectButton.Enabled = true;
+                            RefreshConnectionState();
+                        }
+                        else
+                        {
+                            // Remain disconnected: user can restart the application
+                            // or investigate the hardware instead of connecting
+                            // into an incomplete PicoTuner reboot.
+                            connectionPill.Text = "PICO OFFLINE";
+                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
+                        }
+                    });
+                }
+                catch (InvalidOperationException) { }
+            });
+        }
+
         private void Connect()
         {
+            if (picoResetPending) return;
             if (sourceCombo.SelectedIndex < 0) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
@@ -757,6 +840,15 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
+            if (picoResetPending)
+            {
+                connectionPill.Text = "RESETTING";
+                connectionPill.ForeColor = Muted;
+                connectionPill.BackColor = Surface2;
+                connectionPill.Enabled = false;
+                if (connectButton != null) connectButton.Enabled = false;
+                return;
+            }
             bool initialised = backend.BackendSourceInitialised;
             bool live = backend.BackendTransportConnected;
             if (initialised && live)
