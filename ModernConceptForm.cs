@@ -486,9 +486,10 @@ namespace opentuner
                     continue;
                 // Do not act on stale lock information or while the receiver
                 // is being initialised and awaiting its first status message.
-                if (lastSignalStatus[rx] == DateTime.MinValue ||
-                    (now - lastSignalStatus[rx]).TotalSeconds > 8)
-                    continue;
+                // Some PicoTuner firmware versions do not send periodic status
+                // for an idle/unlocked RX. A live connection with no RX status
+                // should still be eligible for scanning. Never override a
+                // receiver known to be locked, even if its status goes stale.
                 if (lastData[rx] != null && lastData[rx].demod_locked)
                 {
                     noLockSince[rx] = DateTime.MinValue;
@@ -519,6 +520,7 @@ namespace opentuner
                     srKs < srInputs[rx].Minimum || srKs > srInputs[rx].Maximum)
                     continue;
 
+                Serilog.Log.Information("QO100 Auto Scan RX{Receiver}: trying {FreqMHz:F3} MHz / {SymbolRate} kS", rx + 1, selected.frequency, srKs);
                 lastAutoFrequency[rx] = selected.frequency;
                 lastAutoTune[rx] = now;
                 freqInputs[rx].Value = mhz;
