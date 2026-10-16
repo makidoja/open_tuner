@@ -30,6 +30,12 @@ namespace opentuner
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
+        private readonly CheckBox[] autoScanEnabled = new CheckBox[2];
+        private readonly DateTime[] noLockSince = new DateTime[2];
+        private readonly DateTime[] lastAutoTune = new DateTime[2];
+        private readonly DateTime[] lastSignalStatus = new DateTime[2];
+        private readonly double[] lastAutoFrequency = new double[2];
+        private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
         private int visibleTuners = 2;
         private bool connectRequested;
@@ -71,6 +77,7 @@ namespace opentuner
             {
                 AdoptVideoControls();
                 RefreshConnectionState();
+                CheckQuickTuneAutoScan();
             };
             uiTimer.Start();
         }
@@ -214,9 +221,40 @@ namespace opentuner
                 Size = new Size(922, 275)
             };
             p.Controls.Add(batcSpectrumBox);
+            // Each receiver gets an independent opt-in auto scan checkbox in
+            // its own half of the BATC spectrum (above/below the RX divider).
+            for (int rx = 0; rx < 2; rx++)
+            {
+                int index = rx;
+                CheckBox check = new CheckBox
+                {
+                    Text = "RX" + (rx + 1) + " Auto Scan",
+                    Checked = false,
+                    AutoSize = false,
+                    Size = new Size(132, 24),
+                    Location = new Point(Math.Max(4, batcSpectrumBox.Width - 145), rx == 0 ? 65 : 205),
+                    BackColor = Surface2,
+                    ForeColor = Text,
+                    Font = new Font("Segoe UI Semibold", 8.5f),
+                    Cursor = Cursors.Hand
+                };
+                check.CheckedChanged += delegate
+                {
+                    noLockSince[index] = DateTime.MinValue;
+                    lastAutoTune[index] = DateTime.MinValue;
+                    lastAutoFrequency[index] = 0;
+                };
+                batcSpectrumBox.Controls.Add(check);
+                check.BringToFront();
+                autoScanEnabled[rx] = check;
+            }
+
             p.Resize += delegate
             {
                 batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), 275);
+                for (int rx = 0; rx < 2; rx++)
+                    if (autoScanEnabled[rx] != null)
+                        autoScanEnabled[rx].Left = Math.Max(4, batcSpectrumBox.Width - autoScanEnabled[rx].Width - 12);
             };
             return p;
         }
@@ -384,12 +422,83 @@ namespace opentuner
         {
             if (tuner > 1) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
+            lastSignalStatus[tuner] = DateTime.UtcNow;
+            if (data.demod_locked) noLockSince[tuner] = DateTime.MinValue;
             lockLabels[tuner].Text = data.demod_locked ? "● LOCKED" : "NO LOCK";
             lockLabels[tuner].ForeColor = data.demod_locked ? Green : Muted;
             lockLabels[tuner].BackColor = data.demod_locked ? Color.FromArgb(17, 56, 44) : Surface2;
             merLabels[tuner].Text = "MER  " + data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB";
             marginLabels[tuner].Text = "Margin  " + data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB";
             if (data.frequency > 0) liveFreq[tuner].Text = (data.frequency / 1000M).ToString("0.000") + " MHz";
+        }
+
+        // Deliberately opt-in; do not chase short fades or interrupt a lock.
+        // Scan candidates from the BATC Quick Tune signal detector, not presets.
+        private void CheckQuickTuneAutoScan()
+        {
+            DateTime now = DateTime.UtcNow;
+            if ((now - lastAutoScanCheck).TotalSeconds < 2) return;
+            lastAutoScanCheck = now;
+
+            if (!backend.BackendSourceInitialised || !backend.BackendTransportConnected || batcSpectrum == null)
+                return;
+
+            bool any = (autoScanEnabled[0] != null && autoScanEnabled[0].Checked) ||
+                       (autoScanEnabled[1] != null && autoScanEnabled[1].Checked);
+            if (!any) return;
+
+            var candidates = batcSpectrum.ModernDetectedSignals()
+                .Where(sig => sig.frequency > 10490.5 && sig.frequency < 10500.0 &&
+                              Math.Abs(sig.frequency - 10491.5) > 0.10 &&
+                              sig.sr >= 0.065f)
+                .OrderBy(sig => sig.frequency).ToList();
+            if (candidates.Count == 0) return;
+
+            for (int rx = 0; rx < Math.Min(2, visibleTuners); rx++)
+            {
+                if (autoScanEnabled[rx] == null || !autoScanEnabled[rx].Checked)
+                    continue;
+                // Do not act on stale lock information or while the receiver
+                // is being initialised and awaiting its first status message.
+                if (lastSignalStatus[rx] == DateTime.MinValue ||
+                    (now - lastSignalStatus[rx]).TotalSeconds > 8)
+                    continue;
+                if (lastData[rx] != null && lastData[rx].demod_locked)
+                {
+                    noLockSince[rx] = DateTime.MinValue;
+                    continue;
+                }
+                if (noLockSince[rx] == DateTime.MinValue)
+                {
+                    noLockSince[rx] = now;
+                    continue;
+                }
+                if ((now - noLockSince[rx]).TotalSeconds < 10 ||
+                    (now - lastAutoTune[rx]).TotalSeconds < 12)
+                    continue;
+
+                // Avoid retuning onto the same frequency as an already locked
+                // receiver, and cycle onward after an unsuccessful trial.
+                var available = candidates.Where(sig =>
+                    !(lastData[1 - rx] != null && lastData[1 - rx].demod_locked &&
+                      Math.Abs(sig.frequency * 1000.0 - lastData[1 - rx].frequency) < 75))
+                    .ToList();
+                if (available.Count == 0) continue;
+                var selected = available.FirstOrDefault(sig => sig.frequency > lastAutoFrequency[rx] + 0.05);
+                if (selected.frequency <= 0) selected = available[0];
+                uint freqKHz = Convert.ToUInt32(Math.Round(selected.frequency * 1000.0));
+                uint srKs = Convert.ToUInt32(Math.Round(selected.sr * 1000.0));
+                decimal mhz = freqKHz / 1000M;
+                if (mhz < freqInputs[rx].Minimum || mhz > freqInputs[rx].Maximum ||
+                    srKs < srInputs[rx].Minimum || srKs > srInputs[rx].Maximum)
+                    continue;
+
+                lastAutoFrequency[rx] = selected.frequency;
+                lastAutoTune[rx] = now;
+                freqInputs[rx].Value = mhz;
+                srInputs[rx].Value = srKs;
+                Tune(rx);
+            }
         }
 
         private static bool IsVideoRenderer(Control control)
