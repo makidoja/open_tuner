@@ -314,6 +314,30 @@ namespace opentuner
             OnSignalSelected?.Invoke(receiver, freqKHz, srKs);
         }
 
+        // Keep RX pointers in sync with the actual demodulator lock, not
+        // merely the last click or auto-scan tuning attempt.
+        internal void UpdateLockedReceiverMarker(int receiver, double frequencyMHz, float symbolRateMs)
+        {
+            if (receiver < 0 || receiver >= tuned.Length ||
+                frequencyMHz < StartMHz || frequencyMHz > StartMHz + SpanMHz)
+                return;
+            signal.Sig best = new signal.Sig(0, 0, 0, 0, frequencyMHz, symbolRateMs, false, 0);
+            lock (sync)
+            {
+                foreach (signal.Sig candidate in signals)
+                {
+                    if (Math.Abs(candidate.frequency - frequencyMHz) <=
+                        Math.Max(0.08, candidate.sr / 2.0))
+                    {
+                        best = candidate;
+                        break;
+                    }
+                }
+                tuned[receiver] = best;
+            }
+            Invalidate();
+        }
+
         internal bool TryDetectedSignalsSnapshot(out List<signal.Sig> snapshot)
         {
             lock (sync)
