@@ -155,6 +155,11 @@ namespace opentuner
             };
         }
 
+        private static ModernConceptForm FindOwnerForm(Control control)
+        {
+            return control == null ? null : control.FindForm() as ModernConceptForm;
+        }
+
         private static void LayoutDisplay(Panel card)
         {
             if (display == null || display.IsDisposed || card == null) return;
@@ -174,9 +179,13 @@ namespace opentuner
 
             display.Size = new Size(width, height);
             display.Location = new Point(Math.Max(12, (card.ClientSize.Width - width) / 2), 31);
-            CheckBox[] checkboxes = display.Controls.OfType<CheckBox>().ToArray();
-            for (int i = 0; i < Math.Min(2, checkboxes.Length); i++)
-                checkboxes[i].Location = new Point(Math.Max(4, display.Width - checkboxes[i].Width - 8), i == 0 ? 8 : 53);
+            // Controls collection is in reverse z-order (BringToFront), so
+            // position explicitly by receiver identity, never enumeration order.
+            CheckBox[] checkboxes = GetField<CheckBox[]>(FindOwnerForm(card), "autoScanEnabled");
+            if (checkboxes != null)
+                for (int rx = 0; rx < Math.Min(2, checkboxes.Length); rx++)
+                    if (checkboxes[rx] != null && !checkboxes[rx].IsDisposed)
+                        checkboxes[rx].Location = new Point(Math.Max(4, display.Width - checkboxes[rx].Width - 8), rx == 0 ? 9 : 55);
         }
     }
 }
