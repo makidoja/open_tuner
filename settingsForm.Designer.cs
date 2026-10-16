@@ -472,7 +472,7 @@
             this.label6.Name = "label6";
             this.label6.Size = new System.Drawing.Size(83, 16);
             this.label6.TabIndex = 6;
-            this.label6.Text = "Strean 2 Port";
+            this.label6.Text = "Streaming 2 Port:";
             // 
             // txtStreaming3IP
             // 
