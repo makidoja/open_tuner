@@ -635,7 +635,13 @@ namespace opentuner
                 .OrderBy(sig => sig.frequency).ToList();
             if (candidates.Count == 0)
             {
-                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "NO SIGNALS");
+                for (int rx = 0; rx < Math.Min(2, visibleTuners); rx++)
+                {
+                    bool enabled = autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked;
+                    bool beacon = lastData[rx] != null && lastData[rx].frequency > 0 &&
+                        Math.Abs(lastData[rx].frequency / 1000.0 - 10491.5) < 0.15;
+                    SetAutoScanState(rx, !enabled ? "OFF" : beacon ? "BEACON STANDBY" : "NO SIGNALS");
+                }
                 return;
             }
 
@@ -652,7 +658,11 @@ namespace opentuner
                 // for an idle/unlocked RX. A live connection with no RX status
                 // should still be eligible for scanning. Never override a
                 // receiver known to be locked, even if its status goes stale.
-                if (lastData[rx] != null && lastData[rx].demod_locked)
+                bool onBeacon = lastData[rx] != null && lastData[rx].frequency > 0 &&
+                    Math.Abs(lastData[rx].frequency / 1000.0 - 10491.5) < 0.15;
+                // Beacon lock is a standby condition, not a programme to protect.
+                // The normal 8-second scan dwell still avoids rapid retuning.
+                if (lastData[rx] != null && lastData[rx].demod_locked && !onBeacon)
                 {
                     // Some receiver firmware keeps reporting the previous lock
                     // after the transmission moves. Check the current spectrum
