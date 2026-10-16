@@ -506,9 +506,18 @@ namespace opentuner
 
                 // Avoid retuning onto the same frequency as an already locked
                 // receiver, and cycle onward after an unsuccessful trial.
+                int other = 1 - rx;
                 var available = candidates.Where(sig =>
-                    !(lastData[1 - rx] != null && lastData[1 - rx].demod_locked &&
-                      Math.Abs(sig.frequency * 1000.0 - lastData[1 - rx].frequency) < 75))
+                    // Never take the beacon, including wide detected blocks that
+                    // overlap its centre even when their measured centre differs.
+                    Math.Abs(sig.frequency - 10491.5) > (0.10 + sig.sr / 2.0) &&
+                    // Do not collide with another receiver's valid lock.
+                    !(lastData[other] != null && lastData[other].demod_locked &&
+                      Math.Abs(sig.frequency * 1000.0 - lastData[other].frequency) < 75) &&
+                    // Nor choose the same signal while the other receiver is
+                    // actively attempting to acquire it.
+                    !((now - lastAutoTune[other]).TotalSeconds < 18 &&
+                      Math.Abs(sig.frequency - lastAutoFrequency[other]) < 0.075))
                     .ToList();
                 if (available.Count == 0) continue;
                 var selected = available.FirstOrDefault(sig => sig.frequency > lastAutoFrequency[rx] + 0.05);
