@@ -118,6 +118,7 @@ namespace opentuner
             FieldInfo activeField = typeof(ModernConceptForm).GetField(
                 "activeQuickTuneSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
             activeField?.SetValue(form, display);
+            display.SetReceiverCount(form.ModernReceiverCount);
             CheckBox[] scanChecks = GetField<CheckBox[]>(form, "autoScanEnabled");
             if (scanChecks != null)
             {
@@ -174,6 +175,14 @@ namespace opentuner
 
             LayoutDisplay(card);
             display.BringToFront();
+            if (form.ModernReceiverCount == 1)
+            {
+                if (scanChecks != null && scanChecks.Length > 1 && scanChecks[1] != null)
+                    scanChecks[1].Visible = false;
+                Label[] singleStatuses = GetField<Label[]>(form, "autoScanStatusLabels");
+                if (singleStatuses != null && singleStatuses.Length > 1 && singleStatuses[1] != null)
+                    singleStatuses[1].Visible = false;
+            }
 
             card.Resize += delegate { LayoutDisplay(card); };
             form.FormClosed += delegate
