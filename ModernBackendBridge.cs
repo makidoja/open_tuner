@@ -327,6 +327,73 @@ namespace opentuner
             return video_panels[tuner].Controls.Cast<Control>().ToArray();
         }
 
+        // Close an active receiver without running the application's exit handler.
+        // The next Connect creates fresh player/stream objects against the same
+        // selected source. Only PicoTuner Ethernet uses the remote reset command.
+        public bool BackendDisconnectSource(bool resetPico)
+        {
+            if (!source_connected || videoSource == null) return true;
+            var pico = videoSource as WinterHillSource;
+            bool resetSent = true;
+            try
+            {
+                if (resetPico && pico != null && pico.ModernIsPicoTunerEthernet)
+                    resetSent = pico.ModernSendPicoReset();
+
+                videoSource.OnSourceData -= VideoSource_OnSourceData;
+                if (backendSourceHooked)
+                {
+                    videoSource.OnSourceData -= BackendForwardSourceData;
+                    backendSourceHooked = false;
+                }
+
+                for (int i = 0; i < videoSource.GetVideoSourceCount(); i++)
+                {
+                    try { stop_video(i); }
+                    catch (Exception ex) { Log.Warning(ex, "Stopping receiver {Receiver}", i + 1); }
+                }
+                videoSource.Close();
+
+                if (_mediaPlayers != null)
+                {
+                    foreach (var player in _mediaPlayers)
+                    {
+                        try { player.Close(); }
+                        catch (Exception ex) { Log.Warning(ex, "Closing receiver player"); }
+                    }
+                    _mediaPlayers.Clear();
+                }
+                if (_ts_streamers != null)
+                    foreach (var streamer in _ts_streamers) { try { streamer.Close(); } catch { } }
+                if (_ts_recorders != null)
+                    foreach (var recorder in _ts_recorders) { try { recorder.Close(); } catch { } }
+
+                // Release obsolete renderer controls before a fresh connection.
+                for (int i = 0; i < 2 && i < video_panels.Length; i++)
+                {
+                    Control panel = video_panels[i];
+                    if (panel == null || panel.IsDisposed) continue;
+                    foreach (Control child in panel.Controls.Cast<Control>().ToArray())
+                    {
+                        panel.Controls.Remove(child);
+                        child.Dispose();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "PicoTuner local disconnect encountered an error");
+                return false;
+            }
+            finally
+            {
+                source_connected = false;
+                videoSource = null;
+                backendStartupRetuneDone = false;
+            }
+            return resetSent;
+        }
+
         public void BackendShutdown()
         {
             try
