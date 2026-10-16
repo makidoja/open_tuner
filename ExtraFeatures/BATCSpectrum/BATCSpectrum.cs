@@ -44,6 +44,16 @@ namespace opentuner.ExtraFeatures.BATCSpectrum
         int connect_retries = 5;
         int connect_retry_count = 0;
 
+        // Read Quick Tune's actual detected signals without changing its existing
+        // manual click-to-tune behaviour. Frequencies are MHz; SR is Msym/s.
+        public List<signal.Sig> ModernDetectedSignals()
+        {
+            lock (list_lock)
+            {
+                return sigs == null ? new List<signal.Sig>() : sigs.signals.ToList();
+            }
+        }
+
         public void updateSignalCallsign(string callsign, double freq, float sr)
         {
             sigs.updateCurrentSignal(callsign, freq, sr);
