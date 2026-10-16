@@ -192,6 +192,35 @@ namespace opentuner.MediaSources.WinterHill
             }
         }
 
+        // Same remote RESET command and port calculation as WH Broadcast Listener.
+        // RESET is not REBOOT: it resets the receiver without a power cycle.
+        public bool ModernSendPicoReset()
+        {
+            if (!ModernIsPicoTunerEthernet) return false;
+            IPAddress address;
+            string host = GetRuntimeUdpHost();
+            if (!IPAddress.TryParse(host, out address))
+            {
+                Log.Warning("PicoTuner reset skipped: invalid control host '{Host}'", host);
+                return false;
+            }
+
+            int port = (_settings.WinterHillUdpBasePort / 100) * 100 + 20;
+            try
+            {
+                byte[] command = Encoding.ASCII.GetBytes("[to@wh] reset=147");
+                using (UdpClient client = new UdpClient())
+                    client.Send(command, command.Length, new IPEndPoint(address, port));
+                Log.Information("PicoTuner RESET sent to {Host}:{Port}", host, port);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "PicoTuner RESET failed");
+                return false;
+            }
+        }
+
         public void UDPSetVoltage(int plug, uint voltage)
         {
             int base_port = _settings.WinterHillUdpBasePort;
