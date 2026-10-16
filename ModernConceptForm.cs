@@ -175,7 +175,7 @@ namespace opentuner
             source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
             p.Controls.Add(source);
 
-            Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { Connect(); };
+            Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             p.Controls.Add(connect);
 
             Button settings = FlatButton("SETTINGS", false); settings.Width = 82; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
@@ -183,16 +183,7 @@ namespace opentuner
 
             connectionPill = FlatButton("READY", false);
             connectionPill.Size = new Size(112, 30);
-            connectionPill.Click += delegate
-            {
-                if (backend.BackendUsesPicoEthernet && backend.BackendSourceInitialised)
-                {
-                    connectionPill.Text = "RETRYING";
-                    backend.BackendRetryPicoEthernet();
-                    RefreshConnectionState();
-                }
-                else Connect();
-            };
+            connectionPill.Click += delegate { ToggleConnection(); };
             p.Controls.Add(connectionPill);
 
             p.Resize += delegate
@@ -357,6 +348,40 @@ namespace opentuner
         }
 
         private decimal Clamp(NumericUpDown n, decimal value) { return Math.Min(n.Maximum, Math.Max(n.Minimum, value)); }
+
+        private bool switchingConnection;
+
+        private void ToggleConnection()
+        {
+            if (switchingConnection) return;
+            switchingConnection = true;
+            try
+            {
+                if (backend.BackendSourceInitialised)
+                {
+                    connectionPill.Text = "DISCONNECTING";
+                    connectionPill.Enabled = false;
+                    bool resetOk = backend.BackendDisconnectSource(backend.BackendUsesPicoEthernet);
+                    connectRequested = false;
+                    audioInitialised = false;
+                    for (int i = 0; i < 2; i++)
+                    {
+                        lastData[i] = null;
+                        lastSignalStatus[i] = DateTime.MinValue;
+                        noLockSince[i] = DateTime.MinValue;
+                    }
+                    if (!resetOk)
+                        MessageBox.Show("Disconnected locally, but the PicoTuner RESET could not be confirmed. Check the device address and connection.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+                else Connect();
+            }
+            finally
+            {
+                switchingConnection = false;
+                connectionPill.Enabled = true;
+                RefreshConnectionState();
+            }
+        }
 
         private void Connect()
         {
