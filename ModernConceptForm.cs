@@ -41,6 +41,7 @@ namespace opentuner
         private readonly DateTime[] spectrumMissingSince = new DateTime[2];
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
+        private Timer autoScanTimer;
         private int visibleTuners = 2;
         private bool connectRequested;
         private bool audioInitialised;
@@ -81,20 +82,18 @@ namespace opentuner
             {
                 // Scan must run independently of video adoption and status UI.
                 // An exception in those paths previously left Auto Scan ARMED.
-                try { CheckQuickTuneAutoScan(); }
-                catch (Exception ex)
-                {
-                    Serilog.Log.Warning(ex, "QO100 Auto Scan tick failed");
-                    for (int rx = 0; rx < 2; rx++)
-                        if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked)
-                            SetAutoScanState(rx, "SCAN ERROR");
-                }
                 try { AdoptVideoControls(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
                 try { RefreshConnectionState(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Connection status refresh failed"); }
             };
             uiTimer.Start();
+
+            // Independent periodic scanner: video/control UI updates must never
+            // starve the QO-100 scan state machine.
+            autoScanTimer = new Timer { Interval = 1000 };
+            autoScanTimer.Tick += delegate { AutoScanTick(); };
+            Shown += delegate { autoScanTimer.Start(); AutoScanTick(); };
         }
 
         private void BuildInterface()
@@ -478,6 +477,25 @@ namespace opentuner
             if (data.frequency > 0) liveFreq[tuner].Text = (data.frequency / 1000M).ToString("0.000") + " MHz";
         }
 
+        private void AutoScanTick()
+        {
+            if (IsDisposed || Disposing) return;
+            for (int rx = 0; rx < 2; rx++)
+            {
+                if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked &&
+                    autoScanState[rx] == "ARMED")
+                    SetAutoScanState(rx, "CHECKING");
+            }
+            try { CheckQuickTuneAutoScan(); }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "QO100 Auto Scan tick failed");
+                for (int rx = 0; rx < 2; rx++)
+                    if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked)
+                        SetAutoScanState(rx, "SCAN ERROR");
+            }
+        }
+
         // Deliberately opt-in; do not chase short fades or interrupt a lock.
         // Scan candidates from the BATC Quick Tune signal detector, not presets.
         private void CheckQuickTuneAutoScan()
@@ -613,7 +631,12 @@ namespace opentuner
             // Force refresh even if the previous cached state was identical.
             autoScanState[receiver] = "";
             SetAutoScanState(receiver, enabled ? "ARMED" : "OFF");
-            if (enabled) lastAutoScanCheck = DateTime.MinValue;
+            if (enabled)
+            {
+                lastAutoScanCheck = DateTime.MinValue;
+                if (autoScanTimer != null && !autoScanTimer.Enabled) autoScanTimer.Start();
+                AutoScanTick();
+            }
         }
 
         private void SetAutoScanState(int receiver, string state)
@@ -712,6 +735,7 @@ namespace opentuner
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             if (uiTimer != null) uiTimer.Stop();
+            if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
             backend.BackendSourceData -= BackendSourceData;
             backend.BackendShutdown();
