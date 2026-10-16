@@ -314,6 +314,11 @@ namespace opentuner
             OnSignalSelected?.Invoke(receiver, freqKHz, srKs);
         }
 
+        internal List<signal.Sig> DetectedSignalsSnapshot()
+        {
+            lock (sync) return new List<signal.Sig>(signals);
+        }
+
         public void UpdateSignalCallsign(string callsign, double freqMHz, float srMs)
         {
             try { detector.updateCurrentSignal(callsign, freqMHz, srMs); } catch { }
