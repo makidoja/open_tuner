@@ -140,8 +140,28 @@ namespace opentuner
                         };
                         scanChecks[rx] = check;
                     }
+                    check.Text = "RX" + (rx + 1) + " Auto Scan";
+                    check.Size = new Size(180, 22);
                     card.Controls.Add(check);
                     check.BringToFront();
+
+                    Label[] statusLabels = GetField<Label[]>(form, "autoScanStatusLabels");
+                    if (statusLabels != null)
+                    {
+                        Label status = new Label
+                        {
+                            Text = "OFF",
+                            Name = "AutoScanStatusRX" + (rx + 1),
+                            Size = new Size(180, 19),
+                            AutoEllipsis = true,
+                            ForeColor = Color.FromArgb(155, 196, 225),
+                            BackColor = Color.FromArgb(13, 28, 45),
+                            Font = new Font("Segoe UI", 8f)
+                        };
+                        statusLabels[rx] = status;
+                        card.Controls.Add(status);
+                        status.BringToFront();
+                    }
                 }
             }
 
@@ -188,7 +208,12 @@ namespace opentuner
             if (checkboxes != null)
                 for (int rx = 0; rx < Math.Min(2, checkboxes.Length); rx++)
                     if (checkboxes[rx] != null && !checkboxes[rx].IsDisposed)
-                        checkboxes[rx].Location = new Point(display.Right + 8, display.Top + (rx == 0 ? 10 : 57));
+                    {
+                        checkboxes[rx].Location = new Point(display.Right + 8, display.Top + (rx == 0 ? 5 : 54));
+                        Label[] statuses = GetField<Label[]>(FindOwnerForm(card), "autoScanStatusLabels");
+                        if (statuses != null && statuses[rx] != null)
+                            statuses[rx].Location = new Point(display.Right + 11, display.Top + (rx == 0 ? 27 : 76));
+                    }
         }
     }
 }
