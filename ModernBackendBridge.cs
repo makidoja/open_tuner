@@ -133,8 +133,11 @@ namespace opentuner
                         ? "Modern startup: PicoTuner discovery succeeded; reapplying receiver setup"
                         : "Modern startup: PicoTuner discovery unavailable; using configured host and live-status fallback");
 
-                    try { winterHill.ModernReapplyStartupTune(); }
-                    catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                    if (discovered)
+                    {
+                        try { winterHill.ModernReapplyStartupTune(); }
+                        catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                    }
                 }
 
                 if (!backendSourceHooked)
@@ -149,20 +152,10 @@ namespace opentuner
 
         private void BackendForwardSourceData(int videoNr, OTSourceData data, string description)
         {
-            if (!backendStartupRetuneDone)
-            {
-                WinterHillSource winterHill = videoSource as WinterHillSource;
-                if (winterHill != null && winterHill.ModernIsPicoTunerEthernet)
-                {
-                    backendStartupRetuneDone = true;
-                    try { winterHill.ModernReapplyStartupTune(); }
-                    catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
-                }
-                else if (videoSource != null)
-                {
-                    backendStartupRetuneDone = true;
-                }
-            }
+            // Never retune in response to an incoming status update. An already
+            // streaming PicoTuner can report a lock while VLC is attaching;
+            // restarting playback at that instant races native HWND ownership.
+            backendStartupRetuneDone = true;
 
             EnrichModernSourceData(videoNr, data);
 
