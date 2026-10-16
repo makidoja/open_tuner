@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Reflection;
+using System.Linq;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
 
@@ -112,6 +113,38 @@ namespace opentuner
             };
 
             card.Controls.Add(display);
+            // The original PictureBox is replaced above; restore Auto Scan
+            // controls as children of the actual visible modern spectrum.
+            FieldInfo activeField = typeof(ModernConceptForm).GetField(
+                "activeQuickTuneSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
+            activeField?.SetValue(form, display);
+            CheckBox[] scanChecks = GetField<CheckBox[]>(form, "autoScanEnabled");
+            if (scanChecks != null)
+            {
+                for (int rx = 0; rx < Math.Min(2, scanChecks.Length); rx++)
+                {
+                    CheckBox check = scanChecks[rx];
+                    if (check == null || check.IsDisposed)
+                    {
+                        // Original controls may have been disposed with the old box.
+                        int index = rx;
+                        check = new CheckBox
+                        {
+                            Text = "RX" + (rx + 1) + " Auto Scan",
+                            Checked = false,
+                            AutoSize = false,
+                            Size = new Size(132, 22),
+                            BackColor = Color.FromArgb(18, 38, 60),
+                            ForeColor = Color.White,
+                            Font = new Font("Segoe UI Semibold", 8f)
+                        };
+                        scanChecks[rx] = check;
+                    }
+                    display.Controls.Add(check);
+                    check.BringToFront();
+                }
+            }
+
             LayoutDisplay(card);
             display.BringToFront();
 
@@ -141,6 +174,9 @@ namespace opentuner
 
             display.Size = new Size(width, height);
             display.Location = new Point(Math.Max(12, (card.ClientSize.Width - width) / 2), 31);
+            CheckBox[] checkboxes = display.Controls.OfType<CheckBox>().ToArray();
+            for (int i = 0; i < Math.Min(2, checkboxes.Length); i++)
+                checkboxes[i].Location = new Point(Math.Max(4, display.Width - checkboxes[i].Width - 8), i == 0 ? 8 : 53);
         }
     }
 }
