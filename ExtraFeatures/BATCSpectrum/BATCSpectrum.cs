@@ -46,7 +46,7 @@ namespace opentuner.ExtraFeatures.BATCSpectrum
 
         // Read Quick Tune's actual detected signals without changing its existing
         // manual click-to-tune behaviour. Frequencies are MHz; SR is Msym/s.
-        public List<signal.Sig> ModernDetectedSignals()
+        internal List<signal.Sig> ModernDetectedSignals()
         {
             lock (list_lock)
             {
