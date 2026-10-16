@@ -592,6 +592,19 @@ namespace opentuner
             }
         }
 
+        internal void ModernAutoScanChanged(int receiver, bool enabled)
+        {
+            if (receiver < 0 || receiver >= 2) return;
+            noLockSince[receiver] = DateTime.MinValue;
+            spectrumMissingSince[receiver] = DateTime.MinValue;
+            lastAutoTune[receiver] = DateTime.MinValue;
+            lastAutoFrequency[receiver] = 0;
+            // Force refresh even if the previous cached state was identical.
+            autoScanState[receiver] = "";
+            SetAutoScanState(receiver, enabled ? "ARMED" : "OFF");
+            if (enabled) lastAutoScanCheck = DateTime.MinValue;
+        }
+
         private void SetAutoScanState(int receiver, string state)
         {
             if (receiver < 0 || receiver > 1) return;
