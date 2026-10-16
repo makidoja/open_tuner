@@ -41,6 +41,7 @@ namespace opentuner.ExtraFeatures.BATCSpectrum
         Timer SpectrumTuneTimer;
         Timer websocketTimer;
         private int _autoTuneMode = 0;
+        private int spectrumRedrawPending;
         int connect_retries = 5;
         int connect_retry_count = 0;
 
@@ -311,7 +312,25 @@ namespace opentuner.ExtraFeatures.BATCSpectrum
         {
             try
             {
-                _spectrum.Parent?.Invoke(new MethodInvoker(delegate { _spectrum.Image = bmp; _spectrum.Update(); }));
+                // Never block the BATC websocket callback on a busy UI thread.
+                // Coalesce redraws so incoming FFT frames cannot queue indefinitely.
+                if (_spectrum.IsDisposed || !_spectrum.IsHandleCreated) return;
+                if (System.Threading.Interlocked.CompareExchange(ref spectrumRedrawPending, 1, 0) != 0) return;
+                _spectrum.BeginInvoke(new MethodInvoker(delegate
+                {
+                    try
+                    {
+                        if (!_spectrum.IsDisposed && _spectrum.IsHandleCreated)
+                        {
+                            _spectrum.Image = bmp;
+                            _spectrum.Invalidate();
+                        }
+                    }
+                    finally
+                    {
+                        System.Threading.Interlocked.Exchange(ref spectrumRedrawPending, 0);
+                    }
+                }));
             }
             catch { }
         }
