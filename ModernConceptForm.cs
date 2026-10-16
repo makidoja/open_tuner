@@ -36,6 +36,7 @@ namespace opentuner
         private readonly DateTime[] lastAutoTune = new DateTime[2];
         private readonly DateTime[] lastSignalStatus = new DateTime[2];
         private readonly double[] lastAutoFrequency = new double[2];
+        private readonly DateTime[] spectrumMissingSince = new DateTime[2];
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
         private int visibleTuners = 2;
@@ -233,6 +234,7 @@ namespace opentuner
                 check.CheckedChanged += delegate
                 {
                     noLockSince[index] = DateTime.MinValue;
+                    spectrumMissingSince[index] = DateTime.MinValue;
                     lastAutoTune[index] = DateTime.MinValue;
                     lastAutoFrequency[index] = 0;
                 };
@@ -370,6 +372,7 @@ namespace opentuner
                         lastData[i] = null;
                         lastSignalStatus[i] = DateTime.MinValue;
                         noLockSince[i] = DateTime.MinValue;
+                        spectrumMissingSince[i] = DateTime.MinValue;
                     }
                     if (!resetOk)
                         MessageBox.Show("Disconnected locally, but the PicoTuner RESET could not be confirmed. Check the device address and connection.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -473,7 +476,9 @@ namespace opentuner
                        (autoScanEnabled[1] != null && autoScanEnabled[1].Checked);
             if (!any) return;
 
-            var candidates = activeQuickTuneSpectrum.DetectedSignalsSnapshot()
+            List<signal.Sig> detected;
+            if (!activeQuickTuneSpectrum.TryDetectedSignalsSnapshot(out detected)) return;
+            var candidates = detected
                 .Where(sig => sig.frequency > 10490.5 && sig.frequency < 10500.0 &&
                               Math.Abs(sig.frequency - 10491.5) > 0.10 &&
                               sig.sr >= 0.065f)
@@ -492,9 +497,25 @@ namespace opentuner
                 // receiver known to be locked, even if its status goes stale.
                 if (lastData[rx] != null && lastData[rx].demod_locked)
                 {
-                    noLockSince[rx] = DateTime.MinValue;
-                    continue;
+                    // Some receiver firmware keeps reporting the previous lock
+                    // after the transmission moves. Check the current spectrum
+                    // before deciding that the old lock is still usable.
+                    double currentMHz = lastData[rx].frequency / 1000.0;
+                    bool present = detected.Any(sig =>
+                        Math.Abs(sig.frequency - currentMHz) <
+                        Math.Max(0.10, sig.sr / 2.0 + 0.045));
+                    if (present || currentMHz < 10490.5 || currentMHz > 10499.5)
+                    {
+                        spectrumMissingSince[rx] = DateTime.MinValue;
+                        noLockSince[rx] = DateTime.MinValue;
+                        continue;
+                    }
+                    if (spectrumMissingSince[rx] == DateTime.MinValue)
+                        spectrumMissingSince[rx] = now;
+                    if ((now - spectrumMissingSince[rx]).TotalSeconds < 12)
+                        continue;
                 }
+                else spectrumMissingSince[rx] = DateTime.MinValue;
                 if (noLockSince[rx] == DateTime.MinValue)
                 {
                     noLockSince[rx] = now;
