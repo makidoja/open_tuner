@@ -133,7 +133,7 @@ namespace opentuner
                             Text = "RX" + (rx + 1) + " Auto Scan",
                             Checked = false,
                             AutoSize = false,
-                            Size = new Size(132, 22),
+                            Size = new Size(180, 22),
                             BackColor = Color.FromArgb(18, 38, 60),
                             ForeColor = Color.White,
                             Font = new Font("Segoe UI Semibold", 8f)
@@ -175,7 +175,7 @@ namespace opentuner
 
             // Reserve a dedicated control strip to the right of the actual
             // spectrum, so checkboxes never obscure the upper or lower RX plot.
-            const int stripWidth = 150;
+            const int stripWidth = 190;
             int usableWidth = Math.Max(300, card.ClientSize.Width - 36 - stripWidth);
             int width = Math.Min(1140, usableWidth);
             int height = 108;
