@@ -432,8 +432,7 @@ namespace opentuner
                     using (UdpClient listener = new UdpClient(9997))
                     {
                         listener.Client.ReceiveTimeout = 1500;
-                        DateTime deadline = DateTime.UtcNow.AddSeconds(90);
-                        while (DateTime.UtcNow < deadline && generation == picoResetGeneration)
+                        while (generation == picoResetGeneration && !IsDisposed)
                         {
                             try
                             {
@@ -473,9 +472,8 @@ namespace opentuner
                         }
                         else
                         {
-                            // Remain disconnected: user can restart the application
-                            // or investigate the hardware instead of connecting
-                            // into an incomplete PicoTuner reboot.
+                            // Remain disconnected if discovery is unavailable;
+                            // never permit an unsafe immediate reconnect.
                             connectionPill.Text = "PICO OFFLINE";
                             Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
                         }
