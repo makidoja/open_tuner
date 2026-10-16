@@ -142,8 +142,15 @@ namespace opentuner
                     }
                     check.Text = "RX" + (rx + 1) + " Auto Scan";
                     check.Size = new Size(180, 22);
+                    // The old checkbox was disposed with the legacy PictureBox.
+                    // Wire the replacement control to the scan state machine.
+                    check.CheckedChanged += delegate
+                    {
+                        form.ModernAutoScanChanged(index, check.Checked);
+                    };
                     card.Controls.Add(check);
                     check.BringToFront();
+                    form.ModernAutoScanChanged(index, check.Checked);
 
                     Label[] statusLabels = GetField<Label[]>(form, "autoScanStatusLabels");
                     if (statusLabels != null)
