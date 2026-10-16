@@ -30,6 +30,7 @@ namespace opentuner
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
+        private ModernBatcSpectrumControl activeQuickTuneSpectrum;
         private readonly CheckBox[] autoScanEnabled = new CheckBox[2];
         private readonly DateTime[] noLockSince = new DateTime[2];
         private readonly DateTime[] lastAutoTune = new DateTime[2];
@@ -465,14 +466,14 @@ namespace opentuner
             if ((now - lastAutoScanCheck).TotalSeconds < 2) return;
             lastAutoScanCheck = now;
 
-            if (!backend.BackendSourceInitialised || !backend.BackendTransportConnected || batcSpectrum == null)
+            if (!backend.BackendSourceInitialised || !backend.BackendTransportConnected || activeQuickTuneSpectrum == null)
                 return;
 
             bool any = (autoScanEnabled[0] != null && autoScanEnabled[0].Checked) ||
                        (autoScanEnabled[1] != null && autoScanEnabled[1].Checked);
             if (!any) return;
 
-            var candidates = batcSpectrum.ModernDetectedSignals()
+            var candidates = activeQuickTuneSpectrum.DetectedSignalsSnapshot()
                 .Where(sig => sig.frequency > 10490.5 && sig.frequency < 10500.0 &&
                               Math.Abs(sig.frequency - 10491.5) > 0.10 &&
                               sig.sr >= 0.065f)
