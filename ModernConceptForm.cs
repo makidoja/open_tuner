@@ -37,6 +37,7 @@ namespace opentuner
         private readonly DateTime[] lastSignalStatus = new DateTime[2];
         private readonly double[] lastAutoFrequency = new double[2];
         private readonly string[] autoScanState = new string[] { "OFF", "OFF" };
+        private readonly Label[] autoScanStatusLabels = new Label[2];
         private readonly DateTime[] spectrumMissingSince = new DateTime[2];
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
@@ -475,11 +476,18 @@ namespace opentuner
             lastAutoScanCheck = now;
 
             if (!backend.BackendSourceInitialised || !backend.BackendTransportConnected || activeQuickTuneSpectrum == null)
+            {
+                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "WAITING FOR RX");
                 return;
+            }
 
             bool any = (autoScanEnabled[0] != null && autoScanEnabled[0].Checked) ||
                        (autoScanEnabled[1] != null && autoScanEnabled[1].Checked);
-            if (!any) return;
+            if (!any)
+            {
+                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "OFF");
+                return;
+            }
 
             List<signal.Sig> detected;
             if (!activeQuickTuneSpectrum.TryDetectedSignalsSnapshot(out detected))
@@ -590,8 +598,10 @@ namespace opentuner
             if (autoScanState[receiver] == state) return;
             autoScanState[receiver] = state;
             CheckBox cb = autoScanEnabled[receiver];
-            if (cb != null && !cb.IsDisposed)
-                cb.Text = "RX" + (receiver + 1) + " Scan: " + state;
+            Label label = autoScanStatusLabels[receiver];
+            if (label != null && !label.IsDisposed)
+                label.Text = state;
+            Serilog.Log.Information("QO100 scan RX{Receiver}: {State}", receiver + 1, state);
         }
 
         private static bool IsVideoRenderer(Control control)
