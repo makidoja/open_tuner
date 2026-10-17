@@ -1058,7 +1058,7 @@ namespace opentuner
             if (connectButton != null)
             {
                 connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
-                connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
+                connectButton.Text = resetting ? "WAITING" : connected ? "CONNECTED" :
                     waiting ? "WAITING" : connectRequested ? "CONNECTING" : !hardwareReady ? "WAITING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
@@ -1070,7 +1070,7 @@ namespace opentuner
             connectionPill.Cursor = connectionPill.Enabled ? Cursors.Hand : Cursors.Default;
             if (resetting)
             {
-                connectionPill.Text = "RESETTING";
+                connectionPill.Text = "WAITING";
                 connectionPill.ForeColor = Color.FromArgb(210, 216, 223);
                 connectionPill.BackColor = grey;
                 connectionPill.FlatAppearance.BorderColor = greyBorder;
