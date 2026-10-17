@@ -50,6 +50,9 @@ namespace opentuner
         private Timer autoScanTimer;
         private int visibleTuners = 2;
         private TableLayoutPanel receiverGrid;
+        private Panel spectrumCardPanel;
+        private readonly Panel[] receiverCards = new Panel[4];
+        private readonly Panel[] receiverControls = new Panel[4];
         private bool connectRequested;
         private bool audioInitialised;
 
@@ -143,24 +146,28 @@ namespace opentuner
             Panel spectrumCard = BuildSpectrumCard();
             spectrumCard.Dock = DockStyle.Top;
             spectrumCard.Height = 319;
+            spectrumCardPanel = spectrumCard;
             work.Controls.Add(spectrumCard);
 
             TableLayoutPanel tunerGrid = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 1,
+                RowCount = 2,
                 BackColor = Bg,
                 Padding = new Padding(0, 10, 0, 0)
             };
             tunerGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             tunerGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-            tunerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            tunerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+            tunerGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             work.Controls.Add(tunerGrid);
             tunerGrid.BringToFront();
 
             tunerGrid.Controls.Add(BuildTunerCard(0), 0, 0);
             tunerGrid.Controls.Add(BuildTunerCard(1), 1, 0);
+            tunerGrid.Controls.Add(BuildTunerCard(2), 0, 1);
+            tunerGrid.Controls.Add(BuildTunerCard(3), 1, 1);
             receiverGrid = tunerGrid;
         }
 
@@ -276,13 +283,15 @@ namespace opentuner
 
         private Panel BuildTunerCard(int tuner)
         {
-            Panel card = Card(); card.Dock = DockStyle.Fill; card.Margin = tuner == 0 ? new Padding(0,0,6,0) : new Padding(6,0,0,0); card.Padding = new Padding(10);
+            Panel card = Card(); card.Dock = DockStyle.Fill; card.Margin = tuner % 2 == 0 ? new Padding(0,0,6,4) : new Padding(6,0,0,4); card.Padding = new Padding(10);
+            receiverCards[tuner] = card;
 
             Label title = new Label { Text = "▣  RX" + (tuner + 1), Dock = DockStyle.Top, Height = 30, ForeColor = Text, Font = new Font("Segoe UI Semibold", 11f) };
             card.Controls.Add(title);
 
             Panel controls = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Surface };
             card.Controls.Add(controls);
+            receiverControls[tuner] = controls;
 
             videoHosts[tuner] = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black };
             card.Controls.Add(videoHosts[tuner]); videoHosts[tuner].BringToFront();
@@ -493,7 +502,7 @@ namespace opentuner
             backend.BackendSetVideoHosts(videoHosts.Cast<Control>().ToArray());
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
             if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
-            visibleTuners = Math.Max(1, Math.Min(2, backend.BackendTunerCount));
+            visibleTuners = Math.Max(1, Math.Min(4, backend.BackendTunerCount));
             ApplyReceiverCount();
             if (!audioInitialised)
             {
@@ -505,18 +514,71 @@ namespace opentuner
         private void ApplyReceiverCount()
         {
             bool dual = visibleTuners > 1;
+            bool four = visibleTuners > 2;
             if (receiverGrid != null)
             {
-                Control second = receiverGrid.GetControlFromPosition(1, 0);
-                if (second != null) second.Visible = dual;
+                receiverGrid.SuspendLayout();
+                for (int i = 0; i < receiverCards.Length; i++)
+                    if (receiverCards[i] != null) receiverCards[i].Visible = i < visibleTuners;
                 receiverGrid.ColumnStyles[0].Width = dual ? 50f : 100f;
                 receiverGrid.ColumnStyles[1].Width = dual ? 50f : 0f;
-                receiverGrid.PerformLayout();
+                receiverGrid.RowStyles[0].Height = four ? 50f : 100f;
+                receiverGrid.RowStyles[1].Height = four ? 50f : 0f;
+                receiverGrid.ResumeLayout(true);
             }
+            if (spectrumCardPanel != null) spectrumCardPanel.Height = four ? 200 : 319;
+            for (int i = 0; i < receiverControls.Length; i++)
+                if (receiverControls[i] != null) ApplyCompactReceiverLayout(i, four);
             if (activeQuickTuneSpectrum != null)
-                activeQuickTuneSpectrum.SetReceiverCount(visibleTuners);
+                activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, visibleTuners));
             if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = dual;
             if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = dual;
+        }
+
+        private void ApplyCompactReceiverLayout(int rx, bool compact)
+        {
+            Panel panel = receiverControls[rx];
+            if (panel == null) return;
+            panel.Height = compact ? 117 : 190;
+            if (!compact) return; // Original two-RX arrangement is unchanged.
+
+            panel.SuspendLayout();
+            panel.Font = new Font("Segoe UI", 7.5f);
+            liveFreq[rx].Location = new Point(2, 2);
+            liveFreq[rx].Size = new Size(130, 27);
+            liveFreq[rx].Font = new Font("Segoe UI Semibold", 13f);
+            freqInputs[rx].Location = new Point(135, 4);
+            freqInputs[rx].Width = 94;
+            srInputs[rx].Location = new Point(233, 4);
+            srInputs[rx].Width = 63;
+            lockLabels[rx].Location = new Point(2, 33);
+            lockLabels[rx].Size = new Size(75, 22);
+            lockLabels[rx].Font = new Font("Segoe UI Semibold", 7.5f);
+            serviceLabels[rx].Location = new Point(82, 34);
+            serviceLabels[rx].Size = new Size(132, 19);
+            merLabels[rx].Location = new Point(218, 34);
+            merLabels[rx].Size = new Size(90, 19);
+            marginLabels[rx].Location = new Point(218, 55);
+            marginLabels[rx].Size = new Size(100, 18);
+            // Reflow the existing buttons without replacing their Click handlers.
+            Button tune = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text == "TUNE");
+            if (tune != null) { tune.Location = new Point(300, 3); tune.Size = new Size(57, 25); tune.Font = new Font("Segoe UI Semibold", 7f); }
+            Label speaker = panel.Controls.OfType<Label>().FirstOrDefault(x => x.Text == "🔊");
+            if (speaker != null) { speaker.Location = new Point(2, 73); speaker.Size = new Size(20, 22); }
+            volumeBars[rx].Location = new Point(22, 72);
+            volumeBars[rx].Width = 85;
+            muteButtons[rx].Location = new Point(108, 72);
+            muteButtons[rx].Size = new Size(53, 24);
+            muteButtons[rx].Font = new Font("Segoe UI Semibold", 7f);
+            Button record = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text.Contains("RECORD"));
+            if (record != null) { record.Location = new Point(165, 72); record.Size = new Size(66, 24); record.Font = new Font("Segoe UI", 7f); }
+            Button snap = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text.Contains("SNAPSHOT"));
+            if (snap != null) { snap.Location = new Point(235, 72); snap.Size = new Size(75, 24); snap.Font = new Font("Segoe UI", 7f); }
+            Button full = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text == "⛶");
+            if (full != null) { full.Location = new Point(314, 72); full.Size = new Size(35, 24); }
+            Label hint = panel.Controls.OfType<Label>().FirstOrDefault(x => x.Text.StartsWith("Frequency and SR"));
+            if (hint != null) hint.Visible = false;
+            panel.ResumeLayout(true);
         }
 
         internal int ModernReceiverCount { get { return visibleTuners; } }
@@ -565,7 +627,7 @@ namespace opentuner
 
         private void ApplyData(int tuner, OTSourceData data)
         {
-            if (tuner > 1) return;
+            if (tuner >= visibleTuners || tuner < 0) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
             if (data.demod_locked && activeQuickTuneSpectrum != null && data.frequency > 0)
@@ -805,7 +867,7 @@ namespace opentuner
 
         private void AdoptVideoControls()
         {
-            for (int i = 0; i < 2; i++)
+            for (int i = 0; i < Math.Min(4, visibleTuners); i++)
             {
                 Control[] controls = backend.BackendTakeVideoControls(i);
                 if (controls == null) continue;
