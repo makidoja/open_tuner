@@ -102,60 +102,23 @@ namespace opentuner.MediaSources.WinterHill
         // which some firmware versions can format in a way that drops part of the address.
         public bool ModernDiscoverPicoTuner(int timeoutMs)
         {
-            if (!ModernIsPicoTunerEthernet)
-                return false;
-
-            UdpClient listener = null;
+            // Discovery is owned by the shared broadcast listener.
+            // Do not open a second socket on UDP 9997.
             try
             {
-                listener = new UdpClient(9997);
-                listener.Client.ReceiveTimeout = System.Math.Max(250, timeoutMs);
-
-                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-                byte[] bytes = listener.Receive(ref remote);
-                string text = Encoding.ASCII.GetString(bytes);
-
-                string detectedIp = remote != null && remote.Address != null
-                    ? remote.Address.ToString()
-                    : null;
-
-                if (string.IsNullOrWhiteSpace(detectedIp))
+                PicoWHBroadcastListener.EnsureStarted();
+                string address = PicoWHBroadcastListener.LastAddress;
+                if (PicoWHBroadcastListener.RecentlySeen(address, 10) &&
+                    !string.IsNullOrWhiteSpace(address))
                 {
-                    string[] lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (string raw in lines)
-                    {
-                        string line = raw.Trim();
-                        if (line.IndexOf("IP address", StringComparison.OrdinalIgnoreCase) < 0)
-                            continue;
-
-                        int colon = line.IndexOf(':');
-                        if (colon >= 0 && colon + 1 < line.Length)
-                            detectedIp = line.Substring(colon + 1).Trim();
-                        break;
-                    }
+                    runtimeUdpHost = address;
+                    return true;
                 }
-
-                IPAddress parsed;
-                if (string.IsNullOrWhiteSpace(detectedIp) || !IPAddress.TryParse(detectedIp, out parsed))
-                    return false;
-
-                runtimeUdpHost = detectedIp;
-                Serilog.Log.Warning("PicoTuner discovered at " + detectedIp + " - using this address for startup control");
-                return true;
-            }
-            catch (SocketException ex)
-            {
-                Serilog.Log.Information("PicoTuner discovery did not complete: " + ex.Message);
             }
             catch (Exception ex)
             {
-                Serilog.Log.Information("PicoTuner discovery skipped: " + ex.Message);
+                Serilog.Log.Information("PicoTuner shared discovery unavailable: " + ex.Message);
             }
-            finally
-            {
-                try { listener?.Close(); } catch { }
-            }
-
             return false;
         }
 
