@@ -25,11 +25,9 @@ namespace opentuner.MediaSources.WinterHill
             ModernReapplyStartupTune();
         }
 
-        public string ModernConfiguredPicoAddress { get { return _settings == null ? "" : _settings.WinterHillUdpHost; } }
-
         public bool ModernIsPicoTunerEthernet
         {
-            get { return hw_device == 2 || (_settings != null && _settings.DefaultInterface == 2); }
+            get { return _settings != null && _settings.DefaultInterface == 2; }
         }
 
         public string ModernInterfaceDescription
@@ -37,9 +35,6 @@ namespace opentuner.MediaSources.WinterHill
             get
             {
                 if (_settings == null) return "WinterHill";
-                // Prefer the actual active transport over an Always Ask
-                // setting when reporting the hardware interface.
-                if (hw_device == 2) return "PicoTuner Ethernet (G4EWJ)";
                 switch (_settings.DefaultInterface)
                 {
                     case 1: return "WebSocket (ZR6TG)";
