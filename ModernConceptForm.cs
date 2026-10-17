@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
 using opentuner.MediaSources;
+using opentuner.MediaSources.WinterHill;
+using opentuner.Utilities;
 
 namespace opentuner
 {
@@ -32,6 +34,9 @@ namespace opentuner
         private ComboBox layoutCombo;
         private Button connectionPill;
         private Button connectButton;
+        private PicoWHBroadcastListener picoDiscovery;
+        private string configuredPicoHost;
+        private bool picoDiscoveryRequired;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
         private FlowLayoutPanel presetList;
@@ -87,6 +92,7 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
+            RefreshDiscoveryConfiguration();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -203,6 +209,7 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
+            sourceCombo.SelectedIndexChanged += delegate { RefreshDiscoveryConfiguration(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -216,7 +223,7 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshDiscoveryConfiguration(); };
             p.Controls.Add(source);
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
@@ -397,6 +404,40 @@ namespace opentuner
         }
 
         private decimal Clamp(NumericUpDown n, decimal value) { return Math.Min(n.Maximum, Math.Max(n.Minimum, value)); }
+
+        // Discovery affects UI readiness only. The existing receiver backend is
+        // never modified, tuned, or disconnected by this observer.
+        private void RefreshDiscoveryConfiguration()
+        {
+            bool pico = false;
+            string host = null;
+            try
+            {
+                if (sourceCombo != null && sourceCombo.SelectedItem != null &&
+                    sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var settings = new SettingsManager<WinterHillSettings>("winterhill_settings")
+                        .LoadSettings(new WinterHillSettings());
+                    pico = settings.DefaultInterface == 2;
+                    host = settings.WinterHillUdpHost;
+                }
+            }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "Unable to read PicoTuner discovery settings"); }
+
+            picoDiscoveryRequired = pico;
+            configuredPicoHost = host;
+            if (pico && picoDiscovery == null)
+            {
+                try { picoDiscovery = new PicoWHBroadcastListener(); }
+                catch (Exception ex) { Serilog.Log.Warning(ex, "Shared PicoTuner discovery unavailable"); }
+            }
+            if (!pico && picoDiscovery != null)
+            {
+                picoDiscovery.Close();
+                picoDiscovery = null;
+            }
+            if (connectButton != null) RefreshConnectionState();
+        }
 
         private bool switchingConnection;
 
@@ -940,7 +981,8 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool hardwareReady = !picoDiscoveryRequired || PicoWHBroadcastListener.RecentlySeen(configuredPicoHost);
+            bool ready = hardwareReady && !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
             // reliably change its background when Enabled becomes false.
@@ -1000,6 +1042,7 @@ namespace opentuner
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             if (uiTimer != null) uiTimer.Stop();
+            if (picoDiscovery != null) { picoDiscovery.Close(); picoDiscovery = null; }
             if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
             backend.BackendSourceData -= BackendSourceData;
