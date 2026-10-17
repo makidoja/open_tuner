@@ -29,6 +29,7 @@ namespace opentuner
         private readonly int[] savedVolume = new int[] { 60, 60, 60, 60 };
 
         private ComboBox sourceCombo;
+        private ComboBox layoutCombo;
         private Button connectionPill;
         private Button connectButton;
         private volatile bool picoResetPending;
@@ -202,6 +203,17 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
+            layoutCombo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 83, Height = 30, BackColor = Surface2,
+                ForeColor = Text, FlatStyle = FlatStyle.Flat
+            };
+            layoutCombo.Items.Add("AUTO");
+            layoutCombo.SelectedIndex = 0;
+            layoutCombo.Enabled = false;
+            layoutCombo.SelectedIndexChanged += delegate { ApplyReceiverCount(); };
+            p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
             source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
@@ -226,7 +238,8 @@ namespace opentuner
                 settings.Location = new Point(x - settings.Width, 12); x -= settings.Width + 7;
                 connect.Location = new Point(x - connect.Width, 12); x -= connect.Width + 7;
                 source.Location = new Point(x - source.Width, 12); x -= source.Width + 7;
-                sourceCombo.Location = new Point(x - sourceCombo.Width, 14);
+                sourceCombo.Location = new Point(x - sourceCombo.Width, 14); x -= sourceCombo.Width + 7;
+                layoutCombo.Location = new Point(x - layoutCombo.Width, 14);
             };
             return p;
         }
@@ -404,6 +417,7 @@ namespace opentuner
                     connectRequested = false;
                     audioInitialised = false;
                     visibleTuners = 2;
+                    RefreshLayoutOptions();
                     ApplyReceiverCount();
                     for (int i = 0; i < 2; i++)
                     {
@@ -506,6 +520,7 @@ namespace opentuner
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
             if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
             visibleTuners = Math.Max(1, Math.Min(4, backend.BackendTunerCount));
+            RefreshLayoutOptions();
             ApplyReceiverCount();
             if (!audioInitialised)
             {
@@ -514,15 +529,43 @@ namespace opentuner
             }
         }
 
+        private void RefreshLayoutOptions()
+        {
+            if (layoutCombo == null) return;
+            // Only advertise layouts which the currently connected backend
+            // can genuinely provide; never create fictional RX channels.
+            int count = backend.BackendSourceInitialised ? visibleTuners : 0;
+            layoutCombo.BeginUpdate();
+            try
+            {
+                layoutCombo.Items.Clear();
+                layoutCombo.Items.Add("AUTO");
+                if (count == 1) layoutCombo.Items.Add("1 RX");
+                if (count >= 2) layoutCombo.Items.Add("2 RX");
+                if (count >= 4) layoutCombo.Items.Add("4 RX");
+                layoutCombo.SelectedIndex = 0;
+                layoutCombo.Enabled = count > 0;
+            }
+            finally { layoutCombo.EndUpdate(); }
+        }
+
         private void ApplyReceiverCount()
         {
-            bool dual = visibleTuners > 1;
-            bool four = visibleTuners > 2;
+            int displayed = visibleTuners;
+            if (layoutCombo != null && layoutCombo.Enabled)
+            {
+                string selection = layoutCombo.SelectedItem as string;
+                if (selection == "1 RX") displayed = Math.Min(1, visibleTuners);
+                else if (selection == "2 RX") displayed = Math.Min(2, visibleTuners);
+                else if (selection == "4 RX") displayed = Math.Min(4, visibleTuners);
+            }
+            bool dual = displayed > 1;
+            bool four = displayed > 2;
             if (receiverGrid != null)
             {
                 receiverGrid.SuspendLayout();
                 for (int i = 0; i < receiverCards.Length; i++)
-                    if (receiverCards[i] != null) receiverCards[i].Visible = i < visibleTuners;
+                    if (receiverCards[i] != null) receiverCards[i].Visible = i < displayed;
                 receiverGrid.ColumnStyles[0].Width = dual ? 50f : 100f;
                 receiverGrid.ColumnStyles[1].Width = dual ? 50f : 0f;
                 receiverGrid.RowStyles[0].Height = four ? 50f : 100f;
@@ -534,8 +577,8 @@ namespace opentuner
                 if (receiverControls[i] != null) ApplyCompactReceiverLayout(i, four);
             if (activeQuickTuneSpectrum != null)
                 activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, visibleTuners));
-            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = dual;
-            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = dual;
+            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = visibleTuners > 1;
+            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = visibleTuners > 1;
         }
 
         private void ApplyCompactReceiverLayout(int rx, bool compact)
