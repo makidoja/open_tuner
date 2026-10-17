@@ -422,7 +422,11 @@ namespace opentuner
                         interfaceName.IndexOf("PicoTuner Ethernet", StringComparison.OrdinalIgnoreCase) >= 0 ||
                         interfaceName.IndexOf("PicoTuner (ETH)", StringComparison.OrdinalIgnoreCase) >= 0;
                     Serilog.Log.Information("Disconnect receiver: interface={Interface}, PicoReset={Reset}", interfaceName, resetPico);
-                    if (resetPico) { picoResetPending = true; picoReadyConfirmed = false; picoResetStartedUtc = DateTime.UtcNow; }
+                    // Always display a protected disconnect/recovery state. A
+                    // runtime hardware classification failure must not skip it.
+                    picoResetPending = true;
+                    picoReadyConfirmed = false;
+                    picoResetStartedUtc = DateTime.UtcNow;
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
@@ -444,6 +448,7 @@ namespace opentuner
                         spectrumMissingSince[i] = DateTime.MinValue;
                     }
                     if (resetPico) WaitForPicoReturn();
+                    else WaitForNonPicoDisconnect();
                     if (!resetOk)
                         MessageBox.Show("Disconnected locally, but the PicoTuner RESET could not be confirmed. Check the device address and connection.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
@@ -470,6 +475,26 @@ namespace opentuner
         {
             long ticks = System.Threading.Interlocked.Read(ref lastPicoDiscoveryTicks);
             return ticks > 0 && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromSeconds(8).Ticks;
+        }
+
+        private void WaitForNonPicoDisconnect()
+        {
+            // Hardware modes other than PicoTuner Ethernet have different
+            // presence tests. Retain a visible recovery period without using
+            // PicoTuner UDP broadcasts for USB / other sources.
+            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            Task.Run(async delegate
+            {
+                await Task.Delay(3000);
+                if (IsDisposed || !IsHandleCreated || generation != picoResetGeneration) return;
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (IsDisposed || generation != picoResetGeneration) return;
+                    picoReadyConfirmed = true;
+                    picoResetPending = false;
+                    RefreshConnectionState();
+                });
+            });
         }
 
         private void WaitForPicoReturn()
@@ -997,12 +1022,12 @@ namespace opentuner
             bool picoSelected = sourceCombo.SelectedIndex >= 0 && backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
             // UDP 9997 is exclusively owned by the existing PicoTuner broadcast
             // listener. Do not keep a second listener open in the modern UI.
-            bool hardwareReady = !picoSelected || picoReadyConfirmed;
+            bool hardwareReady = picoReadyConfirmed;
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool waiting = (initialised && !live) || (picoSelected && !hardwareReady);
+            bool waiting = (initialised && !live) || !hardwareReady;
             bool ready = hardwareReady && !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
