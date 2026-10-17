@@ -384,6 +384,8 @@ namespace opentuner
             foreach (string s in backend.BackendSourceNames()) sourceCombo.Items.Add(s);
             int idx = backend.BackendSelectedSourceIndex;
             if (idx < 0 || idx >= sourceCombo.Items.Count) idx = 0;
+            for (int i = 0; i < sourceCombo.Items.Count; i++)
+                if (backend.BackendSelectedSourceIsPicoEthernet(i)) { idx = i; break; }
             if (sourceCombo.Items.Count > 0) sourceCombo.SelectedIndex = idx;
         }
 
@@ -930,7 +932,7 @@ namespace opentuner
             bool detected = !pico || PicoWHBroadcastListener.RecentlySeen(
                 backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex), 6);
             if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc >= TimeSpan.FromSeconds(5)
-                && detected)
+                && (!pico || PicoWHBroadcastListener.SeenAfter(backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex), picoResetStartedUtc.AddSeconds(4))))
                 picoResetPending = false;
 
             bool live = initialised && backend.BackendTransportConnected;
