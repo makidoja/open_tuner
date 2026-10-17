@@ -8,9 +8,9 @@ This branch modernises the Windows interface while retaining the existing receiv
 - The project targets **.NET Framework 4.7.2**, Release / x64.
 - The workflow restores NuGet packages, generates `OpenTunerModern.ico`, compiles the application, packages the official OpenTuner FFmpeg runtime and builds the Inno Setup installer.
 - Installer configuration: `installer/OpenTuner.iss`.
-- Installer branding: **Open Tuner (ZR6TG) Version M0CKE 0.C.v1.1.0**.
+- Installer branding: **Open Tuner (ZR6TG) Version M0CKE 0.C.v1.2.0**.
 - The generated icon is embedded in the EXE and installer and copied for the Start Menu and optional desktop shortcut.
-- Successful workflow artifacts include `OpenTuner-modern-ui` (portable build) and `OpenTuner-Windows-Installer-v1.1.0`.
+- Successful workflow artifacts include `OpenTuner-modern-ui` (portable build) and `OpenTuner-Windows-Installer-v1.2.0`.
 
 ## Functional regression checks
 
