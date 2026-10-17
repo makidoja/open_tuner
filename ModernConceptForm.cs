@@ -400,7 +400,7 @@ namespace opentuner
 
         private bool switchingConnection;
 
-        private void ToggleConnection()
+        private async void ToggleConnection()
         {
             if (switchingConnection || picoResetPending) return;
             switchingConnection = true;
@@ -413,6 +413,10 @@ namespace opentuner
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
+                    // Give WinForms an opportunity to PAINT the grey RESETTING
+                    // state before the synchronous hardware disconnect/reset.
+                    RefreshConnectionState();
+                    await Task.Delay(180);
                     bool resetOk = backend.BackendDisconnectSource(resetPico);
                     connectRequested = false;
                     audioInitialised = false;
@@ -430,7 +434,13 @@ namespace opentuner
                     if (!resetOk)
                         MessageBox.Show("Disconnected locally, but the PicoTuner RESET could not be confirmed. Check the device address and connection.", "OpenTuner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 }
-                else Connect();
+                else
+                {
+                    connectRequested = true;
+                    RefreshConnectionState();
+                    await Task.Delay(140);
+                    Connect();
+                }
             }
             finally
             {
