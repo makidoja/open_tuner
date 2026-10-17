@@ -35,6 +35,7 @@ namespace opentuner
         private volatile bool picoResetPending;
         private int picoResetGeneration;
         private long lastPicoDiscoveryTicks;
+        private string expectedPicoAddress = "";
         private DateTime picoResetStartedUtc = DateTime.MinValue;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
@@ -206,7 +207,12 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshConnectionState(); };
+            sourceCombo.SelectedIndexChanged += delegate
+            {
+                expectedPicoAddress = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
+                System.Threading.Interlocked.Exchange(ref lastPicoDiscoveryTicks, 0);
+                RefreshConnectionState();
+            };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -481,7 +487,7 @@ namespace opentuner
                                     IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
                                     byte[] packet = listener.Receive(ref remote);
                                     if (packet == null || packet.Length == 0 || remote == null) continue;
-                                    string expected = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
+                                    string expected = expectedPicoAddress;
                                     if (!string.IsNullOrWhiteSpace(expected) &&
                                         !string.Equals(expected, remote.Address.ToString(), StringComparison.OrdinalIgnoreCase))
                                         continue;
