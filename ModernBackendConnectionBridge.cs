@@ -25,6 +25,20 @@ namespace opentuner
             }
         }
 
+        public bool BackendSelectedSourceIsPicoEthernet(int sourceIndex)
+        {
+            if (sourceIndex < 0 || sourceIndex >= _availableSources.Count) return false;
+            WinterHillSource wh = _availableSources[sourceIndex] as WinterHillSource;
+            return wh != null && wh.ModernIsPicoTunerEthernet;
+        }
+
+        public string BackendSelectedPicoAddress(int sourceIndex)
+        {
+            if (sourceIndex < 0 || sourceIndex >= _availableSources.Count) return "";
+            WinterHillSource wh = _availableSources[sourceIndex] as WinterHillSource;
+            return wh == null ? "" : wh.ModernConfiguredPicoAddress;
+        }
+
         public bool BackendUsesPicoEthernet
         {
             get { WinterHillSource wh = videoSource as WinterHillSource; return wh != null && wh.ModernIsPicoTunerEthernet; }
