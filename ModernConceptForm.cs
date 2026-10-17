@@ -950,7 +950,7 @@ namespace opentuner
             {
                 connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
+                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
