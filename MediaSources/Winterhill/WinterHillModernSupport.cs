@@ -25,6 +25,8 @@ namespace opentuner.MediaSources.WinterHill
             ModernReapplyStartupTune();
         }
 
+        public string ModernConfiguredPicoAddress { get { return _settings == null ? "" : _settings.WinterHillUdpHost; } }
+
         public bool ModernIsPicoTunerEthernet
         {
             get { return _settings != null && _settings.DefaultInterface == 2; }
