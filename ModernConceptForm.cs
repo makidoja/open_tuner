@@ -860,13 +860,13 @@ namespace opentuner
             Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                connectButton.Enabled = ready;
+                connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
                     offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
-                connectButton.BackColor = ready ? Accent : grey;
-                connectButton.ForeColor = ready ? Text : Color.FromArgb(210, 216, 223);
-                connectButton.FlatAppearance.BorderColor = ready ? Accent : greyBorder;
-                connectButton.Cursor = ready ? Cursors.Hand : Cursors.Default;
+                connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
+                connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
+                connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
 
             connectionPill.Enabled = !resetting && !switchingConnection;
