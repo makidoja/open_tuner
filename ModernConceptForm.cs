@@ -37,7 +37,7 @@ namespace opentuner
         private long lastPicoDiscoveryTicks;
         private string expectedPicoAddress = "";
         private DateTime picoResetStartedUtc = DateTime.MinValue;
-        private bool picoReadyConfirmed = true;
+        private bool picoReadyConfirmed = false;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -91,6 +91,7 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
+            RefreshSelectedReceiverReadiness();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -207,7 +208,7 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshConnectionState(); };
+            sourceCombo.SelectedIndexChanged += delegate { RefreshSelectedReceiverReadiness(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -477,6 +478,25 @@ namespace opentuner
             return ticks > 0 && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromSeconds(8).Ticks;
         }
 
+        private void RefreshSelectedReceiverReadiness()
+        {
+            if (sourceCombo == null || backend.BackendSourceInitialised) return;
+            int selected = sourceCombo.SelectedIndex;
+            bool picoEthernet = selected >= 0 &&
+                backend.BackendSelectedSourceIsPicoEthernet(selected);
+            System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            picoResetPending = false;
+            picoReadyConfirmed = !picoEthernet;
+            if (picoEthernet)
+            {
+                // At startup, do not assume the configured IP is online.
+                // A fresh broadcast is required before enabling CONNECT.
+                picoResetStartedUtc = DateTime.UtcNow.AddSeconds(-8);
+                WaitForPicoReturn();
+            }
+            RefreshConnectionState();
+        }
+
         private void WaitForNonPicoDisconnect()
         {
             // Hardware modes other than PicoTuner Ethernet have different
@@ -506,7 +526,8 @@ namespace opentuner
             string expectedAddress = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
             Task.Run(delegate
             {
-                System.Threading.Thread.Sleep(8000);
+                int graceMs = Math.Max(0, (int)(resetAt.AddSeconds(8) - DateTime.UtcNow).TotalMilliseconds);
+                if (graceMs > 0) System.Threading.Thread.Sleep(graceMs);
                 while (!IsDisposed && generation == picoResetGeneration)
                 {
                     try
