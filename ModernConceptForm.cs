@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
 using opentuner.MediaSources;
-using opentuner.MediaSources.WinterHill;
 
 namespace opentuner
 {
@@ -35,7 +34,6 @@ namespace opentuner
         private Button connectButton;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
-        private DateTime picoResetStartedUtc = DateTime.MinValue;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -89,8 +87,6 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
-            try { PicoWHBroadcastListener.EnsureStarted(); }
-            catch (Exception ex) { Serilog.Log.Warning(ex, "PicoTuner broadcast monitor unavailable"); }
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -207,7 +203,6 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshConnectionState(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -221,10 +216,10 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) { backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshConnectionState(); } };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
             p.Controls.Add(source);
 
-            Button connect = FlatButton("WAITING", false); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
+            Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             connectButton = connect;
             p.Controls.Add(connect);
 
@@ -384,8 +379,6 @@ namespace opentuner
             foreach (string s in backend.BackendSourceNames()) sourceCombo.Items.Add(s);
             int idx = backend.BackendSelectedSourceIndex;
             if (idx < 0 || idx >= sourceCombo.Items.Count) idx = 0;
-            for (int i = 0; i < sourceCombo.Items.Count; i++)
-                if (backend.BackendSelectedSourceIsPicoEthernet(i)) { idx = i; break; }
             if (sourceCombo.Items.Count > 0) sourceCombo.SelectedIndex = idx;
         }
 
@@ -416,7 +409,7 @@ namespace opentuner
                 if (backend.BackendSourceInitialised)
                 {
                     bool resetPico = backend.BackendUsesPicoEthernet;
-                    if (resetPico) { picoResetPending = true; picoResetStartedUtc = DateTime.UtcNow; }
+                    if (resetPico) picoResetPending = true;
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
@@ -452,9 +445,67 @@ namespace opentuner
         // A fresh discovery broadcast proves the PicoTuner is back online.
         private void WaitForPicoReturn()
         {
-            // Do not open port 9997 here; the shared listener is already
-            // monitoring hardware broadcasts. The UI heartbeat releases the
-            // interlock only after a fresh broadcast following reset.
+            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            Task.Run(delegate
+            {
+                // Allow the old firmware session to shut down before trusting
+                // any fresh discovery advertisement.
+                System.Threading.Thread.Sleep(3000);
+                bool returned = false;
+                try
+                {
+                    using (UdpClient listener = new UdpClient(9997))
+                    {
+                        listener.Client.ReceiveTimeout = 1500;
+                        while (generation == picoResetGeneration && !IsDisposed)
+                        {
+                            try
+                            {
+                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                                byte[] message = listener.Receive(ref remote);
+                                if (message != null && message.Length > 0)
+                                {
+                                    returned = true;
+                                    break;
+                                }
+                            }
+                            catch (SocketException ex)
+                            {
+                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
+                }
+
+                if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
+                    return;
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (generation != picoResetGeneration || IsDisposed) return;
+                        if (returned)
+                        {
+                            picoResetPending = false;
+                            connectionPill.Enabled = true;
+                            if (connectButton != null) connectButton.Enabled = true;
+                            RefreshConnectionState();
+                        }
+                        else
+                        {
+                            // Remain disconnected if discovery is unavailable;
+                            // never permit an unsafe immediate reconnect.
+                            connectionPill.Text = "PICO OFFLINE";
+                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
+                        }
+                    });
+                }
+                catch (InvalidOperationException) { }
+            });
         }
 
         private void Connect()
@@ -926,48 +977,66 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
+            bool resetting = picoResetPending;
             bool initialised = backend.BackendSourceInitialised;
-            bool pico = sourceCombo != null && sourceCombo.SelectedIndex >= 0 &&
-                backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
-            bool detected = !pico || PicoWHBroadcastListener.RecentlySeen(
-                backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex), 6);
-            if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc >= TimeSpan.FromSeconds(5)
-                && (!pico || PicoWHBroadcastListener.SeenAfter(backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex), picoResetStartedUtc.AddSeconds(4))))
-                picoResetPending = false;
-
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
-            bool working = switchingConnection || connectRequested && !connected;
-            bool canConnect = !initialised && detected && !picoResetPending && !working;
-            bool canDisconnect = initialised && !picoResetPending && !switchingConnection;
-            string status = picoResetPending || !detected ? "WAITING" :
-                connected ? "CONNECTED" : initialised || connectRequested ? "CONNECTING" : "CONNECT";
-            Color grey = Color.FromArgb(75, 84, 95);
-            Color background = connected ? Color.FromArgb(17, 91, 59) : canConnect ? Accent : grey;
-            Color border = connected ? Color.FromArgb(38, 140, 86) : canConnect ? Accent : Color.FromArgb(108, 119, 131);
-            bool enabled = canConnect || canDisconnect;
+            bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
+            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
 
+            // Set the colours explicitly; a FlatStyle.Flat button does not
+            // reliably change its background when Enabled becomes false.
+            Color grey = Color.FromArgb(75, 84, 95);
+            Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                // Apply visual state while enabled, then set Enabled last.
-                // This avoids retaining the original blue disabled-button paint.
-                connectButton.Enabled = true;
-                connectButton.Text = status;
-                connectButton.BackColor = background;
-                connectButton.ForeColor = Text;
-                connectButton.FlatAppearance.BorderColor = border;
-                connectButton.Cursor = enabled ? Cursors.Hand : Cursors.Default;
-                connectButton.Enabled = enabled;
+                connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
+                connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
+                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
+                connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
+                connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
+                connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
-            if (connectionPill != null)
+
+            connectionPill.Enabled = !resetting && !switchingConnection;
+            connectionPill.Cursor = connectionPill.Enabled ? Cursors.Hand : Cursors.Default;
+            if (resetting)
             {
-                connectionPill.Text = status;
-                connectionPill.ForeColor = Text;
-                connectionPill.BackColor = background;
-                connectionPill.FlatAppearance.BorderColor = border;
-                connectionPill.Enabled = enabled;
+                connectionPill.Text = "RESETTING";
+                connectionPill.ForeColor = Color.FromArgb(210, 216, 223);
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
             }
-            if (connected) connectRequested = false;
+            else if (connected)
+            {
+                connectRequested = false;
+                connectionPill.Text = "● CONNECTED";
+                connectionPill.ForeColor = Green;
+                connectionPill.BackColor = Color.FromArgb(17, 56, 44);
+                connectionPill.FlatAppearance.BorderColor = Color.FromArgb(38, 112, 83);
+            }
+            else if (offline)
+            {
+                connectionPill.Text = "● OFFLINE";
+                connectionPill.ForeColor = Color.FromArgb(210, 216, 223);
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
+            }
+            else if (connectRequested)
+            {
+                connectionPill.Text = "CONNECTING";
+                connectionPill.ForeColor = Muted;
+                connectionPill.BackColor = grey;
+                connectionPill.FlatAppearance.BorderColor = greyBorder;
+            }
+            else
+            {
+                connectionPill.Text = "READY";
+                connectionPill.ForeColor = Muted;
+                connectionPill.BackColor = Surface2;
+                connectionPill.FlatAppearance.BorderColor = Border;
+            }
         }
 
         protected override void OnFormClosed(FormClosedEventArgs e)
