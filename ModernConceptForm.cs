@@ -572,7 +572,7 @@ namespace opentuner
 
         private void Connect()
         {
-            if (picoResetPending || !picoReadyConfirmed) return;
+            if (picoResetPending) return;
             if (sourceCombo.SelectedIndex < 0) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
