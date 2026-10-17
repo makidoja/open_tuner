@@ -37,6 +37,7 @@ namespace opentuner
         private long lastPicoDiscoveryTicks;
         private string expectedPicoAddress = "";
         private DateTime picoResetStartedUtc = DateTime.MinValue;
+        private bool picoReadyConfirmed = true;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -421,7 +422,7 @@ namespace opentuner
                         interfaceName.IndexOf("PicoTuner Ethernet", StringComparison.OrdinalIgnoreCase) >= 0 ||
                         interfaceName.IndexOf("PicoTuner (ETH)", StringComparison.OrdinalIgnoreCase) >= 0;
                     Serilog.Log.Information("Disconnect receiver: interface={Interface}, PicoReset={Reset}", interfaceName, resetPico);
-                    if (resetPico) { picoResetPending = true; picoResetStartedUtc = DateTime.UtcNow; }
+                    if (resetPico) { picoResetPending = true; picoReadyConfirmed = false; picoResetStartedUtc = DateTime.UtcNow; }
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
@@ -502,6 +503,7 @@ namespace opentuner
                         BeginInvoke((MethodInvoker)delegate
                         {
                             if (IsDisposed || generation != picoResetGeneration) return;
+                            picoReadyConfirmed = true;
                             picoResetPending = false;
                             RefreshConnectionState();
                         });
@@ -524,7 +526,7 @@ namespace opentuner
 
         private void Connect()
         {
-            if (picoResetPending) return;
+            if (picoResetPending || !picoReadyConfirmed) return;
             if (sourceCombo.SelectedIndex < 0) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
@@ -995,12 +997,12 @@ namespace opentuner
             bool picoSelected = sourceCombo.SelectedIndex >= 0 && backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
             // UDP 9997 is exclusively owned by the existing PicoTuner broadcast
             // listener. Do not keep a second listener open in the modern UI.
-            bool hardwareReady = true;
+            bool hardwareReady = !picoSelected || picoReadyConfirmed;
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool waiting = initialised && !live;
+            bool waiting = (initialised && !live) || (picoSelected && !hardwareReady);
             bool ready = hardwareReady && !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
@@ -1011,7 +1013,7 @@ namespace opentuner
             {
                 connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    waiting ? "WAITING" : connectRequested ? "CONNECTING" : !hardwareReady ? "NO RECEIVER" : "CONNECT";
+                    waiting ? "WAITING" : connectRequested ? "CONNECTING" : !hardwareReady ? "WAITING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
@@ -1051,7 +1053,7 @@ namespace opentuner
             }
             else
             {
-                connectionPill.Text = hardwareReady ? "CONNECT" : "NO RECEIVER";
+                connectionPill.Text = hardwareReady ? "CONNECT" : "WAITING";
                 connectionPill.ForeColor = Muted;
                 connectionPill.BackColor = Surface2;
                 connectionPill.FlatAppearance.BorderColor = Border;
