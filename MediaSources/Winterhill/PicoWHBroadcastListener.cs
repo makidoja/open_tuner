@@ -43,6 +43,13 @@ namespace opentuner.MediaSources.WinterHill
                     string.Equals(lastSeenAddress, expectedAddress, StringComparison.OrdinalIgnoreCase);
         }
 
+        public static bool SeenAfter(string expectedAddress, DateTime thresholdUtc)
+        {
+            long ticks = Interlocked.Read(ref lastSeenTicks);
+            return ticks > thresholdUtc.Ticks &&
+                RecentlySeen(expectedAddress, 6);
+        }
+
         public static string LastAddress { get { lock (Sync) return lastSeenAddress; } }
 
         private static void Listen()
