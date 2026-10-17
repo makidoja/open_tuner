@@ -982,6 +982,7 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
+            bool waiting = initialised && !live;
             bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
@@ -990,16 +991,16 @@ namespace opentuner
             Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
+                connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
+                    waiting ? "WAITING" : connectRequested ? "CONNECTING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
                 connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
 
-            connectionPill.Enabled = !resetting && !switchingConnection;
+            connectionPill.Enabled = (connected || ready) && !switchingConnection && !resetting;
             connectionPill.Cursor = connectionPill.Enabled ? Cursors.Hand : Cursors.Default;
             if (resetting)
             {
@@ -1032,7 +1033,7 @@ namespace opentuner
             }
             else
             {
-                connectionPill.Text = "READY";
+                connectionPill.Text = "CONNECT";
                 connectionPill.ForeColor = Muted;
                 connectionPill.BackColor = Surface2;
                 connectionPill.FlatAppearance.BorderColor = Border;
