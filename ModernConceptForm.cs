@@ -385,6 +385,10 @@ namespace opentuner
             foreach (string s in backend.BackendSourceNames()) sourceCombo.Items.Add(s);
             int idx = backend.BackendSelectedSourceIndex;
             if (idx < 0 || idx >= sourceCombo.Items.Count) idx = 0;
+            // Prefer the configured Ethernet PicoTuner over a stale default
+            // source choice left in the original OpenTuner settings.
+            for (int i = 0; i < sourceCombo.Items.Count; i++)
+                if (backend.BackendSelectedSourceIsPicoEthernet(i)) { idx = i; break; }
             if (sourceCombo.Items.Count > 0) sourceCombo.SelectedIndex = idx;
         }
 
