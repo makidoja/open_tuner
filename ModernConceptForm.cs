@@ -90,7 +90,6 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
-            StartPicoReadinessMonitor();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -207,12 +206,7 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate
-            {
-                expectedPicoAddress = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
-                System.Threading.Interlocked.Exchange(ref lastPicoDiscoveryTicks, 0);
-                RefreshConnectionState();
-            };
+            sourceCombo.SelectedIndexChanged += delegate { RefreshConnectionState(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -469,46 +463,6 @@ namespace opentuner
             return ticks > 0 && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromSeconds(8).Ticks;
         }
 
-        private void StartPicoReadinessMonitor()
-        {
-            Task.Run(delegate
-            {
-                while (!IsDisposed)
-                {
-                    try
-                    {
-                        using (UdpClient listener = new UdpClient(9997))
-                        {
-                            listener.Client.ReceiveTimeout = 1200;
-                            while (!IsDisposed)
-                            {
-                                try
-                                {
-                                    IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-                                    byte[] packet = listener.Receive(ref remote);
-                                    if (packet == null || packet.Length == 0 || remote == null) continue;
-                                    string expected = expectedPicoAddress;
-                                    if (!string.IsNullOrWhiteSpace(expected) &&
-                                        !string.Equals(expected, remote.Address.ToString(), StringComparison.OrdinalIgnoreCase))
-                                        continue;
-                                    System.Threading.Interlocked.Exchange(ref lastPicoDiscoveryTicks, DateTime.UtcNow.Ticks);
-                                }
-                                catch (SocketException ex)
-                                {
-                                    if (ex.SocketErrorCode != SocketError.TimedOut) break;
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Serilog.Log.Warning(ex, "PicoTuner discovery listener unavailable");
-                    }
-                    System.Threading.Thread.Sleep(1500);
-                }
-            });
-        }
-
         private void WaitForPicoReturn()
         {
             picoResetStartedUtc = DateTime.UtcNow;
@@ -518,7 +472,6 @@ namespace opentuner
         {
             if (picoResetPending) return;
             if (sourceCombo.SelectedIndex < 0) return;
-            if (backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex) && !PicoDiscoveredRecently()) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
             // Give the backend the final visible video destinations before it creates
@@ -984,13 +937,13 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
-            if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc > TimeSpan.FromSeconds(3) &&
-                PicoDiscoveredRecently() &&
-                new DateTime(System.Threading.Interlocked.Read(ref lastPicoDiscoveryTicks), DateTimeKind.Utc) > picoResetStartedUtc.AddSeconds(2))
+            if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc > TimeSpan.FromSeconds(12))
                 picoResetPending = false;
             bool resetting = picoResetPending;
             bool picoSelected = sourceCombo.SelectedIndex >= 0 && backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
-            bool hardwareReady = !picoSelected || PicoDiscoveredRecently();
+            // UDP 9997 is exclusively owned by the existing PicoTuner broadcast
+            // listener. Do not keep a second listener open in the modern UI.
+            bool hardwareReady = true;
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
