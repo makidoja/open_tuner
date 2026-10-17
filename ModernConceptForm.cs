@@ -278,7 +278,7 @@ namespace opentuner
         {
             Panel card = Card(); card.Dock = DockStyle.Fill; card.Margin = tuner == 0 ? new Padding(0,0,6,0) : new Padding(6,0,0,0); card.Padding = new Padding(10);
 
-            Label title = new Label { Text = "▣  Tuner " + (tuner + 1), Dock = DockStyle.Top, Height = 30, ForeColor = Text, Font = new Font("Segoe UI Semibold", 11f) };
+            Label title = new Label { Text = "▣  RX" + (tuner + 1), Dock = DockStyle.Top, Height = 30, ForeColor = Text, Font = new Font("Segoe UI Semibold", 11f) };
             card.Controls.Add(title);
 
             Panel controls = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Surface };
