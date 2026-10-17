@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
@@ -35,10 +34,6 @@ namespace opentuner
         private Button connectButton;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
-        private volatile bool picoProbeAlive;
-        private volatile bool picoProbeEnabled;
-        private volatile string picoProbeAddress = "";
-        private volatile bool picoProbeStarted;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -92,8 +87,6 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
-            RefreshPicoProbeTarget();
-            StartPassivePicoProbe();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -210,7 +203,6 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshPicoProbeTarget(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -224,10 +216,10 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) { backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshPicoProbeTarget(); } };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
             p.Controls.Add(source);
 
-            Button connect = FlatButton("WAITING", false); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
+            Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             connectButton = connect;
             p.Controls.Add(connect);
 
@@ -407,43 +399,6 @@ namespace opentuner
         private decimal Clamp(NumericUpDown n, decimal value) { return Math.Min(n.Maximum, Math.Max(n.Minimum, value)); }
 
         private bool switchingConnection;
-
-        // Passive ICMP status only: the proven backend remains fully usable.
-        // Never open UDP 9997 and never reject a connection based on this probe.
-        private void RefreshPicoProbeTarget()
-        {
-            int index = sourceCombo == null ? -1 : sourceCombo.SelectedIndex;
-            picoProbeEnabled = index >= 0 && backend.BackendSelectedPicoEthernet(index);
-            picoProbeAddress = picoProbeEnabled ? backend.BackendSelectedPicoIp(index) : "";
-            picoProbeAlive = false;
-            if (connectButton != null) RefreshConnectionState();
-        }
-
-        private void StartPassivePicoProbe()
-        {
-            if (picoProbeStarted) return;
-            picoProbeStarted = true;
-            Task.Run(delegate
-            {
-                while (!IsDisposed)
-                {
-                    string ip = picoProbeAddress;
-                    bool success = false;
-                    if (picoProbeEnabled && !string.IsNullOrWhiteSpace(ip))
-                    {
-                        try
-                        {
-                            using (Ping ping = new Ping())
-                                success = ping.Send(ip, 750).Status == IPStatus.Success;
-                        }
-                        catch (Exception) { }
-                    }
-                    if (ip == picoProbeAddress)
-                        picoProbeAlive = success;
-                    System.Threading.Thread.Sleep(1800);
-                }
-            });
-        }
 
         private void ToggleConnection()
         {
@@ -1027,8 +982,7 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool available = !picoProbeEnabled || picoProbeAlive;
-            bool ready = available && !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
             // reliably change its background when Enabled becomes false.
@@ -1036,11 +990,9 @@ namespace opentuner
             Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                // Deliberately keep manual connection possible if ICMP is blocked.
-                // This passive status check must never break receiver operation.
-                connectButton.Enabled = !switchingConnection && !resetting;
-                connectButton.Text = resetting ? "WAITING" : connected ? "CONNECTED" :
-                    connectRequested ? "CONNECTING" : !available ? "WAITING" : "CONNECT";
+                connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
+                connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
+                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
