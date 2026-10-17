@@ -37,6 +37,9 @@ namespace opentuner.MediaSources.WinterHill
             get
             {
                 if (_settings == null) return "WinterHill";
+                // Prefer the actual active transport over an Always Ask
+                // setting when reporting the hardware interface.
+                if (hw_device == 2) return "PicoTuner Ethernet (G4EWJ)";
                 switch (_settings.DefaultInterface)
                 {
                     case 1: return "WebSocket (ZR6TG)";
