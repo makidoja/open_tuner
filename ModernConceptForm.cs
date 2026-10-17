@@ -94,7 +94,7 @@ namespace opentuner
             RefreshSelectedReceiverReadiness();
             LoadPresets();
 
-            Shown += delegate { StartBatcSpectrum(); };
+            Shown += delegate { RefreshConnectionState(); StartBatcSpectrum(); };
 
             uiTimer = new Timer { Interval = 300 };
             uiTimer.Tick += delegate
@@ -225,7 +225,7 @@ namespace opentuner
             source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) { backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshSelectedReceiverReadiness(); } };
             p.Controls.Add(source);
 
-            Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
+            Button connect = FlatButton("WAITING", false); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             connectButton = connect;
             p.Controls.Add(connect);
 
@@ -573,7 +573,7 @@ namespace opentuner
         private void Connect()
         {
             if (picoResetPending) return;
-            if (sourceCombo.SelectedIndex < 0) return;
+            if (sourceCombo.SelectedIndex < 0) { MessageBox.Show("No receiver source is selected.", "OpenTuner"); return; }
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
             // Give the backend the final visible video destinations before it creates
