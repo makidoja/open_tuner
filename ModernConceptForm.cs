@@ -1048,6 +1048,8 @@ namespace opentuner
             // UDP 9997 is exclusively owned by the existing PicoTuner broadcast
             // listener. Do not keep a second listener open in the modern UI.
             bool hardwareReady = picoReadyConfirmed;
+            // Do not allow a stale designer colour to make a disabled button
+            // appear clickable before the first hardware discovery.
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
@@ -1061,13 +1063,16 @@ namespace opentuner
             Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
+                // On WinForms a disabled Button can retain its previous blue
+                // background unless its style is updated BEFORE Enabled.
+                connectButton.Enabled = true;
                 connectButton.Text = resetting ? "WAITING" : connected ? "CONNECTED" :
                     waiting ? "WAITING" : connectRequested ? "CONNECTING" : !hardwareReady ? "WAITING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
-                connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
+                connectButton.Cursor = (ready || connected) ? Cursors.Hand : Cursors.Default;
+                connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
             }
 
             connectionPill.Enabled = (connected || ready) && !switchingConnection && !resetting;
