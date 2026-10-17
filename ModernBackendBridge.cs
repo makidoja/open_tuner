@@ -125,12 +125,19 @@ namespace opentuner
                 WinterHillSource winterHill = videoSource as WinterHillSource;
                 if (winterHill != null && winterHill.ModernIsPicoTunerEthernet)
                 {
-                    // Receiver discovery is handled before CONNECT by the
-                    // modern UI. Do not bind UDP 9997 a second time here:
-                    // doing so races the readiness listener and the broadcast
-                    // settings window during hardware initialisation.
-                    try { winterHill.ModernReapplyStartupTune(); }
-                    catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                    bool discovered = false;
+                    try { discovered = winterHill.ModernDiscoverPicoTuner(1800); }
+                    catch (Exception ex) { Log.Warning(ex, "PicoTuner discovery failed"); }
+
+                    Log.Warning(discovered
+                        ? "Modern startup: PicoTuner discovery succeeded; reapplying receiver setup"
+                        : "Modern startup: PicoTuner discovery unavailable; using configured host and live-status fallback");
+
+                    if (discovered)
+                    {
+                        try { winterHill.ModernReapplyStartupTune(); }
+                        catch (Exception ex) { Log.Warning(ex, "PicoTuner startup retune failed"); }
+                    }
                 }
 
                 if (!backendSourceHooked)
