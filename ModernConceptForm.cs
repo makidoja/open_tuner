@@ -952,7 +952,7 @@ namespace opentuner
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
                     offline ? "OFFLINE" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
-                connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.ForeColor = connectButton.Text == "WAITING" ? Color.White : (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
                 connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
