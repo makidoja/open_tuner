@@ -441,46 +441,16 @@ namespace opentuner
             }
         }
 
-        // The device drops its control/status transport during a hardware reset.
-        // A fresh discovery broadcast proves the PicoTuner is back online.
+        // Do not bind UDP 9997 here: PicoWHBroadcastListener owns that port.
+        // The receiver restarts asynchronously after RESET. This delay only
+        // protects against an immediate reconnect; it never proves availability
+        // or changes the existing receiver connection path.
         private void WaitForPicoReturn()
         {
             int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
             Task.Run(delegate
             {
-                // Allow the old firmware session to shut down before trusting
-                // any fresh discovery advertisement.
-                System.Threading.Thread.Sleep(3000);
-                bool returned = false;
-                try
-                {
-                    using (UdpClient listener = new UdpClient(9997))
-                    {
-                        listener.Client.ReceiveTimeout = 1500;
-                        while (generation == picoResetGeneration && !IsDisposed)
-                        {
-                            try
-                            {
-                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-                                byte[] message = listener.Receive(ref remote);
-                                if (message != null && message.Length > 0)
-                                {
-                                    returned = true;
-                                    break;
-                                }
-                            }
-                            catch (SocketException ex)
-                            {
-                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
-                }
-
+                System.Threading.Thread.Sleep(5000);
                 if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
                     return;
                 try
@@ -488,20 +458,8 @@ namespace opentuner
                     BeginInvoke((MethodInvoker)delegate
                     {
                         if (generation != picoResetGeneration || IsDisposed) return;
-                        if (returned)
-                        {
-                            picoResetPending = false;
-                            connectionPill.Enabled = true;
-                            if (connectButton != null) connectButton.Enabled = true;
-                            RefreshConnectionState();
-                        }
-                        else
-                        {
-                            // Remain disconnected if discovery is unavailable;
-                            // never permit an unsafe immediate reconnect.
-                            connectionPill.Text = "PICO OFFLINE";
-                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
-                        }
+                        picoResetPending = false;
+                        RefreshConnectionState();
                     });
                 }
                 catch (InvalidOperationException) { }
