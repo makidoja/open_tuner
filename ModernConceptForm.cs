@@ -53,6 +53,8 @@ namespace opentuner
         private Panel spectrumCardPanel;
         private readonly Panel[] receiverCards = new Panel[4];
         private readonly Panel[] receiverControls = new Panel[4];
+        private readonly Dictionary<Control, Rectangle> originalReceiverBounds = new Dictionary<Control, Rectangle>();
+        private readonly Dictionary<Control, Font> originalReceiverFonts = new Dictionary<Control, Font>();
         private bool connectRequested;
         private bool audioInitialised;
 
@@ -82,6 +84,7 @@ namespace opentuner
             backend.BackendSourceData += BackendSourceData;
 
             BuildInterface();
+            ApplyReceiverCount();
             LoadSources();
             LoadPresets();
 
@@ -540,9 +543,31 @@ namespace opentuner
             Panel panel = receiverControls[rx];
             if (panel == null) return;
             panel.Height = compact ? 117 : 190;
-            if (!compact) return; // Original two-RX arrangement is unchanged.
+            if (!compact)
+            {
+                foreach (Control control in panel.Controls)
+                {
+                    Rectangle original;
+                    if (originalReceiverBounds.TryGetValue(control, out original))
+                        control.Bounds = original;
+                    Font originalFont;
+                    if (originalReceiverFonts.TryGetValue(control, out originalFont))
+                        control.Font = originalFont;
+                    if (control is Label && control.Text.StartsWith("Frequency and SR"))
+                        control.Visible = true;
+                }
+                return;
+            }
 
             panel.SuspendLayout();
+            foreach (Control control in panel.Controls)
+            {
+                if (!originalReceiverBounds.ContainsKey(control))
+                {
+                    originalReceiverBounds[control] = control.Bounds;
+                    originalReceiverFonts[control] = control.Font;
+                }
+            }
             panel.Font = new Font("Segoe UI", 7.5f);
             liveFreq[rx].Location = new Point(2, 2);
             liveFreq[rx].Size = new Size(130, 27);
