@@ -412,7 +412,15 @@ namespace opentuner
             {
                 if (backend.BackendSourceInitialised)
                 {
-                    bool resetPico = backend.BackendUsesPicoEthernet;
+                    // Resolve the hardware before BackendDisconnectSource clears
+                    // videoSource. The settings dialog can be set to "Always Ask",
+                    // so also check the live interface description.
+                    string interfaceName = backend.BackendInterfaceDescription ?? "";
+                    bool resetPico = backend.BackendUsesPicoEthernet ||
+                        backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex) ||
+                        interfaceName.IndexOf("PicoTuner Ethernet", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        interfaceName.IndexOf("PicoTuner (ETH)", StringComparison.OrdinalIgnoreCase) >= 0;
+                    Serilog.Log.Information("Disconnect receiver: interface={Interface}, PicoReset={Reset}", interfaceName, resetPico);
                     if (resetPico) { picoResetPending = true; picoResetStartedUtc = DateTime.UtcNow; }
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
