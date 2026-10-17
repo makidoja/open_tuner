@@ -465,7 +465,53 @@ namespace opentuner
 
         private void WaitForPicoReturn()
         {
-            picoResetStartedUtc = DateTime.UtcNow;
+            // The old UDP session may still advertise during shutdown.
+            // Ignore it and wait for a fresh discovery after a reboot grace period.
+            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            DateTime resetAt = picoResetStartedUtc;
+            string expectedAddress = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
+            Task.Run(delegate
+            {
+                System.Threading.Thread.Sleep(8000);
+                while (!IsDisposed && generation == picoResetGeneration)
+                {
+                    try
+                    {
+                        // Bind only for a short verification window; never hold
+                        // UDP 9997 open permanently or compete with the broadcast UI.
+                        using (UdpClient client = new UdpClient(9997))
+                        {
+                            client.Client.ReceiveTimeout = 1800;
+                            IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                            byte[] packet = client.Receive(ref remote);
+                            if (packet == null || packet.Length == 0 || remote == null ||
+                                (!string.IsNullOrWhiteSpace(expectedAddress) &&
+                                 !string.Equals(remote.Address.ToString(), expectedAddress, StringComparison.OrdinalIgnoreCase)))
+                                continue;
+                            if (DateTime.UtcNow < resetAt.AddSeconds(8)) continue;
+                        }
+                        if (IsDisposed || generation != picoResetGeneration || !IsHandleCreated) return;
+                        BeginInvoke((MethodInvoker)delegate
+                        {
+                            if (IsDisposed || generation != picoResetGeneration) return;
+                            picoResetPending = false;
+                            RefreshConnectionState();
+                        });
+                        return;
+                    }
+                    catch (SocketException ex)
+                    {
+                        if (ex.SocketErrorCode != SocketError.TimedOut &&
+                            ex.SocketErrorCode != SocketError.AddressAlreadyInUse)
+                            Serilog.Log.Warning(ex, "PicoTuner readiness check failed");
+                    }
+                    catch (Exception ex)
+                    {
+                        Serilog.Log.Warning(ex, "PicoTuner readiness check failed");
+                    }
+                    System.Threading.Thread.Sleep(1500);
+                }
+            });
         }
 
         private void Connect()
@@ -937,8 +983,6 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
-            if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc > TimeSpan.FromSeconds(12))
-                picoResetPending = false;
             bool resetting = picoResetPending;
             bool picoSelected = sourceCombo.SelectedIndex >= 0 && backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
             // UDP 9997 is exclusively owned by the existing PicoTuner broadcast
