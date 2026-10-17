@@ -34,6 +34,8 @@ namespace opentuner
         private Button connectButton;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
+        private long lastPicoDiscoveryTicks;
+        private DateTime picoResetStartedUtc = DateTime.MinValue;
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
@@ -87,6 +89,7 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
+            StartPicoReadinessMonitor();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -203,6 +206,7 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
+            sourceCombo.SelectedIndexChanged += delegate { RefreshConnectionState(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -409,7 +413,7 @@ namespace opentuner
                 if (backend.BackendSourceInitialised)
                 {
                     bool resetPico = backend.BackendUsesPicoEthernet;
-                    if (resetPico) picoResetPending = true;
+                    if (resetPico) { picoResetPending = true; picoResetStartedUtc = DateTime.UtcNow; }
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
@@ -453,75 +457,62 @@ namespace opentuner
 
         // The device drops its control/status transport during a hardware reset.
         // A fresh discovery broadcast proves the PicoTuner is back online.
-        private void WaitForPicoReturn()
+        private bool PicoDiscoveredRecently()
         {
-            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            long ticks = System.Threading.Interlocked.Read(ref lastPicoDiscoveryTicks);
+            return ticks > 0 && DateTime.UtcNow.Ticks - ticks < TimeSpan.FromSeconds(8).Ticks;
+        }
+
+        private void StartPicoReadinessMonitor()
+        {
             Task.Run(delegate
             {
-                // Allow the old firmware session to shut down before trusting
-                // any fresh discovery advertisement.
-                System.Threading.Thread.Sleep(3000);
-                bool returned = false;
-                try
+                while (!IsDisposed)
                 {
-                    using (UdpClient listener = new UdpClient(9997))
+                    try
                     {
-                        listener.Client.ReceiveTimeout = 1500;
-                        while (generation == picoResetGeneration && !IsDisposed)
+                        using (UdpClient listener = new UdpClient(9997))
                         {
-                            try
+                            listener.Client.ReceiveTimeout = 1200;
+                            while (!IsDisposed)
                             {
-                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-                                byte[] message = listener.Receive(ref remote);
-                                if (message != null && message.Length > 0)
+                                try
                                 {
-                                    returned = true;
-                                    break;
+                                    IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                                    byte[] packet = listener.Receive(ref remote);
+                                    if (packet == null || packet.Length == 0 || remote == null) continue;
+                                    string expected = backend.BackendSelectedPicoAddress(sourceCombo.SelectedIndex);
+                                    if (!string.IsNullOrWhiteSpace(expected) &&
+                                        !string.Equals(expected, remote.Address.ToString(), StringComparison.OrdinalIgnoreCase))
+                                        continue;
+                                    System.Threading.Interlocked.Exchange(ref lastPicoDiscoveryTicks, DateTime.UtcNow.Ticks);
                                 }
-                            }
-                            catch (SocketException ex)
-                            {
-                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
+                                catch (SocketException ex)
+                                {
+                                    if (ex.SocketErrorCode != SocketError.TimedOut) break;
+                                }
                             }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
-                }
-
-                if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
-                    return;
-                try
-                {
-                    BeginInvoke((MethodInvoker)delegate
+                    catch (Exception ex)
                     {
-                        if (generation != picoResetGeneration || IsDisposed) return;
-                        if (returned)
-                        {
-                            picoResetPending = false;
-                            connectionPill.Enabled = true;
-                            if (connectButton != null) connectButton.Enabled = true;
-                            RefreshConnectionState();
-                        }
-                        else
-                        {
-                            // Remain disconnected if discovery is unavailable;
-                            // never permit an unsafe immediate reconnect.
-                            connectionPill.Text = "PICO OFFLINE";
-                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
-                        }
-                    });
+                        Serilog.Log.Warning(ex, "PicoTuner discovery listener unavailable");
+                    }
+                    System.Threading.Thread.Sleep(1500);
                 }
-                catch (InvalidOperationException) { }
             });
+        }
+
+        private void WaitForPicoReturn()
+        {
+            picoResetStartedUtc = DateTime.UtcNow;
         }
 
         private void Connect()
         {
             if (picoResetPending) return;
             if (sourceCombo.SelectedIndex < 0) return;
+            if (backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex) && !PicoDiscoveredRecently()) return;
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
             // Give the backend the final visible video destinations before it creates
@@ -987,13 +978,19 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
+            if (picoResetPending && DateTime.UtcNow - picoResetStartedUtc > TimeSpan.FromSeconds(3) &&
+                PicoDiscoveredRecently() &&
+                new DateTime(System.Threading.Interlocked.Read(ref lastPicoDiscoveryTicks), DateTimeKind.Utc) > picoResetStartedUtc.AddSeconds(2))
+                picoResetPending = false;
             bool resetting = picoResetPending;
+            bool picoSelected = sourceCombo.SelectedIndex >= 0 && backend.BackendSelectedSourceIsPicoEthernet(sourceCombo.SelectedIndex);
+            bool hardwareReady = !picoSelected || PicoDiscoveredRecently();
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
             bool waiting = initialised && !live;
-            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool ready = hardwareReady && !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
             // reliably change its background when Enabled becomes false.
@@ -1003,7 +1000,7 @@ namespace opentuner
             {
                 connectButton.Enabled = (ready || connected) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    waiting ? "WAITING" : connectRequested ? "CONNECTING" : "CONNECT";
+                    waiting ? "WAITING" : connectRequested ? "CONNECTING" : !hardwareReady ? "NO RECEIVER" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
@@ -1043,7 +1040,7 @@ namespace opentuner
             }
             else
             {
-                connectionPill.Text = "CONNECT";
+                connectionPill.Text = hardwareReady ? "CONNECT" : "NO RECEIVER";
                 connectionPill.ForeColor = Muted;
                 connectionPill.BackColor = Surface2;
                 connectionPill.FlatAppearance.BorderColor = Border;
