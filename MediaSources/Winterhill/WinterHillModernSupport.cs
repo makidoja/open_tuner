@@ -29,7 +29,7 @@ namespace opentuner.MediaSources.WinterHill
 
         public bool ModernIsPicoTunerEthernet
         {
-            get { return _settings != null && _settings.DefaultInterface == 2; }
+            get { return hw_device == 2 || (_settings != null && _settings.DefaultInterface == 2); }
         }
 
         public string ModernInterfaceDescription
