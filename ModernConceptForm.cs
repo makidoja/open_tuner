@@ -222,7 +222,7 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) { backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshSelectedReceiverReadiness(); } };
             p.Controls.Add(source);
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
@@ -580,7 +580,7 @@ namespace opentuner
             // the media players. This avoids native renderer HWND re-parenting.
             backend.BackendSetVideoHosts(videoHosts.Cast<Control>().ToArray());
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
-            if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
+            if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; Serilog.Log.Warning("Receiver connection failed for source {Source}", sourceCombo.SelectedItem); RefreshConnectionState(); return; }
             visibleTuners = Math.Max(1, Math.Min(4, backend.BackendTunerCount));
             RefreshLayoutOptions();
             ApplyReceiverCount();
