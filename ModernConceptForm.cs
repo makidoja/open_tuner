@@ -57,6 +57,7 @@ namespace opentuner
         private readonly Dictionary<Control, Rectangle> originalReceiverBounds = new Dictionary<Control, Rectangle>();
         private readonly Dictionary<Control, Font> originalReceiverFonts = new Dictionary<Control, Font>();
         private bool connectRequested;
+        private string lastConnectionDiagnostic;
         private bool audioInitialised;
 
         private static readonly Color Bg = Color.FromArgb(7, 17, 29);
@@ -87,6 +88,7 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
+            Serilog.Log.Information("[CONNECT-DIAG] Startup sources={Sources}, selected={Index}, name={Name}", sourceCombo.Items.Count, sourceCombo.SelectedIndex, sourceCombo.SelectedItem);
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -402,7 +404,8 @@ namespace opentuner
 
         private void ToggleConnection()
         {
-            if (switchingConnection || picoResetPending) return;
+            Serilog.Log.Information("[CONNECT-DIAG] Click: switching={Switching}, reset={Reset}, selected={Index}, source={Source}, initialised={Initialised}, buttonEnabled={Enabled}", switchingConnection, picoResetPending, sourceCombo.SelectedIndex, sourceCombo.SelectedItem, backend.BackendSourceInitialised, connectButton != null && connectButton.Enabled);
+            if (switchingConnection || picoResetPending) { Serilog.Log.Warning("[CONNECT-DIAG] Click ignored: switching={Switching}, reset={Reset}", switchingConnection, picoResetPending); return; }
             switchingConnection = true;
             try
             {
@@ -413,7 +416,9 @@ namespace opentuner
                     connectionPill.Text = "DISCONNECTING";
                     connectionPill.Enabled = false;
                     if (connectButton != null) connectButton.Enabled = false;
+                    Serilog.Log.Information("[CONNECT-DIAG] Disconnect requested; resetPico={ResetPico}", resetPico);
                     bool resetOk = backend.BackendDisconnectSource(resetPico);
+                    Serilog.Log.Information("[CONNECT-DIAG] Disconnect returned={Result}", resetOk);
                     connectRequested = false;
                     audioInitialised = false;
                     visibleTuners = 2;
@@ -510,14 +515,16 @@ namespace opentuner
 
         private void Connect()
         {
-            if (picoResetPending) return;
-            if (sourceCombo.SelectedIndex < 0) return;
+            if (picoResetPending) { Serilog.Log.Warning("[CONNECT-DIAG] Connect ignored: reset pending"); return; }
+            if (sourceCombo.SelectedIndex < 0) { Serilog.Log.Warning("[CONNECT-DIAG] Connect ignored: no source selected"); return; }
+            Serilog.Log.Information("[CONNECT-DIAG] Connecting source={Index} name={Name}", sourceCombo.SelectedIndex, sourceCombo.SelectedItem);
             connectRequested = true; connectionPill.Text = "CONNECTING";
 
             // Give the backend the final visible video destinations before it creates
             // the media players. This avoids native renderer HWND re-parenting.
             backend.BackendSetVideoHosts(videoHosts.Cast<Control>().ToArray());
             bool ok = backend.BackendConnectSource(sourceCombo.SelectedIndex);
+            Serilog.Log.Information("[CONNECT-DIAG] BackendConnectSource result={Result}, initialised={Initialised}, transport={Transport}", ok, backend.BackendSourceInitialised, backend.BackendTransportConnected);
             if (!ok) { connectRequested = false; connectionPill.Text = "ERROR"; return; }
             visibleTuners = Math.Max(1, Math.Min(4, backend.BackendTunerCount));
             RefreshLayoutOptions();
@@ -983,6 +990,12 @@ namespace opentuner
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
             bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
+            string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
+            if (diagnostic != lastConnectionDiagnostic)
+            {
+                lastConnectionDiagnostic = diagnostic;
+                Serilog.Log.Information("[CONNECT-DIAG] State changed: {State}", diagnostic);
+            }
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
             // reliably change its background when Enabled becomes false.
