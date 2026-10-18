@@ -40,6 +40,8 @@ namespace opentuner
         private DateTime picoProbeLastReport = DateTime.MinValue;
         private bool picoProbeAvailable;
         private int picoProbeConsecutiveFailures;
+        private int picoProbeConsecutiveSuccesses;
+        private bool connectButtonAllowed;
         private string picoProbeHost;
         private DateTime picoLastProbe = DateTime.MinValue;
         private int picoProbeGeneration;
@@ -448,6 +450,7 @@ namespace opentuner
         private void ToggleConnection()
         {
             Serilog.Log.Information("[CONNECT-DIAG] Click: switching={Switching}, reset={Reset}, selected={Index}, source={Source}, initialised={Initialised}, buttonEnabled={Enabled}", switchingConnection, picoResetPending, sourceCombo.SelectedIndex, sourceCombo.SelectedItem, backend.BackendSourceInitialised, connectButton != null && connectButton.Enabled);
+            if (!backend.BackendSourceInitialised && !connectButtonAllowed) { Serilog.Log.Information("[CONNECT-DIAG] Ignored click while waiting for hardware"); return; }
             if (switchingConnection || picoResetPending) { Serilog.Log.Warning("[CONNECT-DIAG] Click ignored: switching={Switching}, reset={Reset}", switchingConnection, picoResetPending); return; }
             switchingConnection = true;
             try
@@ -497,6 +500,7 @@ namespace opentuner
             picoResetAt = DateTime.UtcNow;
             picoProbeAvailable = false;
             picoProbeConsecutiveFailures = 0;
+            picoProbeConsecutiveSuccesses = 0;
             allowManualConnect = false;
             Serilog.Log.Information("[PICO-PROBE] Reset started; waiting for new device response");
         }
@@ -519,6 +523,8 @@ namespace opentuner
             if (string.Equals(newHost, picoProbeHost, StringComparison.OrdinalIgnoreCase)) return;
             picoProbeHost = newHost;
             picoProbeAvailable = false;
+            picoProbeConsecutiveSuccesses = 0;
+            picoProbeConsecutiveFailures = 0;
             allowManualConnect = false;
             System.Threading.Interlocked.Increment(ref picoProbeGeneration);
             Serilog.Log.Information("[PICO-PROBE] Target changed to {Host}", newHost ?? "(non-Pico source)");
@@ -576,10 +582,15 @@ namespace opentuner
                         if (responded)
                         {
                             picoProbeConsecutiveFailures = 0;
-                            picoProbeAvailable = true;
+                            picoProbeConsecutiveSuccesses++;
+                            // Avoid a transient successful ping briefly lighting CONNECT
+                            // when the unit is otherwise consistently unavailable.
+                            if (picoProbeConsecutiveSuccesses >= 2)
+                                picoProbeAvailable = true;
                         }
                         else
                         {
+                            picoProbeConsecutiveSuccesses = 0;
                             picoProbeConsecutiveFailures++;
                             if (picoProbeConsecutiveFailures >= 3)
                                 picoProbeAvailable = false;
@@ -1098,12 +1109,16 @@ namespace opentuner
             Color greyBorder = Color.FromArgb(108, 119, 131);
             if (connectButton != null)
             {
-                connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
+                // WinForms themes force grey text on a disabled Button. Keep it
+                // visually enabled for white text; block WAITING clicks in
+                // ToggleConnection rather than relying on Enabled=false.
+                connectButtonAllowed = (ready || connected || offline) && !switchingConnection && !resetting;
+                connectButton.Enabled = true;
                 connectButton.Text = connected ? "CONNECTED" : resetting ? "RESETTING" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = Color.White;
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
-                connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
+                connectButton.Cursor = connectButtonAllowed ? Cursors.Hand : Cursors.Default;
             }
 
             connectionPill.Enabled = !resetting && !switchingConnection;
