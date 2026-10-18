@@ -5,6 +5,10 @@ using System.Globalization;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Net.NetworkInformation;
+using System.Threading;
+using opentuner.MediaSources.WinterHill;
+using opentuner.Utilities;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
@@ -32,6 +36,13 @@ namespace opentuner
         private ComboBox layoutCombo;
         private Button connectionPill;
         private Button connectButton;
+        private bool picoProbeActive;
+        private bool picoProbeAvailable;
+        private string picoProbeHost;
+        private DateTime picoLastProbe = DateTime.MinValue;
+        private int picoProbeGeneration;
+        private bool allowManualConnect;
+        private DateTime picoResetAt = DateTime.MinValue;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
         private FlowLayoutPanel presetList;
@@ -88,6 +99,7 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
+            RefreshPicoProbeTarget();
             Serilog.Log.Information("[CONNECT-DIAG] Startup sources={Sources}, selected={Index}, name={Name}", sourceCombo.Items.Count, sourceCombo.SelectedIndex, sourceCombo.SelectedItem);
             LoadPresets();
 
@@ -100,7 +112,7 @@ namespace opentuner
                 // An exception in those paths previously left Auto Scan ARMED.
                 try { AdoptVideoControls(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
-                try { RefreshConnectionState(); }
+                try { UpdatePicoProbe(); RefreshConnectionState(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Connection status refresh failed"); }
             };
             uiTimer.Start();
@@ -205,6 +217,7 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
+            sourceCombo.SelectedIndexChanged += delegate { RefreshPicoProbeTarget(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -218,11 +231,21 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshPicoProbeTarget(); };
             p.Controls.Add(source);
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             connectButton = connect;
+            // An explicit recovery route if the receiver does not answer ICMP.
+            ContextMenuStrip recoveryMenu = new ContextMenuStrip();
+            recoveryMenu.Items.Add("Force connect (skip availability check)", null, delegate
+            {
+                allowManualConnect = true;
+                Serilog.Log.Warning("[PICO-PROBE] Manual connection override requested");
+                RefreshConnectionState();
+                ToggleConnection();
+            });
+            connect.ContextMenuStrip = recoveryMenu;
             p.Controls.Add(connect);
 
             Button settings = FlatButton("SETTINGS", false); settings.Width = 82; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
@@ -449,70 +472,82 @@ namespace opentuner
             }
         }
 
-        // The device drops its control/status transport during a hardware reset.
-        // A fresh discovery broadcast proves the PicoTuner is back online.
+        // A fresh network response is needed after reset. Do not bind UDP 9997:
+        // the proven PicoTuner backend already uses that port during connection.
         private void WaitForPicoReturn()
         {
-            int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
+            Interlocked.Increment(ref picoResetGeneration);
+            picoResetAt = DateTime.UtcNow;
+            picoProbeAvailable = false;
+            allowManualConnect = false;
+            Serilog.Log.Information("[PICO-PROBE] Reset started; waiting for new device response");
+        }
+
+        private void RefreshPicoProbeTarget()
+        {
+            string newHost = null;
+            try
+            {
+                if (sourceCombo != null && sourceCombo.SelectedItem != null &&
+                    sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var settings = new SettingsManager<WinterHillSettings>("winterhill_settings")
+                        .LoadSettings(new WinterHillSettings());
+                    if (settings.DefaultInterface == 2)
+                        newHost = settings.WinterHillUdpHost;
+                }
+            }
+            catch (Exception ex) { Serilog.Log.Warning(ex, "[PICO-PROBE] Unable to load target"); }
+            if (string.Equals(newHost, picoProbeHost, StringComparison.OrdinalIgnoreCase)) return;
+            picoProbeHost = newHost;
+            picoProbeAvailable = false;
+            allowManualConnect = false;
+            Interlocked.Increment(ref picoProbeGeneration);
+            Serilog.Log.Information("[PICO-PROBE] Target changed to {Host}", newHost ?? "(non-Pico source)");
+            UpdatePicoProbe();
+        }
+
+        private void UpdatePicoProbe()
+        {
+            if (string.IsNullOrWhiteSpace(picoProbeHost) || picoProbeActive ||
+                (DateTime.UtcNow - picoLastProbe).TotalMilliseconds < 1800) return;
+            picoLastProbe = DateTime.UtcNow;
+            picoProbeActive = true;
+            string host = picoProbeHost;
+            int generation = picoProbeGeneration;
             Task.Run(delegate
             {
-                // Allow the old firmware session to shut down before trusting
-                // any fresh discovery advertisement.
-                System.Threading.Thread.Sleep(3000);
-                bool returned = false;
+                bool responded = false;
                 try
                 {
-                    using (UdpClient listener = new UdpClient(9997))
+                    using (Ping ping = new Ping())
                     {
-                        listener.Client.ReceiveTimeout = 1500;
-                        while (generation == picoResetGeneration && !IsDisposed)
-                        {
-                            try
-                            {
-                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
-                                byte[] message = listener.Receive(ref remote);
-                                if (message != null && message.Length > 0)
-                                {
-                                    returned = true;
-                                    break;
-                                }
-                            }
-                            catch (SocketException ex)
-                            {
-                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
-                            }
-                        }
+                        PingReply reply = ping.Send(host, 700);
+                        responded = reply != null && reply.Status == IPStatus.Success;
                     }
                 }
-                catch (Exception ex)
-                {
-                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
-                }
-
-                if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
-                    return;
+                catch (Exception ex) { Serilog.Log.Debug(ex, "[PICO-PROBE] Probe failed"); }
+                if (IsDisposed || !IsHandleCreated) { picoProbeActive = false; return; }
                 try
                 {
                     BeginInvoke((MethodInvoker)delegate
                     {
-                        if (generation != picoResetGeneration || IsDisposed) return;
-                        if (returned)
+                        picoProbeActive = false;
+                        if (IsDisposed || generation != picoProbeGeneration ||
+                            !string.Equals(host, picoProbeHost, StringComparison.OrdinalIgnoreCase)) return;
+                        if (picoProbeAvailable != responded)
+                            Serilog.Log.Information("[PICO-PROBE] {Host} availability={Available}", host, responded);
+                        picoProbeAvailable = responded;
+                        if (picoResetPending && responded &&
+                            (DateTime.UtcNow - picoResetAt).TotalSeconds >= 3)
                         {
                             picoResetPending = false;
-                            connectionPill.Enabled = true;
-                            if (connectButton != null) connectButton.Enabled = true;
-                            RefreshConnectionState();
+                            Serilog.Log.Information("[PICO-PROBE] Reset recovery confirmed via network response");
                         }
-                        else
-                        {
-                            // Remain disconnected if discovery is unavailable;
-                            // never permit an unsafe immediate reconnect.
-                            connectionPill.Text = "PICO OFFLINE";
-                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
-                        }
+                        RefreshConnectionState();
                     });
                 }
-                catch (InvalidOperationException) { }
+                catch (InvalidOperationException) { picoProbeActive = false; }
             });
         }
 
@@ -992,7 +1027,8 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool detected = string.IsNullOrWhiteSpace(picoProbeHost) || picoProbeAvailable || allowManualConnect;
+            bool ready = detected && !resetting && !switchingConnection && !connectRequested && !initialised;
             string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
             if (diagnostic != lastConnectionDiagnostic)
             {
@@ -1007,10 +1043,9 @@ namespace opentuner
             if (connectButton != null)
             {
                 connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
-                connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
+                connectButton.Text = connected ? "CONNECTED" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
-                connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.ForeColor = Color.White;
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
                 connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
@@ -1060,6 +1095,7 @@ namespace opentuner
             if (uiTimer != null) uiTimer.Stop();
             if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
+            Interlocked.Increment(ref picoProbeGeneration);
             backend.BackendSourceData -= BackendSourceData;
             backend.BackendShutdown();
             backend.Dispose();
