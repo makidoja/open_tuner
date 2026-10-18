@@ -51,11 +51,12 @@ namespace opentuner
 
         public bool BackendConnectSource(int sourceIndex)
         {
+            Log.Information("[CONNECT-DIAG] Backend entry index={Index} count={Count} connected={Connected} hasVideoSource={HasSource}", sourceIndex, _availableSources.Count, source_connected, videoSource != null);
             if (sourceIndex < 0 || sourceIndex >= _availableSources.Count)
-                return false;
+            { Log.Warning("[CONNECT-DIAG] Invalid source index {Index}", sourceIndex); return false; }
 
             if (source_connected && videoSource != null)
-                return true;
+            { Log.Information("[CONNECT-DIAG] Existing source reused"); return true; }
 
             BackendSelectedSourceIndex = sourceIndex;
             backendStartupRetuneDone = false;
@@ -77,10 +78,13 @@ namespace opentuner
                 checkMqttClient.Checked = false;
                 checkDATVReporter.Checked = false;
 
+                Log.Information("[CONNECT-DIAG] Calling legacy ConnectSelectedSource; selected={Index}", BackendSelectedSourceIndex);
                 source_connected = ConnectSelectedSource();
+                Log.Information("[CONNECT-DIAG] Legacy ConnectSelectedSource returned={Result}, sourceType={Type}", source_connected, videoSource == null ? "null" : videoSource.GetType().Name);
             }
             catch (SocketException ex)
             {
+                Log.Error(ex, "[CONNECT-DIAG] Socket exception connecting source");
                 source_connected = false;
 
                 string message;
@@ -103,6 +107,7 @@ namespace opentuner
             }
             catch (Exception ex)
             {
+                Log.Error(ex, "[CONNECT-DIAG] Exception connecting source");
                 source_connected = false;
                 MessageBox.Show(
                     "OpenTuner could not initialise the selected receiver source.\r\n\r\n" + ex.Message,
