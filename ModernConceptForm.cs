@@ -254,6 +254,9 @@ namespace opentuner
             connectionPill = FlatButton("READY", false);
             connectionPill.Size = new Size(112, 30);
             connectionPill.Click += delegate { ToggleConnection(); };
+            // This status control stays enabled in WAITING, so the recovery menu
+            // is reachable even though the main CONNECT button is disabled.
+            connectionPill.ContextMenuStrip = recoveryMenu;
             p.Controls.Add(connectionPill);
 
             p.Resize += delegate
