@@ -104,7 +104,6 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
-            PicoWHBroadcastListener.StartShared();
             RefreshPicoProbeTarget();
             Serilog.Log.Information("[CONNECT-DIAG] Startup sources={Sources}, selected={Index}, name={Name}", sourceCombo.Items.Count, sourceCombo.SelectedIndex, sourceCombo.SelectedItem);
             LoadPresets();
@@ -534,20 +533,79 @@ namespace opentuner
 
         private void UpdatePicoProbe()
         {
-            // Shared UDP 9997 receiver tracks actual broadcast sender addresses.
-            // Never ping or open another listener in the button update path.
             if (string.IsNullOrWhiteSpace(picoProbeHost)) return;
-            bool fresh = PicoWHBroadcastListener.RecentlySeen(picoProbeHost, 8);
-            if (fresh != picoProbeAvailable)
-                Serilog.Log.Information("[PICO-DISCOVERY] host={Host}, advertised={Available}", picoProbeHost, fresh);
-            picoProbeAvailable = fresh;
-            if (picoResetPending && fresh &&
-                (DateTime.UtcNow - picoResetAt).TotalSeconds >= 3)
+            // A failed dispatcher callback must not permanently stop discovery.
+            if (picoProbeActive && (DateTime.UtcNow - picoProbeStarted).TotalSeconds > 5)
             {
-                picoResetPending = false;
-                Serilog.Log.Information("[PICO-DISCOVERY] Receiver readvertised following reset");
+                Serilog.Log.Warning("[PICO-PROBE] In-flight probe timed out; restarting discovery");
+                picoProbeActive = false;
+                System.Threading.Interlocked.Increment(ref picoProbeGeneration);
             }
-            RefreshConnectionState();
+            if (picoProbeActive || (DateTime.UtcNow - picoLastProbe).TotalMilliseconds < 1800) return;
+            picoLastProbe = DateTime.UtcNow;
+            Serilog.Log.Information("[PICO-PROBE] Starting probe host={Host}", picoProbeHost);
+            picoProbeStarted = picoLastProbe;
+            picoProbeActive = true;
+            string host = picoProbeHost;
+            int generation = picoProbeGeneration;
+            Task.Run(delegate
+            {
+                bool responded = false;
+                IPStatus resultStatus = IPStatus.Unknown;
+                try
+                {
+                    using (Ping ping = new Ping())
+                    {
+                        PingReply reply = ping.Send(host, 1200);
+                        resultStatus = reply == null ? IPStatus.Unknown : reply.Status;
+                        responded = resultStatus == IPStatus.Success;
+                    }
+                }
+                catch (Exception ex) { Serilog.Log.Debug(ex, "[PICO-PROBE] Probe failed"); }
+                if (IsDisposed || !IsHandleCreated) { picoProbeActive = false; return; }
+                try
+                {
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        picoProbeActive = false;
+                        if (IsDisposed || generation != picoProbeGeneration ||
+                            !string.Equals(host, picoProbeHost, StringComparison.OrdinalIgnoreCase)) return;
+                        if (picoProbeAvailable != responded ||
+                            (DateTime.UtcNow - picoProbeLastReport).TotalSeconds > 15)
+                        {
+                            picoProbeLastReport = DateTime.UtcNow;
+                            Serilog.Log.Information("[PICO-PROBE] host={Host} response={Status} available={Available} reset={Reset}", host, resultStatus, responded, picoResetPending);
+                        }
+                        // ICMP can drop sporadically during PicoTuner reset/recovery.
+                        // Treat one successful probe as online, but require multiple
+                        // failures before removing a previously confirmed connection.
+                        if (responded)
+                        {
+                            picoProbeConsecutiveFailures = 0;
+                            picoProbeConsecutiveSuccesses++;
+                            // Avoid a transient successful ping briefly lighting CONNECT
+                            // when the unit is otherwise consistently unavailable.
+                            if (picoProbeConsecutiveSuccesses >= 2)
+                                picoProbeAvailable = true;
+                        }
+                        else
+                        {
+                            picoProbeConsecutiveSuccesses = 0;
+                            picoProbeConsecutiveFailures++;
+                            if (picoProbeConsecutiveFailures >= 3)
+                                picoProbeAvailable = false;
+                        }
+                        if (picoResetPending && responded &&
+                            (DateTime.UtcNow - picoResetAt).TotalSeconds >= 3)
+                        {
+                            picoResetPending = false;
+                            Serilog.Log.Information("[PICO-PROBE] Reset recovery confirmed via network response");
+                        }
+                        RefreshConnectionState();
+                    });
+                }
+                catch (InvalidOperationException) { picoProbeActive = false; }
+            });
         }
 
         private void Connect()
@@ -1036,9 +1094,7 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool picoSelected = sourceCombo != null && sourceCombo.SelectedItem != null &&
-                sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
-            bool detected = !picoSelected || picoProbeAvailable || allowManualConnect;
+            bool detected = string.IsNullOrWhiteSpace(picoProbeHost) || picoProbeAvailable || allowManualConnect;
             bool ready = detected && !resetting && !switchingConnection && !connectRequested && !initialised;
             string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
             if (diagnostic != lastConnectionDiagnostic)
