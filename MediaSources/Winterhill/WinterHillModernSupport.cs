@@ -97,15 +97,66 @@ namespace opentuner.MediaSources.WinterHill
             ModernSetVolume(tuner, volume);
         }
 
-        // Read the shared UDP 9997 discovery cache; never open a second socket.
-        // Only the configured receiver can be accepted as the target.
+        // PicoTuner sends a regular discovery broadcast on UDP 9997. The UDP sender
+        // address is authoritative and is safer than parsing the human-readable payload,
+        // which some firmware versions can format in a way that drops part of the address.
         public bool ModernDiscoverPicoTuner(int timeoutMs)
         {
-            if (!ModernIsPicoTunerEthernet || _settings == null) return false;
-            string host = _settings.WinterHillUdpHost;
-            if (!PicoWHBroadcastListener.RecentlySeen(host)) return false;
-            runtimeUdpHost = host;
-            return true;
+            if (!ModernIsPicoTunerEthernet)
+                return false;
+
+            UdpClient listener = null;
+            try
+            {
+                listener = new UdpClient(9997);
+                listener.Client.ReceiveTimeout = System.Math.Max(250, timeoutMs);
+
+                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                byte[] bytes = listener.Receive(ref remote);
+                string text = Encoding.ASCII.GetString(bytes);
+
+                string detectedIp = remote != null && remote.Address != null
+                    ? remote.Address.ToString()
+                    : null;
+
+                if (string.IsNullOrWhiteSpace(detectedIp))
+                {
+                    string[] lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string raw in lines)
+                    {
+                        string line = raw.Trim();
+                        if (line.IndexOf("IP address", StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+
+                        int colon = line.IndexOf(':');
+                        if (colon >= 0 && colon + 1 < line.Length)
+                            detectedIp = line.Substring(colon + 1).Trim();
+                        break;
+                    }
+                }
+
+                IPAddress parsed;
+                if (string.IsNullOrWhiteSpace(detectedIp) || !IPAddress.TryParse(detectedIp, out parsed))
+                    return false;
+
+                runtimeUdpHost = detectedIp;
+                Serilog.Log.Warning("PicoTuner discovered at " + detectedIp + " - using this address for startup control");
+                return true;
+            }
+            catch (SocketException ex)
+            {
+                Serilog.Log.Information("PicoTuner discovery did not complete: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Information("PicoTuner discovery skipped: " + ex.Message);
+            }
+            finally
+            {
+                try { listener?.Close(); } catch { }
+            }
+
+            return false;
         }
 
         public void ModernReapplyStartupTune()
