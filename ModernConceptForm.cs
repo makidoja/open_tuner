@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
-using System.Threading;
 using opentuner.MediaSources.WinterHill;
 using opentuner.Utilities;
 using System.Threading.Tasks;
@@ -479,7 +478,7 @@ namespace opentuner
         // the proven PicoTuner backend already uses that port during connection.
         private void WaitForPicoReturn()
         {
-            Interlocked.Increment(ref picoResetGeneration);
+            System.Threading.Interlocked.Increment(ref picoResetGeneration);
             picoResetAt = DateTime.UtcNow;
             picoProbeAvailable = false;
             allowManualConnect = false;
@@ -505,7 +504,7 @@ namespace opentuner
             picoProbeHost = newHost;
             picoProbeAvailable = false;
             allowManualConnect = false;
-            Interlocked.Increment(ref picoProbeGeneration);
+            System.Threading.Interlocked.Increment(ref picoProbeGeneration);
             Serilog.Log.Information("[PICO-PROBE] Target changed to {Host}", newHost ?? "(non-Pico source)");
             UpdatePicoProbe();
         }
@@ -1098,7 +1097,7 @@ namespace opentuner
             if (uiTimer != null) uiTimer.Stop();
             if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
-            Interlocked.Increment(ref picoProbeGeneration);
+            System.Threading.Interlocked.Increment(ref picoProbeGeneration);
             backend.BackendSourceData -= BackendSourceData;
             backend.BackendShutdown();
             backend.Dispose();
