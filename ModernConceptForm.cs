@@ -1115,7 +1115,14 @@ namespace opentuner
                 connectButtonAllowed = (ready || connected || offline) && !switchingConnection && !resetting;
                 connectButton.Enabled = true;
                 connectButton.Text = connected ? "CONNECTED" : resetting ? "RESETTING" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
-                connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
+                Color buttonColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
+                if (connectButton.BackColor != buttonColor)
+                    connectButton.BackColor = buttonColor;
+                // WinForms FlatButton hover/pressed defaults can flash lighter
+                // during the 2-second probe and 300-ms UI refresh.
+                // Keep all interaction paints identical to the active state.
+                connectButton.FlatAppearance.MouseOverBackColor = buttonColor;
+                connectButton.FlatAppearance.MouseDownBackColor = buttonColor;
                 connectButton.ForeColor = Color.White;
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
                 connectButton.Cursor = connectButtonAllowed ? Cursors.Hand : Cursors.Default;
