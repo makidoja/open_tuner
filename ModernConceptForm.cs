@@ -357,7 +357,7 @@ namespace opentuner
             controls.Controls.Add(serviceLabels[tuner]);
             merLabels[tuner] = new Label { Text = "MER  — dB", Location = new Point(350, 55), Size = new Size(95, 24), ForeColor = Text };
             controls.Controls.Add(merLabels[tuner]);
-            marginLabels[tuner] = new Label { Text = "Margin  — dB", Location = new Point(445, 55), Size = new Size(100, 24), ForeColor = Text };
+            marginLabels[tuner] = new Label { Text = "Margin  — dB", Location = new Point(445, 55), AutoSize = true, MinimumSize = new Size(100, 24), ForeColor = Text };
             controls.Controls.Add(marginLabels[tuner]);
 
             Label volIcon = new Label { Text = "🔊", Location = new Point(4, 99), Size = new Size(28, 26), ForeColor = Text, TextAlign = ContentAlignment.MiddleCenter };
@@ -690,7 +690,8 @@ namespace opentuner
             merLabels[rx].Location = new Point(218, 34);
             merLabels[rx].Size = new Size(90, 19);
             marginLabels[rx].Location = new Point(218, 55);
-            marginLabels[rx].Size = new Size(100, 18);
+            marginLabels[rx].AutoSize = true;
+            marginLabels[rx].MinimumSize = new Size(100, 18);
             // Reflow the existing buttons without replacing their Click handlers.
             Button tune = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text == "TUNE");
             if (tune != null) { tune.Location = new Point(300, 3); tune.Size = new Size(57, 25); tune.Font = new Font("Segoe UI Semibold", 7f); }
