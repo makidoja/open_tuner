@@ -39,6 +39,7 @@ namespace opentuner
         private DateTime picoProbeStarted = DateTime.MinValue;
         private DateTime picoProbeLastReport = DateTime.MinValue;
         private bool picoProbeAvailable;
+        private int picoProbeConsecutiveFailures;
         private string picoProbeHost;
         private DateTime picoLastProbe = DateTime.MinValue;
         private int picoProbeGeneration;
@@ -495,6 +496,7 @@ namespace opentuner
             System.Threading.Interlocked.Increment(ref picoResetGeneration);
             picoResetAt = DateTime.UtcNow;
             picoProbeAvailable = false;
+            picoProbeConsecutiveFailures = 0;
             allowManualConnect = false;
             Serilog.Log.Information("[PICO-PROBE] Reset started; waiting for new device response");
         }
@@ -568,7 +570,20 @@ namespace opentuner
                             picoProbeLastReport = DateTime.UtcNow;
                             Serilog.Log.Information("[PICO-PROBE] host={Host} response={Status} available={Available} reset={Reset}", host, resultStatus, responded, picoResetPending);
                         }
-                        picoProbeAvailable = responded;
+                        // ICMP can drop sporadically during PicoTuner reset/recovery.
+                        // Treat one successful probe as online, but require multiple
+                        // failures before removing a previously confirmed connection.
+                        if (responded)
+                        {
+                            picoProbeConsecutiveFailures = 0;
+                            picoProbeAvailable = true;
+                        }
+                        else
+                        {
+                            picoProbeConsecutiveFailures++;
+                            if (picoProbeConsecutiveFailures >= 3)
+                                picoProbeAvailable = false;
+                        }
                         if (picoResetPending && responded &&
                             (DateTime.UtcNow - picoResetAt).TotalSeconds >= 3)
                         {
@@ -1084,7 +1099,7 @@ namespace opentuner
             if (connectButton != null)
             {
                 connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
-                connectButton.Text = connected ? "CONNECTED" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
+                connectButton.Text = connected ? "CONNECTED" : resetting ? "RESETTING" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
                 connectButton.ForeColor = Color.White;
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
