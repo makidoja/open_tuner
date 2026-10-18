@@ -128,7 +128,6 @@ namespace opentuner
                     BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) UpdatePicoProbe(); });
                 }
                 catch (InvalidOperationException) { }
-                catch (ObjectDisposedException) { }
             }, null, 0, 2000);
 
             // Independent periodic scanner: video/control UI updates must never
