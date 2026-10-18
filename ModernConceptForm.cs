@@ -382,6 +382,9 @@ namespace opentuner
             int idx = backend.BackendSelectedSourceIndex;
             if (idx < 0 || idx >= sourceCombo.Items.Count) idx = 0;
             if (sourceCombo.Items.Count > 0) sourceCombo.SelectedIndex = idx;
+            Serilog.Log.Information("[CONNECT-DIAG] Source list loaded: UI index={UiIndex}, backend index={BackendIndex}, source={Name}, options={Options}",
+                sourceCombo.SelectedIndex, backend.BackendSelectedSourceIndex, sourceCombo.SelectedItem,
+                string.Join(", ", sourceCombo.Items.Cast<object>().Select(x => x.ToString())));
         }
 
         private void LoadPresets()
