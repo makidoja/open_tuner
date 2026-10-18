@@ -36,6 +36,8 @@ namespace opentuner
         private Button connectionPill;
         private Button connectButton;
         private bool picoProbeActive;
+        private DateTime picoProbeStarted = DateTime.MinValue;
+        private DateTime picoProbeLastReport = DateTime.MinValue;
         private bool picoProbeAvailable;
         private string picoProbeHost;
         private DateTime picoLastProbe = DateTime.MinValue;
@@ -511,21 +513,31 @@ namespace opentuner
 
         private void UpdatePicoProbe()
         {
-            if (string.IsNullOrWhiteSpace(picoProbeHost) || picoProbeActive ||
-                (DateTime.UtcNow - picoLastProbe).TotalMilliseconds < 1800) return;
+            if (string.IsNullOrWhiteSpace(picoProbeHost)) return;
+            // A failed dispatcher callback must not permanently stop discovery.
+            if (picoProbeActive && (DateTime.UtcNow - picoProbeStarted).TotalSeconds > 5)
+            {
+                Serilog.Log.Warning("[PICO-PROBE] In-flight probe timed out; restarting discovery");
+                picoProbeActive = false;
+                System.Threading.Interlocked.Increment(ref picoProbeGeneration);
+            }
+            if (picoProbeActive || (DateTime.UtcNow - picoLastProbe).TotalMilliseconds < 1800) return;
             picoLastProbe = DateTime.UtcNow;
+            picoProbeStarted = picoLastProbe;
             picoProbeActive = true;
             string host = picoProbeHost;
             int generation = picoProbeGeneration;
             Task.Run(delegate
             {
                 bool responded = false;
+                IPStatus resultStatus = IPStatus.Unknown;
                 try
                 {
                     using (Ping ping = new Ping())
                     {
-                        PingReply reply = ping.Send(host, 700);
-                        responded = reply != null && reply.Status == IPStatus.Success;
+                        PingReply reply = ping.Send(host, 1200);
+                        resultStatus = reply == null ? IPStatus.Unknown : reply.Status;
+                        responded = resultStatus == IPStatus.Success;
                     }
                 }
                 catch (Exception ex) { Serilog.Log.Debug(ex, "[PICO-PROBE] Probe failed"); }
@@ -537,8 +549,12 @@ namespace opentuner
                         picoProbeActive = false;
                         if (IsDisposed || generation != picoProbeGeneration ||
                             !string.Equals(host, picoProbeHost, StringComparison.OrdinalIgnoreCase)) return;
-                        if (picoProbeAvailable != responded)
-                            Serilog.Log.Information("[PICO-PROBE] {Host} availability={Available}", host, responded);
+                        if (picoProbeAvailable != responded ||
+                            (DateTime.UtcNow - picoProbeLastReport).TotalSeconds > 15)
+                        {
+                            picoProbeLastReport = DateTime.UtcNow;
+                            Serilog.Log.Information("[PICO-PROBE] host={Host} response={Status} available={Available} reset={Reset}", host, resultStatus, responded, picoResetPending);
+                        }
                         picoProbeAvailable = responded;
                         if (picoResetPending && responded &&
                             (DateTime.UtcNow - picoResetAt).TotalSeconds >= 3)
