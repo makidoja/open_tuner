@@ -61,6 +61,7 @@ namespace opentuner
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
         private Timer autoScanTimer;
+        private System.Threading.Timer picoPollTimer;
         private int visibleTuners = 2;
         private TableLayoutPanel receiverGrid;
         private Panel spectrumCardPanel;
@@ -113,10 +114,22 @@ namespace opentuner
                 // An exception in those paths previously left Auto Scan ARMED.
                 try { AdoptVideoControls(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
-                try { UpdatePicoProbe(); RefreshConnectionState(); }
+                try { RefreshConnectionState(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Connection status refresh failed"); }
             };
             uiTimer.Start();
+            // Probe scheduling is independent of the video/UI refresh timer.
+            // Only dispatch work to the UI thread; the Ping itself remains asynchronous.
+            picoPollTimer = new System.Threading.Timer(delegate
+            {
+                try
+                {
+                    if (IsDisposed || Disposing || !IsHandleCreated) return;
+                    BeginInvoke((MethodInvoker)delegate { if (!IsDisposed) UpdatePicoProbe(); });
+                }
+                catch (InvalidOperationException) { }
+                catch (ObjectDisposedException) { }
+            }, null, 0, 2000);
 
             // Independent periodic scanner: video/control UI updates must never
             // starve the QO-100 scan state machine.
@@ -523,6 +536,7 @@ namespace opentuner
             }
             if (picoProbeActive || (DateTime.UtcNow - picoLastProbe).TotalMilliseconds < 1800) return;
             picoLastProbe = DateTime.UtcNow;
+            Serilog.Log.Information("[PICO-PROBE] Starting probe host={Host}", picoProbeHost);
             picoProbeStarted = picoLastProbe;
             picoProbeActive = true;
             string host = picoProbeHost;
@@ -1111,6 +1125,7 @@ namespace opentuner
 
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
+            if (picoPollTimer != null) { picoPollTimer.Dispose(); picoPollTimer = null; }
             if (uiTimer != null) uiTimer.Stop();
             if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
