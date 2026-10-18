@@ -1055,6 +1055,15 @@ namespace opentuner
 
         private void RefreshConnectionState()
         {
+            // RESET is a short safety cooldown, not a discovery lock. A missed
+            // ping must not permanently prevent connecting to a working PicoTuner.
+            // Availability is evaluated independently by picoProbeAvailable.
+            if (picoResetPending && picoResetAt != DateTime.MinValue &&
+                (DateTime.UtcNow - picoResetAt).TotalSeconds >= 5)
+            {
+                picoResetPending = false;
+                Serilog.Log.Information("[PICO-PROBE] Reset cooldown finished; availability={Available}; connection can recover", picoProbeAvailable);
+            }
             bool resetting = picoResetPending;
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
