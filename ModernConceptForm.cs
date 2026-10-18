@@ -9,8 +9,6 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using opentuner.ExtraFeatures.BATCSpectrum;
 using opentuner.MediaSources;
-using opentuner.MediaSources.WinterHill;
-using opentuner.Utilities;
 
 namespace opentuner
 {
@@ -34,9 +32,6 @@ namespace opentuner
         private ComboBox layoutCombo;
         private Button connectionPill;
         private Button connectButton;
-        private PicoWHBroadcastListener picoDiscovery;
-        private string configuredPicoHost;
-        private bool picoDiscoveryRequired;
         private volatile bool picoResetPending;
         private int picoResetGeneration;
         private FlowLayoutPanel presetList;
@@ -92,7 +87,6 @@ namespace opentuner
             BuildInterface();
             ApplyReceiverCount();
             LoadSources();
-            RefreshDiscoveryConfiguration();
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
@@ -209,7 +203,6 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshDiscoveryConfiguration(); };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -223,7 +216,7 @@ namespace opentuner
             p.Controls.Add(layoutCombo);
 
             Button source = FlatButton("SOURCE SETTINGS", false); source.Width = 126; source.Height = 32;
-            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); RefreshDiscoveryConfiguration(); };
+            source.Click += delegate { if (sourceCombo.SelectedIndex >= 0) backend.BackendShowSourceSettings(sourceCombo.SelectedIndex); };
             p.Controls.Add(source);
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
@@ -405,40 +398,6 @@ namespace opentuner
 
         private decimal Clamp(NumericUpDown n, decimal value) { return Math.Min(n.Maximum, Math.Max(n.Minimum, value)); }
 
-        // Discovery affects UI readiness only. The existing receiver backend is
-        // never modified, tuned, or disconnected by this observer.
-        private void RefreshDiscoveryConfiguration()
-        {
-            bool pico = false;
-            string host = null;
-            try
-            {
-                if (sourceCombo != null && sourceCombo.SelectedItem != null &&
-                    sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    var settings = new SettingsManager<WinterHillSettings>("winterhill_settings")
-                        .LoadSettings(new WinterHillSettings());
-                    pico = settings.DefaultInterface == 2;
-                    host = settings.WinterHillUdpHost;
-                }
-            }
-            catch (Exception ex) { Serilog.Log.Warning(ex, "Unable to read PicoTuner discovery settings"); }
-
-            picoDiscoveryRequired = pico;
-            configuredPicoHost = host;
-            if (pico && picoDiscovery == null)
-            {
-                try { picoDiscovery = new PicoWHBroadcastListener(); }
-                catch (Exception ex) { Serilog.Log.Warning(ex, "Shared PicoTuner discovery unavailable"); }
-            }
-            if (!pico && picoDiscovery != null)
-            {
-                picoDiscovery.Close();
-                picoDiscovery = null;
-            }
-            if (connectButton != null) RefreshConnectionState();
-        }
-
         private bool switchingConnection;
 
         private void ToggleConnection()
@@ -482,16 +441,46 @@ namespace opentuner
             }
         }
 
-        // Do not bind UDP 9997 here: PicoWHBroadcastListener owns that port.
-        // The receiver restarts asynchronously after RESET. This delay only
-        // protects against an immediate reconnect; it never proves availability
-        // or changes the existing receiver connection path.
+        // The device drops its control/status transport during a hardware reset.
+        // A fresh discovery broadcast proves the PicoTuner is back online.
         private void WaitForPicoReturn()
         {
             int generation = System.Threading.Interlocked.Increment(ref picoResetGeneration);
             Task.Run(delegate
             {
-                System.Threading.Thread.Sleep(5000);
+                // Allow the old firmware session to shut down before trusting
+                // any fresh discovery advertisement.
+                System.Threading.Thread.Sleep(3000);
+                bool returned = false;
+                try
+                {
+                    using (UdpClient listener = new UdpClient(9997))
+                    {
+                        listener.Client.ReceiveTimeout = 1500;
+                        while (generation == picoResetGeneration && !IsDisposed)
+                        {
+                            try
+                            {
+                                IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+                                byte[] message = listener.Receive(ref remote);
+                                if (message != null && message.Length > 0)
+                                {
+                                    returned = true;
+                                    break;
+                                }
+                            }
+                            catch (SocketException ex)
+                            {
+                                if (ex.SocketErrorCode != SocketError.TimedOut) break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Serilog.Log.Warning(ex, "PicoTuner reset discovery listener unavailable");
+                }
+
                 if (generation != picoResetGeneration || IsDisposed || !IsHandleCreated)
                     return;
                 try
@@ -499,8 +488,20 @@ namespace opentuner
                     BeginInvoke((MethodInvoker)delegate
                     {
                         if (generation != picoResetGeneration || IsDisposed) return;
-                        picoResetPending = false;
-                        RefreshConnectionState();
+                        if (returned)
+                        {
+                            picoResetPending = false;
+                            connectionPill.Enabled = true;
+                            if (connectButton != null) connectButton.Enabled = true;
+                            RefreshConnectionState();
+                        }
+                        else
+                        {
+                            // Remain disconnected if discovery is unavailable;
+                            // never permit an unsafe immediate reconnect.
+                            connectionPill.Text = "PICO OFFLINE";
+                            Serilog.Log.Warning("PicoTuner did not advertise readiness after reset");
+                        }
                     });
                 }
                 catch (InvalidOperationException) { }
@@ -981,8 +982,7 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool hardwareReady = !picoDiscoveryRequired || PicoWHBroadcastListener.RecentlySeen(configuredPicoHost);
-            bool ready = hardwareReady && !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool ready = !resetting && !switchingConnection && !connectRequested && !initialised;
 
             // Set the colours explicitly; a FlatStyle.Flat button does not
             // reliably change its background when Enabled becomes false.
@@ -992,9 +992,9 @@ namespace opentuner
             {
                 connectButton.Enabled = (ready || connected || offline) && !switchingConnection && !resetting;
                 connectButton.Text = resetting ? "RESETTING" : connected ? "CONNECTED" :
-                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
+                    offline ? "OFFLINE" : connectRequested ? "CONNECTING" : "CONNECT";
                 connectButton.BackColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
-                connectButton.ForeColor = connectButton.Text == "WAITING" ? Color.White : (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
+                connectButton.ForeColor = (ready || connected) ? Text : Color.FromArgb(210, 216, 223);
                 connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
                 connectButton.Cursor = connectButton.Enabled ? Cursors.Hand : Cursors.Default;
             }
@@ -1042,7 +1042,6 @@ namespace opentuner
         protected override void OnFormClosed(FormClosedEventArgs e)
         {
             if (uiTimer != null) uiTimer.Stop();
-            if (picoDiscovery != null) { picoDiscovery.Close(); picoDiscovery = null; }
             if (autoScanTimer != null) { autoScanTimer.Stop(); autoScanTimer.Dispose(); }
             try { batcSpectrum?.Close(); } catch { }
             backend.BackendSourceData -= BackendSourceData;
