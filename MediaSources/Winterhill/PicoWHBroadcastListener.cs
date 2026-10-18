@@ -11,6 +11,8 @@ namespace opentuner.MediaSources.WinterHill
     {
         private Thread listener_thread;
         private bool CloseThread = false;
+        private string lastLoggedSender;
+        private DateTime lastBroadcastLogUtc = DateTime.MinValue;
         private UdpClient listener = new UdpClient(9997);
 
         public delegate void OnBroadcastDelegate(string data);
@@ -46,6 +48,15 @@ namespace opentuner.MediaSources.WinterHill
 
                     string receivedMessage = Encoding.ASCII.GetString(data);
 
+                    // Passive diagnostics: no change to connection or discovery behaviour.
+                    string senderIp = remoteEndPoint.Address.ToString();
+                    if (senderIp != lastLoggedSender ||
+                        (DateTime.UtcNow - lastBroadcastLogUtc).TotalSeconds >= 15)
+                    {
+                        lastLoggedSender = senderIp;
+                        lastBroadcastLogUtc = DateTime.UtcNow;
+                        Log.Information("[PICO-DISCOVERY-DIAG] UDP 9997 from {SenderIp}, bytes={Bytes}", senderIp, data.Length);
+                    }
                     OnBroadcast?.Invoke(receivedMessage);
 
                     //Log.Information(remoteEndPoint.ToString());
