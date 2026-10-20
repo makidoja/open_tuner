@@ -267,7 +267,14 @@ namespace opentuner
                 e.Graphics.Clear(fill);
                 using (Pen pen = new Pen(border))
                     e.Graphics.DrawRectangle(pen, 0, 0, connect.Width - 1, connect.Height - 1);
-                TextRenderer.DrawText(e.Graphics, connect.Text, connect.Font, connect.ClientRectangle,
+                // Render the label from the very same state as the fill, never
+                // from the control's potentially stale native Text property.
+                string label = state == ReceiverButtonState.Connected ? "CONNECTED" :
+                    state == ReceiverButtonState.Ready ? "CONNECT" :
+                    state == ReceiverButtonState.Connecting ? "CONNECTING" :
+                    state == ReceiverButtonState.Resetting ? "RESETTING" :
+                    state == ReceiverButtonState.Offline ? "OFFLINE" : "WAITING";
+                TextRenderer.DrawText(e.Graphics, label, connect.Font, connect.ClientRectangle,
                     Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
             };
             // An explicit recovery route if the receiver does not answer ICMP.
@@ -1163,6 +1170,7 @@ namespace opentuner
                 connectButton.FlatAppearance.BorderColor = desired == ReceiverButtonState.Connected ?
                     Color.FromArgb(38, 140, 86) :
                     desired == ReceiverButtonState.Ready ? Accent : greyBorder;
+                connectButton.Invalidate();
                 Serilog.Log.Information("[CONNECT-STATE] {Old} -> {New}; host={Host}; probe={Probe}; live={Live}",
                     previous, desired, picoProbeHost, picoProbeAvailable, live);
             }
