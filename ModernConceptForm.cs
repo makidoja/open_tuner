@@ -535,7 +535,10 @@ namespace opentuner
                 {
                     var settings = new SettingsManager<WinterHillSettings>("winterhill_settings")
                         .LoadSettings(new WinterHillSettings());
-                    if (settings.DefaultInterface == 2)
+                    // Interface 0 asks at connection time which hardware to use.
+                    // Keep probing the configured Ethernet target even before
+                    // that choice, rather than presenting false CONNECT.
+                    if (settings.DefaultInterface == 2 || settings.DefaultInterface == 0)
                         newHost = settings.WinterHillUdpHost;
                 }
             }
