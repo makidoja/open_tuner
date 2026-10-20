@@ -42,6 +42,8 @@ namespace opentuner
         private int picoProbeConsecutiveFailures;
         private int picoProbeConsecutiveSuccesses;
         private bool connectButtonAllowed;
+        private enum ReceiverButtonState { Waiting, Ready, Connecting, Connected, Resetting, Offline }
+        private ReceiverButtonState? renderedButtonState;
         private string picoProbeHost;
         private DateTime picoLastProbe = DateTime.MinValue;
         private int picoProbeGeneration;
@@ -450,7 +452,8 @@ namespace opentuner
         private void ToggleConnection()
         {
             Serilog.Log.Information("[CONNECT-DIAG] Click: switching={Switching}, reset={Reset}, selected={Index}, source={Source}, initialised={Initialised}, buttonEnabled={Enabled}", switchingConnection, picoResetPending, sourceCombo.SelectedIndex, sourceCombo.SelectedItem, backend.BackendSourceInitialised, connectButton != null && connectButton.Enabled);
-            if (!backend.BackendSourceInitialised && !connectButtonAllowed) { Serilog.Log.Information("[CONNECT-DIAG] Ignored click while waiting for hardware"); return; }
+            RefreshConnectionState();
+            if (!backend.BackendSourceInitialised && !connectButtonAllowed) { Serilog.Log.Information("[CONNECT-DIAG] Ignored click while waiting for hardware; state={State}", renderedButtonState); return; }
             if (switchingConnection || picoResetPending) { Serilog.Log.Warning("[CONNECT-DIAG] Click ignored: switching={Switching}, reset={Reset}", switchingConnection, picoResetPending); return; }
             switchingConnection = true;
             try
@@ -1094,7 +1097,9 @@ namespace opentuner
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
-            bool detected = string.IsNullOrWhiteSpace(picoProbeHost) || picoProbeAvailable || allowManualConnect;
+            bool picoSelected = sourceCombo != null && sourceCombo.SelectedItem != null &&
+                sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool detected = !picoSelected || (!string.IsNullOrWhiteSpace(picoProbeHost) && picoProbeAvailable) || allowManualConnect;
             bool ready = detected && !resetting && !switchingConnection && !connectRequested && !initialised;
             string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
             if (diagnostic != lastConnectionDiagnostic)
@@ -1107,26 +1112,39 @@ namespace opentuner
             // reliably change its background when Enabled becomes false.
             Color grey = Color.FromArgb(75, 84, 95);
             Color greyBorder = Color.FromArgb(108, 119, 131);
-            if (connectButton != null)
+            connectButtonAllowed = (ready || connected || offline) && !switchingConnection && !resetting;
+            ReceiverButtonState desired = connected ? ReceiverButtonState.Connected :
+                resetting ? ReceiverButtonState.Resetting :
+                connectRequested ? ReceiverButtonState.Connecting :
+                offline ? ReceiverButtonState.Offline :
+                ready ? ReceiverButtonState.Ready : ReceiverButtonState.Waiting;
+            if (connectButton != null && renderedButtonState != desired)
             {
-                // WinForms themes force grey text on a disabled Button. Keep it
-                // visually enabled for white text; block WAITING clicks in
-                // ToggleConnection rather than relying on Enabled=false.
-                connectButtonAllowed = (ready || connected || offline) && !switchingConnection && !resetting;
+                ReceiverButtonState? previous = renderedButtonState;
+                renderedButtonState = desired;
+                Color background = desired == ReceiverButtonState.Connected ? Color.FromArgb(17, 91, 59) :
+                    desired == ReceiverButtonState.Ready ? Accent : grey;
+                connectButton.Text = desired == ReceiverButtonState.Connected ? "CONNECTED" :
+                    desired == ReceiverButtonState.Ready ? "CONNECT" :
+                    desired == ReceiverButtonState.Connecting ? "CONNECTING" :
+                    desired == ReceiverButtonState.Resetting ? "RESETTING" :
+                    desired == ReceiverButtonState.Offline ? "OFFLINE" : "WAITING";
+                // Keep Enabled true to retain white text in WinForms; the same
+                // state is checked by ToggleConnection on every click.
                 connectButton.Enabled = true;
-                connectButton.Text = connected ? "CONNECTED" : resetting ? "RESETTING" : connectRequested ? "CONNECTING" : ready ? "CONNECT" : "WAITING";
-                Color buttonColor = connected ? Color.FromArgb(17, 91, 59) : ready ? Accent : grey;
-                if (connectButton.BackColor != buttonColor)
-                    connectButton.BackColor = buttonColor;
-                // WinForms FlatButton hover/pressed defaults can flash lighter
-                // during the 2-second probe and 300-ms UI refresh.
-                // Keep all interaction paints identical to the active state.
-                connectButton.FlatAppearance.MouseOverBackColor = buttonColor;
-                connectButton.FlatAppearance.MouseDownBackColor = buttonColor;
+                connectButton.UseVisualStyleBackColor = false;
+                connectButton.BackColor = background;
                 connectButton.ForeColor = Color.White;
-                connectButton.FlatAppearance.BorderColor = connected ? Color.FromArgb(38, 140, 86) : ready ? Accent : greyBorder;
-                connectButton.Cursor = connectButtonAllowed ? Cursors.Hand : Cursors.Default;
+                connectButton.FlatAppearance.MouseOverBackColor = background;
+                connectButton.FlatAppearance.MouseDownBackColor = background;
+                connectButton.FlatAppearance.BorderColor = desired == ReceiverButtonState.Connected ?
+                    Color.FromArgb(38, 140, 86) :
+                    desired == ReceiverButtonState.Ready ? Accent : greyBorder;
+                Serilog.Log.Information("[CONNECT-STATE] {Old} -> {New}; host={Host}; probe={Probe}; live={Live}",
+                    previous, desired, picoProbeHost, picoProbeAvailable, live);
             }
+            if (connectButton != null)
+                connectButton.Cursor = connectButtonAllowed ? Cursors.Hand : Cursors.Default;
 
             connectionPill.Enabled = !resetting && !switchingConnection;
             connectionPill.Cursor = connectionPill.Enabled ? Cursors.Hand : Cursors.Default;
