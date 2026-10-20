@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - modern-ui
+      - connect-state-test
   workflow_dispatch:
 
 jobs:
