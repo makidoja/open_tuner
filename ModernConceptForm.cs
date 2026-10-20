@@ -254,6 +254,22 @@ namespace opentuner
 
             Button connect = FlatButton("CONNECT", true); connect.Width = 86; connect.Height = 32; connect.Click += delegate { ToggleConnection(); };
             connectButton = connect;
+            // Owner-paint only this button. WinForms visual styles can otherwise
+            // draw the hover fill grey despite FlatAppearance.MouseOverBackColor.
+            connect.Paint += delegate(object sender, PaintEventArgs e)
+            {
+                if (!renderedButtonState.HasValue) return;
+                ReceiverButtonState state = renderedButtonState.Value;
+                Color fill = state == ReceiverButtonState.Connected ? Color.FromArgb(17, 91, 59) :
+                    state == ReceiverButtonState.Ready ? Accent : Color.FromArgb(75, 84, 95);
+                Color border = state == ReceiverButtonState.Connected ? Color.FromArgb(38, 140, 86) :
+                    state == ReceiverButtonState.Ready ? Accent : Color.FromArgb(108, 119, 131);
+                e.Graphics.Clear(fill);
+                using (Pen pen = new Pen(border))
+                    e.Graphics.DrawRectangle(pen, 0, 0, connect.Width - 1, connect.Height - 1);
+                TextRenderer.DrawText(e.Graphics, connect.Text, connect.Font, connect.ClientRectangle,
+                    Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            };
             // An explicit recovery route if the receiver does not answer ICMP.
             ContextMenuStrip recoveryMenu = new ContextMenuStrip();
             recoveryMenu.Items.Add("Force connect (skip availability check)", null, delegate
