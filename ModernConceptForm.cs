@@ -275,9 +275,10 @@ namespace opentuner
             recoveryMenu.Items.Add("Force connect (skip availability check)", null, delegate
             {
                 allowManualConnect = true;
-                Serilog.Log.Warning("[PICO-PROBE] Manual connection override requested");
-                RefreshConnectionState();
-                ToggleConnection();
+                Serilog.Log.Warning("[PICO-PROBE] Explicit manual connection requested (button remains WAITING without a probe)");
+                // Manual recovery is an explicit user action; it does not falsely
+                // advertise hardware availability on the normal CONNECT button.
+                Connect();
             });
             connect.ContextMenuStrip = recoveryMenu;
             p.Controls.Add(connect);
@@ -1115,7 +1116,10 @@ namespace opentuner
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
             bool picoSelected = sourceCombo != null && sourceCombo.SelectedItem != null &&
                 sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
-            bool detected = !picoSelected || (!string.IsNullOrWhiteSpace(picoProbeHost) && picoProbeAvailable) || allowManualConnect;
+            // Fail closed for the PicoTuner test: an unknown source name, an
+            // absent target or a stale/manual override must not show CONNECT.
+            // The explicit right-click recovery action remains available.
+            bool detected = !string.IsNullOrWhiteSpace(picoProbeHost) && picoProbeAvailable;
             bool ready = detected && !resetting && !switchingConnection && !connectRequested && !initialised;
             string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
             if (diagnostic != lastConnectionDiagnostic)
