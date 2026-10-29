@@ -56,6 +56,9 @@ namespace opentuner
         private BATCSpectrum batcSpectrum;
         private ModernBatcSpectrumControl activeQuickTuneSpectrum;
         private readonly CheckBox[] autoScanEnabled = new CheckBox[2];
+        private CheckBox rx2Rotate30Seconds;
+        private DateTime rx2RotationStartedUtc = DateTime.MinValue;
+        private double rx2RotationFrequencyMHz;
         private readonly DateTime[] noLockSince = new DateTime[2];
         private readonly DateTime[] lastAutoTune = new DateTime[2];
         private readonly DateTime[] lastSignalStatus = new DateTime[2];
@@ -357,12 +360,41 @@ namespace opentuner
                 autoScanEnabled[rx] = check;
             }
 
+            // Additional RX2-only scanning policy: cycle across stations at
+            // 30-second intervals while preserving the normal auto-scan mode.
+            rx2Rotate30Seconds = new CheckBox
+            {
+                Text = "Rotate 30s",
+                Checked = false,
+                AutoSize = false,
+                Size = new Size(116, 24),
+                Location = new Point(Math.Max(4, batcSpectrumBox.Width - 265), 205),
+                BackColor = Surface2,
+                ForeColor = Text,
+                Font = new Font("Segoe UI Semibold", 8.5f),
+                Cursor = Cursors.Hand
+            };
+            rx2Rotate30Seconds.CheckedChanged += delegate
+            {
+                rx2RotationStartedUtc = DateTime.MinValue;
+                rx2RotationFrequencyMHz = 0;
+                lastAutoFrequency[1] = 0;
+                if (rx2Rotate30Seconds.Checked && autoScanEnabled[1] != null &&
+                    !autoScanEnabled[1].Checked)
+                    autoScanEnabled[1].Checked = true;
+                Serilog.Log.Information("QO100 RX2 30-second rotation {Enabled}", rx2Rotate30Seconds.Checked);
+            };
+            batcSpectrumBox.Controls.Add(rx2Rotate30Seconds);
+            rx2Rotate30Seconds.BringToFront();
+
             p.Resize += delegate
             {
                 batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), 275);
                 for (int rx = 0; rx < 2; rx++)
                     if (autoScanEnabled[rx] != null)
                         autoScanEnabled[rx].Left = Math.Max(4, batcSpectrumBox.Width - autoScanEnabled[rx].Width - 12);
+                if (rx2Rotate30Seconds != null)
+                    rx2Rotate30Seconds.Left = Math.Max(4, batcSpectrumBox.Width - 265);
             };
             return p;
         }
@@ -710,6 +742,7 @@ namespace opentuner
             if (activeQuickTuneSpectrum != null)
                 activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, visibleTuners));
             if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = visibleTuners > 1;
+            if (rx2Rotate30Seconds != null) rx2Rotate30Seconds.Visible = visibleTuners > 1;
             if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = visibleTuners > 1;
         }
 
@@ -915,6 +948,12 @@ namespace opentuner
                     SetAutoScanState(rx, "OFF");
                     continue;
                 }
+                if (rx == 1 && rx2Rotate30Seconds != null && rx2Rotate30Seconds.Checked)
+                {
+                    RotateRx2EveryThirtySeconds(now, candidates);
+                    continue;
+                }
+
                 // Do not act on stale lock information or while the receiver
                 // is being initialised and awaiting its first status message.
                 // Some PicoTuner firmware versions do not send periodic status
@@ -996,6 +1035,73 @@ namespace opentuner
             }
         }
 
+        private void RotateRx2EveryThirtySeconds(DateTime now, List<signal.Sig> candidates)
+        {
+            const int rx = 1;
+            // A fresh mode enable starts a complete 30-second viewing period
+            // on the station already tuned to RX2.
+            if (rx2RotationStartedUtc == DateTime.MinValue)
+            {
+                rx2RotationStartedUtc = now;
+                if (lastData[rx] != null && lastData[rx].frequency > 0)
+                    rx2RotationFrequencyMHz = lastData[rx].frequency / 1000.0;
+                else
+                    rx2RotationFrequencyMHz = (double)freqInputs[rx].Value;
+            }
+
+            int remaining = (int)Math.Ceiling(30 - (now - rx2RotationStartedUtc).TotalSeconds);
+            if (remaining > 0)
+            {
+                SetAutoScanState(rx, "ROTATE " + remaining + "s");
+                return;
+            }
+
+            double currentMHz = rx2RotationFrequencyMHz;
+            double rx1ConfiguredMHz = (double)freqInputs[0].Value;
+            var available = candidates.Where(sig =>
+                // Include signal bandwidth in the beacon exclusion.
+                Math.Abs(sig.frequency - 10491.5) > 0.10 + sig.sr / 2.0 &&
+                // Never take a transmission RX1 is currently tuned to, even
+                // when RX1 has not yet achieved a lock.
+                Math.Abs(sig.frequency - rx1ConfiguredMHz) >
+                    Math.Max(0.10, (sig.sr + (double)srInputs[0].Value / 1000.0) / 2.0 + 0.05) &&
+                !AutoScanCandidateOccupiedByOther(rx, sig) &&
+                // A station must be different from the one we are watching.
+                Math.Abs(sig.frequency - currentMHz) >
+                    Math.Max(0.10, sig.sr / 2.0 + 0.05))
+                .OrderBy(sig => sig.frequency).ToList();
+
+            if (available.Count == 0)
+            {
+                SetAutoScanState(rx, "NO OTHER STATION");
+                return;
+            }
+
+            // Advance through frequencies, wrapping to the first candidate.
+            var selected = available.FirstOrDefault(sig => sig.frequency > currentMHz + 0.05);
+            if (selected.frequency <= 0) selected = available[0];
+            uint freqKHz = Convert.ToUInt32(Math.Round(selected.frequency * 1000.0));
+            uint srKs = Convert.ToUInt32(Math.Round(selected.sr * 1000.0));
+            decimal mhz = freqKHz / 1000M;
+            if (mhz < freqInputs[rx].Minimum || mhz > freqInputs[rx].Maximum ||
+                srKs < srInputs[rx].Minimum || srKs > srInputs[rx].Maximum)
+            {
+                SetAutoScanState(rx, "INVALID SR");
+                return;
+            }
+
+            freqInputs[rx].Value = mhz;
+            srInputs[rx].Value = srKs;
+            rx2RotationFrequencyMHz = selected.frequency;
+            rx2RotationStartedUtc = now;
+            lastAutoFrequency[rx] = selected.frequency;
+            lastAutoTune[rx] = now;
+            Serilog.Log.Information("QO100 RX2 rotating to {Freq:F3} MHz / {Sr} kS for 30s",
+                selected.frequency, srKs);
+            SetAutoScanState(rx, "ROTATE TUNING");
+            Tune(rx);
+        }
+
         private bool AutoScanCandidateOccupiedByOther(int receiver, signal.Sig candidate)
         {
             int other = 1 - receiver;
@@ -1034,6 +1140,11 @@ namespace opentuner
             if (receiver < 0 || receiver >= 2) return;
             noLockSince[receiver] = DateTime.MinValue;
             spectrumMissingSince[receiver] = DateTime.MinValue;
+            if (receiver == 1)
+            {
+                rx2RotationStartedUtc = DateTime.MinValue;
+                rx2RotationFrequencyMHz = 0;
+            }
             lastAutoTune[receiver] = DateTime.MinValue;
             lastAutoFrequency[receiver] = 0;
             // Force refresh even if the previous cached state was identical.
