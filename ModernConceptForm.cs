@@ -371,7 +371,7 @@ namespace opentuner
                     Checked = false,
                     AutoSize = false,
                     Size = new Size(116, 24),
-                    Location = new Point(Math.Max(4, p.Width - 245), rx == 0 ? 34 : 77),
+                    Location = new Point(Math.Max(4, p.Width - 245), rx == 0 ? 43 : 86),
                     BackColor = Surface2,
                     ForeColor = Text,
                     Font = new Font("Segoe UI Semibold", 8.5f),
