@@ -368,7 +368,7 @@ namespace opentuner
                 Checked = false,
                 AutoSize = false,
                 Size = new Size(116, 24),
-                Location = new Point(Math.Max(4, batcSpectrumBox.Width - 265), 205),
+                Location = new Point(Math.Max(4, p.Width - 245), 76),
                 BackColor = Surface2,
                 ForeColor = Text,
                 Font = new Font("Segoe UI Semibold", 8.5f),
@@ -384,7 +384,7 @@ namespace opentuner
                     autoScanEnabled[1].Checked = true;
                 Serilog.Log.Information("QO100 RX2 30-second rotation {Enabled}", rx2Rotate30Seconds.Checked);
             };
-            batcSpectrumBox.Controls.Add(rx2Rotate30Seconds);
+            p.Controls.Add(rx2Rotate30Seconds);
             rx2Rotate30Seconds.BringToFront();
 
             p.Resize += delegate
@@ -394,7 +394,7 @@ namespace opentuner
                     if (autoScanEnabled[rx] != null)
                         autoScanEnabled[rx].Left = Math.Max(4, batcSpectrumBox.Width - autoScanEnabled[rx].Width - 12);
                 if (rx2Rotate30Seconds != null)
-                    rx2Rotate30Seconds.Left = Math.Max(4, batcSpectrumBox.Width - 265);
+                    rx2Rotate30Seconds.Left = Math.Max(4, p.Width - 245);
             };
             return p;
         }
