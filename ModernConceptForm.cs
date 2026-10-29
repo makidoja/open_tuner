@@ -1044,7 +1044,7 @@ namespace opentuner
         private void RotateReceiverEveryThirtySeconds(int rx, DateTime now, List<signal.Sig> candidates)
         {
             // A fresh mode enable starts a complete 30-second viewing period
-            // on the station already tuned to RX2.
+            // on the station already tuned to that receiver.
             if (rotationStartedUtc[rx] == DateTime.MinValue)
             {
                 rotationStartedUtc[rx] = now;
@@ -1054,14 +1054,31 @@ namespace opentuner
                     rotationFrequencyMHz[rx] = (double)freqInputs[rx].Value;
             }
 
+            double currentMHz = rotationFrequencyMHz[rx];
+            // The spectrum, not an old demodulator LOCKED flag, determines
+            // whether the current transmission is still on air.
+            bool currentPresent = candidates.Any(sig =>
+                Math.Abs(sig.frequency - currentMHz) <
+                Math.Max(0.10, sig.sr / 2.0 + 0.045));
+            if (currentPresent)
+                spectrumMissingSince[rx] = DateTime.MinValue;
+            else if (spectrumMissingSince[rx] == DateTime.MinValue)
+                spectrumMissingSince[rx] = now;
+
+            // Confirm loss over two spectrum refreshes to reject short detector
+            // dropouts; do not wait for the 30-second viewing period to end.
+            bool signalGone = !currentPresent && spectrumMissingSince[rx] != DateTime.MinValue &&
+                (now - spectrumMissingSince[rx]).TotalSeconds >= 2;
             int remaining = (int)Math.Ceiling(30 - (now - rotationStartedUtc[rx]).TotalSeconds);
-            if (remaining > 0)
+            if (!signalGone && remaining > 0)
             {
-                SetAutoScanState(rx, "ROTATE " + remaining + "s");
+                SetAutoScanState(rx, currentPresent ? "ROTATE " + remaining + "s" : "CHECK SIGNAL");
                 return;
             }
+            if (signalGone)
+                Serilog.Log.Information("QO100 RX{Receiver}: current signal {Freq:F3} disappeared; scanning before dwell expiry",
+                    rx + 1, currentMHz);
 
-            double currentMHz = rotationFrequencyMHz[rx];
             int other = 1 - rx;
             double otherConfiguredMHz = (double)freqInputs[other].Value;
             var available = candidates.Where(sig =>
@@ -1079,7 +1096,7 @@ namespace opentuner
 
             if (available.Count == 0)
             {
-                SetAutoScanState(rx, "NO OTHER STATION");
+                SetAutoScanState(rx, signalGone ? "SIGNAL GONE - SEARCHING" : "NO OTHER STATION");
                 return;
             }
 
