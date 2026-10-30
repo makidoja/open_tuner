@@ -341,8 +341,8 @@ namespace opentuner
                     Text = "RX" + (rx + 1) + " Auto Scan",
                     Checked = false,
                     AutoSize = false,
-                    Size = new Size(132, 24),
-                    Location = new Point(Math.Max(4, batcSpectrumBox.Width - 145), rx == 0 ? 65 : 205),
+                    Size = new Size(114, 22),
+                    Location = new Point(Math.Max(4, p.Width - 408), rx == 0 ? 30 : 73),
                     BackColor = Surface2,
                     ForeColor = Text,
                     Font = new Font("Segoe UI Semibold", 8.5f),
@@ -355,7 +355,7 @@ namespace opentuner
                     lastAutoTune[index] = DateTime.MinValue;
                     lastAutoFrequency[index] = 0;
                 };
-                batcSpectrumBox.Controls.Add(check);
+                p.Controls.Add(check);
                 check.BringToFront();
                 autoScanEnabled[rx] = check;
             }
@@ -370,8 +370,8 @@ namespace opentuner
                     Text = "Rotate 30s",
                     Checked = false,
                     AutoSize = false,
-                    Size = new Size(116, 24),
-                    Location = new Point(Math.Max(4, p.Width - 245), rx == 0 ? 37 : 86),
+                    Size = new Size(96, 22),
+                    Location = new Point(Math.Max(4, p.Width - 286), rx == 0 ? 30 : 73),
                     BackColor = Surface2,
                     ForeColor = Text,
                     Font = new Font("Segoe UI Semibold", 8.5f),
@@ -397,10 +397,10 @@ namespace opentuner
                 batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), 275);
                 for (int rx = 0; rx < 2; rx++)
                     if (autoScanEnabled[rx] != null)
-                        autoScanEnabled[rx].Left = Math.Max(4, batcSpectrumBox.Width - autoScanEnabled[rx].Width - 12);
+                        autoScanEnabled[rx].Left = Math.Max(4, p.Width - 408);
                 for (int rx = 0; rx < 2; rx++)
                     if (rotate30Seconds[rx] != null)
-                        rotate30Seconds[rx].Left = Math.Max(4, p.Width - 245);
+                        rotate30Seconds[rx].Left = Math.Max(4, p.Width - 286);
             };
             return p;
         }
