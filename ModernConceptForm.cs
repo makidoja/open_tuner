@@ -342,7 +342,7 @@ namespace opentuner
                     Checked = false,
                     AutoSize = false,
                     Size = new Size(114, 22),
-                    Location = new Point(Math.Max(4, p.Width - 408), rx == 0 ? 30 : 73),
+                    Location = new Point(0, 0),
                     BackColor = Surface2,
                     ForeColor = Text,
                     Font = new Font("Segoe UI Semibold", 8.5f),
@@ -371,7 +371,7 @@ namespace opentuner
                     Checked = false,
                     AutoSize = false,
                     Size = new Size(96, 22),
-                    Location = new Point(Math.Max(4, p.Width - 286), rx == 0 ? 30 : 73),
+                    Location = new Point(0, 0),
                     BackColor = Surface2,
                     ForeColor = Text,
                     Font = new Font("Segoe UI Semibold", 8.5f),
@@ -392,16 +392,40 @@ namespace opentuner
                 rotate30Seconds[rx] = rotate;
             }
 
+            // Lay out each pair together using actual font metrics and the
+            // final DPI-scaled control widths. Separate right offsets previously
+            // caused the Auto Scan background to overlap Rotate on high DPI.
+            Action positionScanControls = delegate
+            {
+                const int gap = 8;
+                const int rightMargin = 18;
+                for (int rx = 0; rx < 2; rx++)
+                {
+                    CheckBox scan = autoScanEnabled[rx];
+                    CheckBox rotate = rotate30Seconds[rx];
+                    if (scan == null || rotate == null) continue;
+
+                    scan.AutoSize = false;
+                    rotate.AutoSize = false;
+                    scan.Width = TextRenderer.MeasureText(scan.Text, scan.Font).Width + 24;
+                    rotate.Width = TextRenderer.MeasureText(rotate.Text, rotate.Font).Width + 24;
+                    scan.Height = rotate.Height = 22;
+
+                    // Both controls share a single baseline and top edge.
+                    int top = rx == 0 ? 36 : 79;
+                    int right = p.ClientSize.Width - rightMargin;
+                    int scanLeft = right - scan.Width - gap - rotate.Width;
+                    scan.Location = new Point(Math.Max(4, scanLeft), top);
+                    rotate.Location = new Point(scan.Right + gap, top);
+                }
+            };
+
             p.Resize += delegate
             {
                 batcSpectrumBox.Size = new Size(Math.Max(10, p.Width - 20), 275);
-                for (int rx = 0; rx < 2; rx++)
-                    if (autoScanEnabled[rx] != null)
-                        autoScanEnabled[rx].Left = Math.Max(4, p.Width - 408);
-                for (int rx = 0; rx < 2; rx++)
-                    if (rotate30Seconds[rx] != null)
-                        rotate30Seconds[rx].Left = Math.Max(4, p.Width - 286);
+                positionScanControls();
             };
+            positionScanControls();
             return p;
         }
 
