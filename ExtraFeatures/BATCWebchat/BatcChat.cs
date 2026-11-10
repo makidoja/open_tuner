@@ -21,25 +21,33 @@ namespace opentuner.ExtraFeatures.BATCWebchat
 
             _form = new WebChatForm(wc_settings, Source);
             ModernBatcChatEnhancements.Attach(_form, wc_settings);
+            // Restore geometry before tracking user-driven changes. The previous
+            // Resize handler overwrote saved dimensions during initial restore.
+            // Never reopen across monitors or at dimensions too small for chat.
+            Rectangle area = Screen.FromPoint(
+                new Point(wc_settings.gui_chat_x, wc_settings.gui_chat_y)).WorkingArea;
+            int maxWidth = Math.Max(640, Math.Min(1200, area.Width));
+            int maxHeight = Math.Max(420, Math.Min(850, area.Height));
+            int width = Math.Max(Math.Min(760, maxWidth),
+                Math.Min(wc_settings.gui_chat_width > 0 ? wc_settings.gui_chat_width : 900, maxWidth));
+            int height = Math.Max(Math.Min(480, maxHeight),
+                Math.Min(wc_settings.gui_chat_height > 0 ? wc_settings.gui_chat_height : 650, maxHeight));
+            int left = Math.Max(area.Left, Math.Min(wc_settings.gui_chat_x, area.Right - width));
+            int top = Math.Max(area.Top, Math.Min(wc_settings.gui_chat_y, area.Bottom - height));
+            _form.StartPosition = FormStartPosition.Manual;
+            _form.Bounds = new Rectangle(left, top, width, height);
+            _form.WindowState = wc_settings.gui_chat_windowstate == (int)FormWindowState.Maximized
+                ? FormWindowState.Maximized : FormWindowState.Normal;
+            wc_settings.gui_chat_width = width;
+            wc_settings.gui_chat_height = height;
+            wc_settings.gui_chat_x = left;
+            wc_settings.gui_chat_y = top;
+            Log.Information("[BATC-CHAT] Restored bounded window: {Width}x{Height} at {X},{Y}",
+                width, height, left, top);
+
             _form.FormClosing += _form_FormClosing;
             _form.Resize += _form_Resize;
             _form.LocationChanged += _form_LocationChanged;
-
-            Log.Information("Restoring BATCWebChat Window Position:");
-            Log.Information(" Size: (h = " + wc_settings.gui_chat_height.ToString() + ", w = " + wc_settings.gui_chat_width.ToString() + ")");
-            Log.Information(" Position: (x = " + wc_settings.gui_chat_x.ToString() + ", y = " + wc_settings.gui_chat_y.ToString() + ")");
-
-            if (wc_settings.gui_chat_width > 0)
-            {
-                _form.Size = new Size(wc_settings.gui_chat_width, wc_settings.gui_chat_height);
-            }
-            else
-            {
-                wc_settings.gui_chat_width = _form.Size.Width;
-                wc_settings.gui_chat_height = _form.Size.Height;
-            }
-            _form.Location = new Point(wc_settings.gui_chat_x, wc_settings.gui_chat_y);
-            _form.WindowState = (FormWindowState)wc_settings.gui_chat_windowstate;
             if (wc_settings.gui_autostart)
             {
                 _form.Show();
