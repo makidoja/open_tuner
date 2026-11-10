@@ -26,6 +26,23 @@ namespace opentuner
         {
             InitializeComponent();
 
+            // Both the old plain ListBox and the formatted RichTextBox occupy
+            // the same Dock.Fill area. Always put the styled transcript above
+            // the unused legacy control, even after the form is shown.
+            lbChat.Visible = false;
+            richChat.Visible = true;
+            richChat.BringToFront();
+            richChat.BorderStyle = BorderStyle.None;
+            Shown += delegate
+            {
+                if (!IsDisposed && !richChat.IsDisposed)
+                {
+                    lbChat.Visible = false;
+                    richChat.Visible = true;
+                    richChat.BringToFront();
+                }
+            };
+
             _settings = Settings;
             _source = Source;
             consoleFont = new Font("Consolas", _settings.chat_font_size);
