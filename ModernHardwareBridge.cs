@@ -19,6 +19,15 @@ namespace opentuner
             }
         }
 
+        public bool BackendDualPicoTunerEnabled
+        {
+            get
+            {
+                WinterHillSource wh = BackendWinterHill();
+                return wh != null && wh.ModernDualPicoTunerEnabled;
+            }
+        }
+
         public int BackendGetLnbVoltage(int output)
         {
             WinterHillSource wh = BackendWinterHill();
