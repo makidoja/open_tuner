@@ -51,6 +51,38 @@ namespace opentuner.MediaSources.Minitiouner
         public override event SourceDataChange OnSourceData;
 
         private List<StoredFrequency> _frequency_presets = null;
+        private readonly object tsStatsLock = new object();
+        private readonly TSStatus[] tsStats = new TSStatus[2];
+        private readonly double[] tsMbps = new double[2];
+        private readonly DateTime[] tsLastUpdated = new DateTime[2];
+        private readonly DateTime[] tsLastCounterTime = new DateTime[2];
+        private readonly uint[] tsLastCount = new uint[2];
+        private readonly string[] videoCodecs = new string[2];
+        private readonly string[] videoResolutions = new string[2];
+        private readonly string[] audioCodecs = new string[2];
+        private readonly string[] audioRates = new string[2];
+
+        private void ApplyTsAndMedia(int rx, OTSourceData data)
+        {
+            lock (tsStatsLock)
+            {
+                TSStatus status = tsStats[rx];
+                if (status != null && (DateTime.UtcNow - tsLastUpdated[rx]).TotalSeconds < 15)
+                {
+                    data.ts_metrics_available = true;
+                    data.ts_bitrate_mbps = tsMbps[rx];
+                    data.null_packets_percent = status.NullPacketsPerc;
+                    data.service_provider = status.ServiceProvider ?? "";
+                    if (string.IsNullOrWhiteSpace(data.service_name))
+                        data.service_name = status.ServiceName ?? "";
+                    data.streaming = data.demod_locked && status.TotalTSPackets > 0;
+                }
+                data.video_codec = videoCodecs[rx] ?? "";
+                data.video_resolution = videoResolutions[rx] ?? "";
+                data.audio_codec = audioCodecs[rx] ?? "";
+                data.audio_rate = audioRates[rx] ?? "";
+            }
+        }
         private bool BuildSourceProperties()
         {
             if (_parent == null)
@@ -343,6 +375,27 @@ namespace opentuner.MediaSources.Minitiouner
             _tuner.UpdateValue("service_name_provider", ts_status.ServiceProvider);
             _tuner.UpdateValue("null_packets", ts_status.NullPacketsPerc.ToString() + "%");
 
+            int rx = tuner - 1;
+            if (rx >= 0 && rx < 2)
+            {
+                lock (tsStatsLock)
+                {
+                    DateTime now = DateTime.UtcNow;
+                    if (tsLastCounterTime[rx] != DateTime.MinValue &&
+                        ts_status.TotalTSPackets >= tsLastCount[rx])
+                    {
+                        double seconds = (now - tsLastCounterTime[rx]).TotalSeconds;
+                        if (seconds > 0.2)
+                            tsMbps[rx] = (ts_status.TotalTSPackets - tsLastCount[rx])
+                                * (188.0 * 8.0 / 1000000.0) / seconds;
+                    }
+                    else tsMbps[rx] = 0;
+                    tsLastCount[rx] = ts_status.TotalTSPackets;
+                    tsLastCounterTime[rx] = now;
+                    tsLastUpdated[rx] = now;
+                    tsStats[rx] = ts_status;
+                }
+            }
             if (tuner == 1)
             {
                 last_service_name_0 = ts_status.ServiceName;
@@ -371,6 +424,16 @@ namespace opentuner.MediaSources.Minitiouner
             _tuner.UpdateValue("video_resolution", video_res);
             _tuner.UpdateValue("audio_codec", media_status.AudioCodec);
             _tuner.UpdateValue("audio_rate", audio_rate);
+            lock (tsStatsLock)
+            {
+                if (player >= 0 && player < 2)
+                {
+                    videoCodecs[player] = media_status.VideoCodec;
+                    videoResolutions[player] = video_res;
+                    audioCodecs[player] = media_status.AudioCodec;
+                    audioRates[player] = audio_rate;
+                }
+            }
         }
 
         private void UpdateTunerProperties(TunerStatus new_status)
@@ -515,6 +578,15 @@ namespace opentuner.MediaSources.Minitiouner
             
             source_data.demod_locked = (new_status.T1P2_demod_status >  1);
             source_data.constellation = source_data.demod_locked ? new_status.T1P2_constellation : null;
+            source_data.tuner_metrics_available = true;
+            source_data.nim_frequency = GetFrequency(0, false);
+            source_data.frequency_offset = current_offset_0;
+            source_data.rf_input = new_status.T1P2_rf_input == 1 ? "A" : "B";
+            source_data.rf_input_level = new_status.T1P2_input_power_level;
+            source_data.ber = new_status.T1P2_ber;
+            source_data.carrier_offset = new_status.T1P2_frequency_carrier_offset;
+            source_data.ldpc_errors = new_status.errors_ldpc_count;
+            ApplyTsAndMedia(0, source_data);
 
             OnSourceData?.Invoke(0, source_data, "Tuner 1");
 
@@ -624,6 +696,15 @@ namespace opentuner.MediaSources.Minitiouner
                 source_data_2.demod_locked = (new_status.T2P1_demod_status > 1);
                 source_data_2.constellation = source_data_2.demod_locked ? new_status.T2P1_constellation : null;
                 source_data_2.symbol_rate = (int)(new_status.T2P1_symbol_rate / 1000);
+                source_data_2.tuner_metrics_available = true;
+                source_data_2.nim_frequency = GetFrequency(1, false);
+                source_data_2.frequency_offset = current_offset_1;
+                source_data_2.rf_input = new_status.T2P1_rf_input == 1 ? "A" : "B";
+                source_data_2.rf_input_level = new_status.T2P1_input_power_level;
+                source_data_2.ber = new_status.T2P1_ber;
+                source_data_2.carrier_offset = new_status.T2P1_frequency_carrier_offset;
+                source_data_2.ldpc_errors = new_status.errors_ldpc_count;
+                ApplyTsAndMedia(1, source_data_2);
 
                 if (_media_player.Count > 1)
                 {
