@@ -489,7 +489,7 @@ namespace opentuner
 
             lockLabels[tuner] = new Label { Name = "ModernReceiverLock" + tuner, Text = "NO LOCK", Location = new Point(4, 51), Size = new Size(105, 28), TextAlign = ContentAlignment.MiddleCenter, ForeColor = Muted, BackColor = Surface2, Font = new Font("Segoe UI Semibold", 9f) };
             controls.Controls.Add(lockLabels[tuner]);
-            serviceLabels[tuner] = new Label { Name = "ModernReceiverService" + tuner, Text = "Waiting for service", Location = new Point(120, 55), Size = new Size(220, 24), ForeColor = Muted };
+            serviceLabels[tuner] = new Label { Name = "ModernReceiverService" + tuner, Text = "Waiting", Location = new Point(120, 55), Size = new Size(220, 24), ForeColor = Muted };
             controls.Controls.Add(serviceLabels[tuner]);
             merLabels[tuner] = new Label { Text = "MER  — dB", Location = new Point(350, 55), Size = new Size(95, 24), ForeColor = Text };
             controls.Controls.Add(merLabels[tuner]);
@@ -975,7 +975,7 @@ namespace opentuner
         private void ApplyData(int tuner, OTSourceData data)
         {
             if (tuner >= visibleTuners || tuner < 0) return;
-            serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
+            serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
             // Quick-tune markers are currently available for RX1/RX2 only.
             if (tuner < 2 && activeQuickTuneSpectrum != null)
