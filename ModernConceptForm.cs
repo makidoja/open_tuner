@@ -829,7 +829,7 @@ namespace opentuner
             // Never reserve the bottom of a video quadrant for diagnostics.
             panel.SuspendLayout();
             panel.Dock = compact ? DockStyle.Left : DockStyle.Bottom;
-            if (compact) panel.Width = 252;
+            if (compact) panel.Width = 340; // Wider 4-RX diagnostics: two readable Tuner Data columns
             else panel.Height = 164;
             panel.ResumeLayout(true);
             if (!compact)
