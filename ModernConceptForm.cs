@@ -823,7 +823,7 @@ namespace opentuner
         {
             Panel panel = receiverControls[rx];
             if (panel == null) return;
-            panel.Height = compact ? 117 : 220;
+            panel.Height = compact ? 105 : 174;
             if (!compact)
             {
                 foreach (Control control in panel.Controls)
