@@ -13,6 +13,8 @@ namespace opentuner
         private static Label hardwareLabel;
         private static ComboBox lnbA;
         private static ComboBox lnbB;
+        private static ComboBox lnb2A;
+        private static ComboBox lnb2B;
         private static readonly Label[] detailLabels = new Label[4];
         private static readonly ComboBox[] rfInputs = new ComboBox[4];
         private static readonly TextBox[] freqText = new TextBox[4];
@@ -87,8 +89,14 @@ namespace opentuner
 
             lnbA = BuildLnbCombo("ModernLnbA", "LNB A", 0, backend);
             lnbB = BuildLnbCombo("ModernLnbB", "LNB B", 1, backend);
+            lnb2A = BuildLnbCombo("ModernLnb2A", "2 LNB A", 2, backend);
+            lnb2B = BuildLnbCombo("ModernLnb2B", "2 LNB B", 3, backend);
             bar.Controls.Add(lnbA);
             bar.Controls.Add(lnbB);
+            bar.Controls.Add(lnb2A);
+            bar.Controls.Add(lnb2B);
+            lnb2A.Visible = false;
+            lnb2B.Visible = false;
 
             Timer refresh = new Timer { Interval = 500 };
             refresh.Tick += delegate
@@ -99,13 +107,26 @@ namespace opentuner
                 hardwareLabel.Text = string.IsNullOrWhiteSpace(hardware) ? "HW: —" : "HW: " + hardware;
 
                 bool enabled = backend.BackendSupportsLnbPower;
+                bool dual = enabled && backend.BackendDualPicoTunerEnabled;
                 lnbA.Enabled = enabled;
                 lnbB.Enabled = enabled;
+                lnb2A.Enabled = dual;
+                lnb2B.Enabled = dual;
 
+                // The native combos are replaced by dark themed buttons.
+                // Show/hide their proxy buttons too when changing source.
+                SetLnbControlVisibility(bar, lnb2A, dual);
+                SetLnbControlVisibility(bar, lnb2B, dual);
+                SetLnbLabels(dual);
                 if (enabled)
                 {
                     SetComboVoltage(lnbA, backend.BackendGetLnbVoltage(0));
                     SetComboVoltage(lnbB, backend.BackendGetLnbVoltage(1));
+                    if (dual)
+                    {
+                        SetComboVoltage(lnb2A, backend.BackendGetLnbVoltage(2));
+                        SetComboVoltage(lnb2B, backend.BackendGetLnbVoltage(3));
+                    }
                 }
 
                 NumericUpDown[] hiddenFreq = GetFreqInputs(form);
@@ -149,6 +170,42 @@ namespace opentuner
                 }
             };
             refresh.Start();
+        }
+
+        private static void SetLnbLabels(bool dual)
+        {
+            // Preserve familiar labels for single-PicoTuner users.
+            string[] prefixes = dual ?
+                new string[] { "1 LNB A", "1 LNB B", "2 LNB A", "2 LNB B" } :
+                new string[] { "LNB A", "LNB B", "2 LNB A", "2 LNB B" };
+            ComboBox[] combos = { lnbA, lnbB, lnb2A, lnb2B };
+            for (int i = 0; i < combos.Length; i++)
+            {
+                ComboBox combo = combos[i];
+                if (combo == null || combo.Items.Count != 3) continue;
+                string[] values = { ": OFF", ": 13V V", ": 18V H" };
+                bool rename = false;
+                for (int j = 0; j < 3; j++)
+                    if (!string.Equals(combo.GetItemText(combo.Items[j]),
+                        prefixes[i] + values[j], StringComparison.Ordinal)) rename = true;
+                if (!rename) continue;
+                int selected = combo.SelectedIndex;
+                combo.Items.Clear();
+                foreach (string value in values) combo.Items.Add(prefixes[i] + value);
+                combo.SelectedIndex = selected < 0 ? 0 : selected;
+            }
+        }
+
+        private static void SetLnbControlVisibility(FlowLayoutPanel bar, ComboBox combo, bool visible)
+        {
+            if (combo == null || bar == null) return;
+            Control proxy = bar.Controls[combo.Name + "Button"];
+            if (proxy != null)
+            {
+                proxy.Visible = visible;
+                combo.Visible = false;
+            }
+            else combo.Visible = visible;
         }
 
         private static ComboBox BuildLnbCombo(string name, string prefix, int output, MainForm backend)
