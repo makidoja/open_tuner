@@ -675,8 +675,12 @@ namespace opentuner.MediaSources.WinterHill
                     source_data.nim_frequency = GetFrequency(c, false);
                     source_data.frequency_offset = _current_offset[c];
                     source_data.rf_input = rx.rfport == 0 ? "A" : "B";
-                    source_data.tuner_metrics_available = true;
-                    source_data.streaming = playing[c];
+                    // BER, carrier offset and LDPC counters are not currently
+                    // exposed by this Winter Hill status decoder; don't present
+                    // invented zero measurements as valid diagnostics.
+                    source_data.tuner_metrics_available = false;
+                    source_data.streaming = playing[c] &&
+                        System.Threading.Interlocked.Read(ref tsReceivedBytes[c]) > 0;
                     source_data.recording = _recorders[c] != null && _recorders[c].record;
                     source_data.video_codec = receivedVideoCodec[c] ?? "";
                     source_data.video_resolution = receivedVideoResolution[c] ?? "";
