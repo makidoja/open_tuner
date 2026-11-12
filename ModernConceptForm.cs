@@ -823,7 +823,7 @@ namespace opentuner
         {
             Panel panel = receiverControls[rx];
             if (panel == null) return;
-            panel.Height = compact ? 105 : 164;
+            panel.Height = compact ? 126 : 164;
             if (!compact)
             {
                 foreach (Control control in panel.Controls)
@@ -888,7 +888,20 @@ namespace opentuner
             panel.ResumeLayout(true);
         }
 
-        internal int ModernReceiverCount { get { return visibleTuners; } }
+        // Active presentation may show fewer receivers than the attached device.
+        internal int ModernReceiverCount
+        {
+            get
+            {
+                if (layoutCombo != null && layoutCombo.Enabled)
+                {
+                    string selected = layoutCombo.SelectedItem as string;
+                    if (selected == "1 RX") return 1;
+                    if (selected == "2 RX") return Math.Min(2, visibleTuners);
+                }
+                return visibleTuners;
+            }
+        }
 
         private void Tune(int tuner)
         {
