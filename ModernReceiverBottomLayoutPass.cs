@@ -1,6 +1,9 @@
 using System;
 using System.Drawing;
+using System.Globalization;
+using System.Reflection;
 using System.Windows.Forms;
+using opentuner.MediaSources;
 
 namespace opentuner
 {
@@ -9,6 +12,13 @@ namespace opentuner
         private static bool attached;
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
         private static readonly Color Muted = Color.FromArgb(142, 165, 190);
+        private static readonly TabControl[] infoTabs = new TabControl[2];
+        private static readonly Label[] currentFreq = new Label[2];
+        private static readonly Label[] currentMer = new Label[2];
+        private static readonly Label[] currentMargin = new Label[2];
+        private static readonly Panel[] currentMerBar = new Panel[2];
+        private static readonly Panel[] currentMarginBar = new Panel[2];
+        private static readonly Label[,] dataLabels = new Label[2, 4];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -18,6 +28,7 @@ namespace opentuner
             form.Shown += delegate
             {
                 Apply(form);
+                HookInfoTelemetry(form);
                 form.Resize += delegate { Apply(form); };
             };
         }
@@ -41,7 +52,7 @@ namespace opentuner
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
 
                 LayoutTunerBox(tunerBox, tuner);
-                LayoutReceiverStatusAndButtons(controls, tunerBox);
+                LayoutReceiverStatusAndButtons(controls, tunerBox, tuner);
                 tunerBox.BringToFront();
             }
         }
@@ -104,7 +115,7 @@ namespace opentuner
             }
         }
 
-        private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox)
+        private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox, int tuner)
         {
             Label volIcon = FindLabelExact(controls, "🔊");
             if (volIcon != null) { volIcon.Location = new Point(4, 4); volIcon.Size = new Size(24, 30); }
@@ -151,62 +162,192 @@ namespace opentuner
                 service.TextAlign = ContentAlignment.MiddleCenter;
             }
 
-            // Compact the live frequency readout and group MER/Margin
-            // immediately below it. Leave the right-hand status area free
-            // for additional telemetry in a future release.
-            Label freq = FindLargestFrequencyLabel(controls);
-            if (freq != null)
-            {
-                freq.Location = new Point(4, 42);
-                freq.Size = new Size(225, 36);
-                freq.Font = new Font("Segoe UI Semibold", 18f);
-            }
+            LayoutInfoTabs(controls, tunerBox, tuner);
+        }
 
-            Label mer = FindLabelStarts(controls, "MER");
-            Label margin = FindLabelStarts(controls, "Margin");
-            if (mer != null)
+        // The left-hand bottom section is selectable. Reparent existing live
+        // telemetry controls, rather than creating duplicates or changing any
+        // receiver event handlers.
+        private static void LayoutInfoTabs(Panel controls, Panel tunerBox, int tuner)
+        {
+            TabControl tabs = infoTabs[tuner];
+            if (tabs == null || tabs.IsDisposed)
             {
-                mer.AutoSize = false;
-                mer.Location = new Point(4, 83);
-                mer.Size = new Size(122, 23);
-                mer.Font = new Font("Segoe UI Semibold", 10f);
-                mer.ForeColor = Text;
-            }
-            if (margin != null)
-            {
-                margin.AutoSize = false;
-                margin.Location = new Point(133, 83);
-                margin.Size = new Size(132, 23);
-                margin.Font = new Font("Segoe UI Semibold", 10f);
-                margin.ForeColor = Text;
-            }
+                Label freq = FindLargestFrequencyLabel(controls);
+                Label mer = FindLabelStarts(controls, "MER");
+                Label margin = FindLabelStarts(controls, "Margin");
+                if (freq == null || mer == null || margin == null) return;
 
-            foreach (Control c in controls.Controls)
-            {
-                Panel p = c as Panel;
-                if (p == null || p == tunerBox || p.Height != 11) continue;
-
-                if (IsMerBar(p))
+                currentFreq[tuner] = freq;
+                currentMer[tuner] = mer;
+                currentMargin[tuner] = margin;
+                foreach (Control child in controls.Controls)
                 {
-                    p.Location = new Point(4, 109);
-                    p.Size = new Size(115, 11);
+                    Panel bar = child as Panel;
+                    if (bar == null || bar == tunerBox || bar.Height != 11) continue;
+                    if (IsMerBar(bar)) currentMerBar[tuner] = bar;
+                    else if (IsMarginBar(bar)) currentMarginBar[tuner] = bar;
                 }
-                else if (IsMarginBar(p))
+
+                tabs = new TabControl
                 {
-                    p.Location = new Point(133, 109);
-                    p.Size = new Size(115, 11);
+                    Name = "ModernReceiverInfoTabs" + tuner,
+                    DrawMode = TabDrawMode.OwnerDrawFixed,
+                    SizeMode = TabSizeMode.Fixed,
+                    ItemSize = new Size(120, 21),
+                    BackColor = Color.FromArgb(13, 28, 45),
+                    ForeColor = Text,
+                    Font = new Font("Segoe UI Semibold", 8f)
+                };
+                tabs.DrawItem += delegate(object sender, DrawItemEventArgs e)
+                {
+                    if (e.Index < 0) return;
+                    Rectangle rect = e.Bounds;
+                    bool selected = e.Index == tabs.SelectedIndex;
+                    using (Brush bg = new SolidBrush(selected ?
+                        Color.FromArgb(34, 68, 98) : Color.FromArgb(17, 35, 52)))
+                        e.Graphics.FillRectangle(bg, rect);
+                    TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text,
+                        tabs.Font, rect, selected ? Text : Muted,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                };
+
+                foreach (string name in new[] { "Current", "TS Info", "Tuner Data" })
+                    tabs.TabPages.Add(new TabPage(name)
+                    {
+                        BackColor = Color.FromArgb(13, 28, 45),
+                        ForeColor = Text,
+                        UseVisualStyleBackColor = false,
+                        Padding = new Padding(3)
+                    });
+
+                TabPage current = tabs.TabPages[0];
+                current.Controls.Add(freq);
+                current.Controls.Add(mer);
+                current.Controls.Add(margin);
+                if (currentMerBar[tuner] != null) current.Controls.Add(currentMerBar[tuner]);
+                if (currentMarginBar[tuner] != null) current.Controls.Add(currentMarginBar[tuner]);
+
+                for (int page = 1; page <= 2; page++)
+                {
+                    for (int col = 0; col < 2; col++)
+                    {
+                        Label label = new Label
+                        {
+                            AutoSize = false,
+                            Font = new Font("Segoe UI", 8.5f),
+                            ForeColor = Text,
+                            BackColor = Color.Transparent,
+                            Text = "Waiting for receiver data...",
+                            TextAlign = ContentAlignment.TopLeft
+                        };
+                        dataLabels[tuner, (page - 1) * 2 + col] = label;
+                        tabs.TabPages[page].Controls.Add(label);
+                    }
                 }
+
+                // The original live details string continues updating, but
+                // belongs with tuner diagnostics rather than overlapping the
+                // new information box.
+                Label detail = FindDetailsLabel(controls);
+                if (detail != null)
+                {
+                    tabs.TabPages[2].Controls.Add(detail);
+                    detail.Font = new Font("Segoe UI", 8f);
+                    detail.ForeColor = Muted;
+                    detail.Anchor = AnchorStyles.Left | AnchorStyles.Top;
+                }
+
+                controls.Controls.Add(tabs);
+                tabs.BringToFront();
+                infoTabs[tuner] = tabs;
             }
 
-            Label details = FindDetailsLabel(controls);
+            int available = Math.Max(355, tunerBox.Left - 9);
+            tabs.Bounds = new Rectangle(4, 39, Math.Min(438, available),
+                Math.Max(120, controls.ClientSize.Height - 43));
+            TabPage pageCurrent = tabs.TabPages[0];
+            if (currentFreq[tuner] != null)
+            {
+                currentFreq[tuner].Location = new Point(5, 1);
+                currentFreq[tuner].Size = new Size(245, 35);
+                currentFreq[tuner].Font = new Font("Segoe UI Semibold", 17f);
+            }
+            if (currentMer[tuner] != null)
+            {
+                currentMer[tuner].AutoSize = false;
+                currentMer[tuner].Bounds = new Rectangle(5, 40, 119, 22);
+                currentMer[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
+            }
+            if (currentMargin[tuner] != null)
+            {
+                currentMargin[tuner].AutoSize = false;
+                currentMargin[tuner].Bounds = new Rectangle(130, 40, 140, 22);
+                currentMargin[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
+            }
+            if (currentMerBar[tuner] != null)
+                currentMerBar[tuner].Bounds = new Rectangle(5, 65, 111, 11);
+            if (currentMarginBar[tuner] != null)
+                currentMarginBar[tuner].Bounds = new Rectangle(130, 65, 111, 11);
+            for (int page = 1; page <= 2; page++)
+                for (int col = 0; col < 2; col++)
+                {
+                    Label label = dataLabels[tuner, (page - 1) * 2 + col];
+                    if (label == null) continue;
+                    int left = col == 0 ? 7 : pageCurrent.ClientSize.Width / 2 + 2;
+                    label.Bounds = new Rectangle(left, 7,
+                        Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 86);
+                }
+            Label details = FindDetailsLabel(tabs.TabPages[2]);
             if (details != null)
             {
-                details.Anchor = AnchorStyles.Left | AnchorStyles.Bottom;
-                details.Location = new Point(4, Math.Max(0, controls.ClientSize.Height - 22));
-                details.Size = new Size(Math.Max(290, tunerBox.Left - 12), 20);
-                details.Font = new Font("Segoe UI Semibold", 9.25f);
-                details.ForeColor = Text;
+                details.Bounds = new Rectangle(7, 88, Math.Max(250, pageCurrent.ClientSize.Width - 14), 18);
+                details.AutoSize = false;
             }
+        }
+
+        private static string ValueOrDash(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "—" : value.Trim();
+        }
+
+        private static void HookInfoTelemetry(ModernConceptForm form)
+        {
+            FieldInfo field = typeof(ModernConceptForm).GetField("backend",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            MainForm backend = field == null ? null : field.GetValue(form) as MainForm;
+            if (backend == null) return;
+            backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
+            {
+                if (tuner < 0 || tuner >= 2 || data == null ||
+                    form.IsDisposed || !form.IsHandleCreated) return;
+                try
+                {
+                    form.BeginInvoke((MethodInvoker)delegate
+                    {
+                        if (form.IsDisposed || dataLabels[tuner, 0] == null ||
+                            dataLabels[tuner, 0].IsDisposed) return;
+                        string mbps = data.streaming && data.ts_bitrate_mbps > 0 ?
+                            data.ts_bitrate_mbps.ToString("0.00", CultureInfo.InvariantCulture) + " Mbps" : "—";
+                        string nulls = data.streaming ?
+                            data.null_packets_percent.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—";
+                        dataLabels[tuner, 0].Text = "TS bitrate:  " + mbps + "\nNull packets:  " + nulls +
+                            "\nStreaming:  " + (data.streaming ? "Yes" : "No");
+                        dataLabels[tuner, 1].Text = "Video:  " + ValueOrDash(data.video_codec) +
+                            "\nResolution:  " + ValueOrDash(data.video_resolution) +
+                            "\nAudio:  " + ValueOrDash(data.audio_codec) +
+                            "\nAudio rate:  " + ValueOrDash(data.audio_rate);
+                        dataLabels[tuner, 2].Text = "Demod:  " + ValueOrDash(data.demode_state) +
+                            "\nSystem:  " + ValueOrDash(data.delivery_system) +
+                            "\nModcod:  " + ValueOrDash(data.modcode);
+                        dataLabels[tuner, 3].Text = "Symbol rate:  " +
+                            (data.symbol_rate > 0 ? data.symbol_rate + " kS" : "—") +
+                            "\nService:  " + ValueOrDash(data.service_name) +
+                            "\nProvider:  " + ValueOrDash(data.service_provider);
+                    });
+                }
+                catch (InvalidOperationException) { }
+            };
         }
 
         private static bool IsMerBar(Panel p)
