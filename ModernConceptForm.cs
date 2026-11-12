@@ -61,7 +61,7 @@ namespace opentuner
         private readonly double[] rotationFrequencyMHz = new double[2];
         private readonly DateTime[] noLockSince = new DateTime[2];
         private readonly DateTime[] lastAutoTune = new DateTime[2];
-        private readonly DateTime[] lastSignalStatus = new DateTime[2];
+        private readonly DateTime[] lastSignalStatus = new DateTime[4];
         private readonly double[] lastAutoFrequency = new double[2];
         private readonly string[] autoScanState = new string[] { "OFF", "OFF" };
         private readonly Label[] autoScanStatusLabels = new Label[2];
@@ -935,7 +935,8 @@ namespace opentuner
             if (tuner >= visibleTuners || tuner < 0) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
-            if (activeQuickTuneSpectrum != null)
+            // Quick-tune markers are currently available for RX1/RX2 only.
+            if (tuner < 2 && activeQuickTuneSpectrum != null)
             {
                 if (data.demod_locked && data.frequency > 0)
                     activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
