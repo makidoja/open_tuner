@@ -20,6 +20,7 @@ namespace opentuner
         private readonly MainForm backend;
         private readonly OTSourceData[] lastData = new OTSourceData[4];
         private readonly Panel[] videoHosts = new Panel[4];
+        private readonly HashSet<Control> arrangedVideoControls = new HashSet<Control>();
         private readonly NumericUpDown[] freqInputs = new NumericUpDown[4];
         private readonly NumericUpDown[] srInputs = new NumericUpDown[4];
         private readonly Label[] liveFreq = new Label[4];
@@ -585,6 +586,7 @@ namespace opentuner
                     Serilog.Log.Information("[CONNECT-DIAG] Disconnect returned={Result}", resetOk);
                     connectRequested = false;
                     audioInitialised = false;
+                    arrangedVideoControls.Clear();
                     visibleTuners = SelectedSourceIsLongmynd() ? 1 : 2;
                     RefreshLayoutOptions();
                     ApplyReceiverCount();
@@ -1281,6 +1283,7 @@ namespace opentuner
                 if (controls == null) continue;
 
                 Control renderer = null;
+                bool needsReorder = false;
                 List<Control> overlays = new List<Control>();
 
                 foreach (Control c in controls)
@@ -1288,7 +1291,14 @@ namespace opentuner
                     if (c == null || c.IsDisposed) continue;
 
                     if (c.Parent != videoHosts[i])
+                    {
                         videoHosts[i].Controls.Add(c);
+                        needsReorder = true;
+                    }
+                    // Avoid forcing native video HWND z-order updates every
+                    // 300 ms. Reorder only when a new renderer/overlay appears.
+                    if (arrangedVideoControls.Add(c))
+                        needsReorder = true;
 
                     if (IsVideoRenderer(c))
                     {
@@ -1307,11 +1317,14 @@ namespace opentuner
                     }
                 }
 
-                if (renderer != null)
-                    renderer.SendToBack();
+                if (needsReorder)
+                {
+                    if (renderer != null)
+                        renderer.SendToBack();
 
-                foreach (Control overlay in overlays)
-                    overlay.BringToFront();
+                    foreach (Control overlay in overlays)
+                        overlay.BringToFront();
+                }
             }
         }
 
