@@ -509,18 +509,18 @@ namespace opentuner
                         }
                         else
                         {
-                            // Four independent four-line metric groups instead of
-                            // two eight-line strings. This prevents long values
-                            // wrapping into the row below in narrow 4 RX panes.
+                            // Two compact, aligned rows of four-line groups.
+                            // Previously the 88px stride left a large blank
+                            // band between rows and made diagnostics look split.
                             int gutter = 8;
                             int width = Math.Max(90, (pagePanel.ClientSize.Width - 12 - gutter) / 2);
                             int x = 6 + (col % 2) * (width + gutter);
-                            int y = 4 + (col / 2) * 88;
-                            label.Bounds = new Rectangle(x, y, width, 83);
+                            int y = 5 + (col / 2) * 64;
+                            label.Bounds = new Rectangle(x, y, width, 61);
                             label.AutoEllipsis = true;
                             label.UseMnemonic = false;
                             label.Visible = true;
-                            label.Font = new Font("Segoe UI", 7.5f);
+                            label.Font = new Font("Segoe UI", 8f);
                         }
                     }
                     else
