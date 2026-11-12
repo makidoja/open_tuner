@@ -420,30 +420,54 @@ namespace opentuner
                 infoPages[tuner, page].SendToBack();
             }
             Panel pageCurrent = infoPages[tuner, 0];
+            // Scale Current diagnostics to the actual available panel space.
+            // In 4 RX the tall sidebar has room for larger, legible readings;
+            // in 1/2 RX the shallow panel still needs to fit without clipping.
+            int panelWidth = Math.Max(140, pageCurrent.ClientSize.Width);
+            int panelHeight = Math.Max(85, pageCurrent.ClientSize.Height);
+            bool tallInfo = panelHeight >= 155;
+            int freqHeight = tallInfo ? 47 : 37;
+            int merTop = tallInfo ? 61 : 44;
+            int marginTop = tallInfo ? 112 : 83;
+            int metricHeight = tallInfo ? 30 : 25;
+            int metricTextWidth = compact4 ? Math.Min(150, panelWidth - 100) :
+                Math.Min(190, panelWidth - 100);
+            int barLeft = Math.Max(140, metricTextWidth + 12);
+            int barWidth = Math.Max(30, panelWidth - barLeft - 14);
+            int barHeight = tallInfo ? 19 : 15;
             if (currentFreq[tuner] != null)
             {
-                currentFreq[tuner].Location = new Point(5, 1);
-                currentFreq[tuner].Size = new Size(compact4 ? 195 : 270, compact4 ? 25 : 37);
-                currentFreq[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 11f : 17f);
+                currentFreq[tuner].AutoSize = false;
+                currentFreq[tuner].Bounds = new Rectangle(8, 5,
+                    Math.Max(100, panelWidth - 18), freqHeight);
+                currentFreq[tuner].Font = new Font("Segoe UI Semibold",
+                    tallInfo ? 20f : 17f);
+                currentFreq[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
-            // Restore the original vertical metric order under the live
-            // frequency, while leaving the right side for Constellation.
             if (currentMer[tuner] != null)
             {
                 currentMer[tuner].AutoSize = false;
-                currentMer[tuner].Bounds = new Rectangle(8, compact4 ? 27 : 51, compact4 ? 90 : 130, compact4 ? 18 : 26);
-                currentMer[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
+                currentMer[tuner].Bounds = new Rectangle(8, merTop,
+                    metricTextWidth, metricHeight);
+                currentMer[tuner].Font = new Font("Segoe UI Semibold",
+                    tallInfo ? 12.5f : 11f);
+                currentMer[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
             if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(86, 30, 52, 11) : new Rectangle(147, 55, 180, 19);
+                currentMerBar[tuner].Bounds = new Rectangle(barLeft,
+                    merTop + (metricHeight - barHeight) / 2, barWidth, barHeight);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
-                currentMargin[tuner].Bounds = new Rectangle(8, compact4 ? 49 : 103, compact4 ? 90 : 133, compact4 ? 18 : 26);
-                currentMargin[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
+                currentMargin[tuner].Bounds = new Rectangle(8, marginTop,
+                    metricTextWidth, metricHeight);
+                currentMargin[tuner].Font = new Font("Segoe UI Semibold",
+                    tallInfo ? 12.5f : 11f);
+                currentMargin[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(86, 52, 52, 11) : new Rectangle(147, 107, 180, 19);
+                currentMarginBar[tuner].Bounds = new Rectangle(barLeft,
+                    marginTop + (metricHeight - barHeight) / 2, barWidth, barHeight);
             // In 4 RX each info panel is narrow and tall, alongside video:
             // use two columns. For 1/2 RX keep the four-column horizontal TS layout.
             for (int page = 1; page <= 2; page++)
