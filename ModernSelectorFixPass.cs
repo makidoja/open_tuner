@@ -145,9 +145,13 @@ namespace opentuner
             if (combo == null || combo.Parent == null) return null;
 
             Control existing = combo.Parent.Controls[buttonName];
+            int desiredHeight = buttonName.StartsWith("ModernLnb", StringComparison.Ordinal)
+                ? 30 : buttonName.StartsWith("ModernSrButton", StringComparison.Ordinal) ||
+                  buttonName.StartsWith("ModernRfButton", StringComparison.Ordinal)
+                ? 29 : Math.Max(30, combo.Height);
             if (existing is Button)
             {
-                existing.Bounds = combo.Bounds;
+                existing.Bounds = new Rectangle(combo.Left, combo.Top, combo.Width, desiredHeight);
                 existing.Visible = true;
                 combo.Visible = false;
                 return (Button)existing;
@@ -159,7 +163,7 @@ namespace opentuner
             {
                 Name = buttonName,
                 Location = combo.Location,
-                Size = combo.Size,
+                Size = new Size(combo.Width, desiredHeight),
                 Anchor = combo.Anchor,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Surface2,
@@ -229,16 +233,23 @@ namespace opentuner
             {
                 if (!button.IsDisposed && !combo.IsDisposed)
                 {
-                    button.Bounds = combo.Bounds;
+                    // Native WinForms DropDownList controls clamp their height.
+                    // Never transfer that clamped height to the themed button.
+                    // In a FlowLayoutPanel, BringToFront changes the toolbar
+                    // *order*, so never call it for LNB controls.
+                    button.Bounds = new Rectangle(combo.Left, combo.Top,
+                        combo.Width, desiredHeight);
                     button.Anchor = combo.Anchor;
-                    button.BringToFront();
+                    if (!(button.Parent is FlowLayoutPanel))
+                        button.BringToFront();
                 }
             };
             combo.LocationChanged += syncBounds;
             combo.SizeChanged += syncBounds;
 
             combo.Parent.Controls.Add(button);
-            button.BringToFront();
+            if (!(button.Parent is FlowLayoutPanel))
+                button.BringToFront();
             combo.Visible = false;
             return button;
         }
