@@ -21,7 +21,6 @@ namespace opentuner
         private List<signal.Sig> signals = new List<signal.Sig>();
         private readonly signal.Sig?[] tuned = new signal.Sig?[2];
         private readonly double[] lockedFrequencyMHz = new double[2];
-        private readonly double[] lockedMerDb = new double[2];
         private readonly string[] lockedServiceName = new string[2];
         private readonly DateTime[] lockedAtUtc = new DateTime[2];
         private bool connected;
@@ -90,9 +89,8 @@ namespace opentuner
                 lock (signalLock)
                 {
                     detector.detect_signals(copy);
-                    detector.updateSignalList();
-                    // The reconciled list retains callsigns matched to the
-                    // previous FFT detections; the raw list does not.
+                    // detect_signals already reconciles its station list.
+                    // Read that list so callsign and dBb are preserved.
                     detected = detector.signalsData.ToList();
                 }
             }
@@ -236,9 +234,9 @@ namespace opentuner
                 g.DrawLines(edge, points.Skip(1).Take(points.Length - 2).ToArray());
         }
 
-        // Keep station identity/quality above the trace and frequency/SR in
-        // the otherwise unused lower blue area. MER only comes from a locked
-        // receiver, never from the uncalibrated BATC FFT strength.
+        // Show callsign and BATC beacon-relative power density (dBb) above
+        // the trace, with frequency and SR in the lower blue area. This is
+        // not receiver MER or an absolute dBm measurement.
         private void DrawSignals(Graphics g, Rectangle plot, List<signal.Sig> localSignals)
         {
             using (Font labelFont = new Font("Segoe UI Semibold", 7.5f))
@@ -259,7 +257,8 @@ namespace opentuner
                     g.DrawRectangle(blockPen, block.X, block.Y, block.Width, block.Height);
 
                     string station = string.IsNullOrWhiteSpace(sig.callsign) ? "" : sig.callsign.Trim();
-                    string mer = "";
+                    string power = float.IsNaN(sig.dbb) || float.IsInfinity(sig.dbb)
+                        ? "" : sig.dbb.ToString("+0.0;-0.0;0.0") + " dBb";
                     lock (sync)
                     {
                         for (int rx = 0; rx < receiverCount; rx++)
@@ -271,14 +270,12 @@ namespace opentuner
                                 continue;
                             if (string.IsNullOrEmpty(station))
                                 station = lockedServiceName[rx] ?? "";
-                            if (!Double.IsNaN(lockedMerDb[rx]) && !Double.IsInfinity(lockedMerDb[rx]))
-                                mer = "MER " + lockedMerDb[rx].ToString("0.0") + " dB";
                             break;
                         }
                     }
 
-                    string top = string.IsNullOrEmpty(station) ? mer :
-                        string.IsNullOrEmpty(mer) ? station : station + "  " + mer;
+                    string top = string.IsNullOrEmpty(station) ? power :
+                        string.IsNullOrEmpty(power) ? station : station + "  " + power;
                     string bottom = sig.frequency.ToString("0.000") + "  " +
                         Math.Round(sig.sr * 1000) + "kS";
 
@@ -308,7 +305,7 @@ namespace opentuner
         }
 
         internal void UpdateReceiverSignalInfo(int receiver, double frequencyMHz,
-            float symbolRateMs, string serviceName, double merDb, bool locked)
+            float symbolRateMs, string serviceName, bool locked)
         {
             if (receiver < 0 || receiver >= lockedAtUtc.Length) return;
             lock (sync)
@@ -321,7 +318,6 @@ namespace opentuner
                 else
                 {
                     lockedFrequencyMHz[receiver] = frequencyMHz;
-                    lockedMerDb[receiver] = merDb;
                     lockedServiceName[receiver] = serviceName;
                     lockedAtUtc[receiver] = DateTime.UtcNow;
                 }
