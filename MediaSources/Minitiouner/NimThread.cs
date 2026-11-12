@@ -275,22 +275,19 @@ namespace opentuner
             if (err == 0) _stv0910.stv0910_read_matype(stv0910.STV0910_DEMOD_BOTTOM, ref ma_type1, ref ma_type2);
             nim_status.T2P1_stream_format = (ma_type1 & 0xC0) >> 6; ;
 
-            Int32 mer = 0;
+            // Do not reuse RX1's MER when RX2 is unlocked or its I2C
+            // read fails. Two demodulators must keep independent readings.
+            Int32 merTop = 0;
+            Int32 merBottom = 0;
+            if (err == 0 && (nim_status.T1P2_demod_status == stv0910.DEMOD_S ||
+                nim_status.T1P2_demod_status == stv0910.DEMOD_S2))
+                err = _stv0910.stv0910_read_mer(stv0910.STV0910_DEMOD_TOP, ref merTop);
+            nim_status.T1P2_mer = merTop;
 
-            if (nim_status.T1P2_demod_status == stv0910.DEMOD_S || nim_status.T1P2_demod_status == stv0910.DEMOD_S2)
-            {
-                if (err == 0) err = _stv0910.stv0910_read_mer(stv0910.STV0910_DEMOD_TOP, ref mer);
-            }
-
-            nim_status.T1P2_mer = mer;
-
-            if (nim_status.T2P1_demod_status == stv0910.DEMOD_S || nim_status.T2P1_demod_status == stv0910.DEMOD_S2)
-            {
-                if (err == 0) err = _stv0910.stv0910_read_mer(stv0910.STV0910_DEMOD_BOTTOM, ref mer);
-            }
-
-            nim_status.T2P1_mer = mer;
-
+            if (err == 0 && (nim_status.T2P1_demod_status == stv0910.DEMOD_S ||
+                nim_status.T2P1_demod_status == stv0910.DEMOD_S2))
+                err = _stv0910.stv0910_read_mer(stv0910.STV0910_DEMOD_BOTTOM, ref merBottom);
+            nim_status.T2P1_mer = merBottom;
 
             /* MODCOD, Short Frames, Pilots */
             UInt32 modcod = 0;
