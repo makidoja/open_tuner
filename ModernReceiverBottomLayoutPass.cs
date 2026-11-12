@@ -63,7 +63,7 @@ namespace opentuner
                 // then set its height from the lowest visible control.
                 tunerBox.Size = compact4
                     ? new Size(Math.Max(185, controls.ClientSize.Width - 8), 138)
-                    : new Size(188, 138);
+                    : new Size(188, 144);
                 tunerBox.Anchor = compact4 ? AnchorStyles.Left | AnchorStyles.Top :
                     AnchorStyles.Right | AnchorStyles.Bottom;
                 LayoutTunerBox(tunerBox, tuner, compact4);
@@ -241,13 +241,13 @@ namespace opentuner
             }
             if (sr != null)
             {
-                sr.Bounds = new Rectangle(left, 69, half2, 26);
+                sr.Bounds = new Rectangle(left, 69, half2, 29);
                 sr.Font = new Font("Segoe UI Semibold", 8.5f);
                 sr.Visible = box.Controls["ModernSrButton" + tuner] == null;
             }
             if (rf != null)
             {
-                rf.Bounds = new Rectangle(right2, 69, half2, 26);
+                rf.Bounds = new Rectangle(right2, 69, half2, 29);
                 rf.Font = new Font("Segoe UI Semibold", 8.5f);
                 rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
             }
@@ -259,14 +259,14 @@ namespace opentuner
                 Control proxy = box.Controls[key];
                 ComboBox native = key.StartsWith("ModernSrButton") ? sr : rf;
                 if (proxy == null || native == null) continue;
-                proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 26);
+                proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 29);
                 proxy.Font = new Font("Segoe UI Semibold", 8.5f);
                 proxy.Visible = true;
                 proxy.BringToFront();
             }
             if (tune != null)
             {
-                tune.Bounds = new Rectangle(left + full - 70, 105, 70, 25);
+                tune.Bounds = new Rectangle(left + full - 70, 110, 70, 25);
                 tune.Font = new Font("Segoe UI Semibold", 8f);
                 tune.BringToFront();
             }
