@@ -308,9 +308,14 @@ namespace opentuner
             // information panel at 438px.
             int infoLeft = 4;
             int gapToTuner = 9;
-            int available = Math.Max(200, tunerBox.Left - gapToTuner - infoLeft);
-            tabs.Bounds = new Rectangle(infoLeft, 4, available,
-                Math.Max(72, controls.ClientSize.Height - 8));
+            int available = compact4
+                ? Math.Max(160, controls.ClientSize.Width - 8)
+                : Math.Max(200, tunerBox.Left - gapToTuner - infoLeft);
+            tabs.Bounds = compact4
+                ? new Rectangle(infoLeft, 4, available,
+                    Math.Max(100, tunerBox.Top - 8))
+                : new Rectangle(infoLeft, 4, available,
+                    Math.Max(72, controls.ClientSize.Height - 8));
             int tabWidth = Math.Max(55, (tabs.ClientSize.Width - 2) / 3);
             for (int page = 0; page < 3; page++)
             {
@@ -324,7 +329,7 @@ namespace opentuner
             if (currentFreq[tuner] != null)
             {
                 currentFreq[tuner].Location = new Point(5, 1);
-                currentFreq[tuner].Size = new Size(compact4 ? 200 : 270, compact4 ? 23 : 37);
+                currentFreq[tuner].Size = new Size(compact4 ? 195 : 270, compact4 ? 25 : 37);
                 currentFreq[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 11f : 17f);
             }
             // Restore the original vertical metric order under the live
@@ -336,7 +341,7 @@ namespace opentuner
                 currentMer[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(97, 30, Math.Max(45, pageCurrent.ClientSize.Width - 215), 11) : new Rectangle(147, 55, 180, 19);
+                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(86, 30, 52, 11) : new Rectangle(147, 55, 180, 19);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
@@ -344,36 +349,56 @@ namespace opentuner
                 currentMargin[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(97, 52, Math.Max(45, pageCurrent.ClientSize.Width - 215), 11) : new Rectangle(147, 107, 180, 19);
-            // TS Info: four two-line columns on top, real bitrate trace below.
-            // Tuner Data: four compact columns, at most four measurements each.
+                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(86, 52, 52, 11) : new Rectangle(147, 107, 180, 19);
+            // In 4 RX each info panel is narrow and tall, alongside video:
+            // use two columns. For 1/2 RX keep the four-column horizontal TS layout.
             for (int page = 1; page <= 2; page++)
                 for (int col = 0; col < 4; col++)
                 {
                     Label label = dataLabels[tuner, (page - 1) * 4 + col];
                     if (label == null) continue;
                     Panel pagePanel = infoPages[tuner, page];
-                    // In 4-RX mode the TS tab stays at four columns, but
-                    // the longer tuner diagnostics need two columns to avoid
-                    // severe truncation on a half-width receiver panel.
-                    bool twoColumnTuner = compact4 && page == 2;
-                    label.Visible = !twoColumnTuner || col == 0 || col == 2;
-                    int columns = twoColumnTuner ? 2 : 4;
-                    int position = twoColumnTuner ? col / 2 : col;
-                    int cellWidth = Math.Max(70, (pagePanel.ClientSize.Width - 12) / columns);
-                    int left = 6 + position * cellWidth;
-                    label.Font = new Font("Segoe UI", twoColumnTuner ? 7.3f : (compact4 ? 7.1f : 8f));
-                    label.Bounds = page == 1
-                        ? new Rectangle(left, 3, cellWidth - 5, compact4 ? 31 : 43)
-                        : new Rectangle(left, 4, cellWidth - 5, Math.Max(38, pagePanel.ClientSize.Height - 6));
+                    if (compact4)
+                    {
+                        if (page == 1)
+                        {
+                            // Four TS summary cells, arranged 2 x 2.
+                            int width = Math.Max(75, (pagePanel.ClientSize.Width - 12) / 2);
+                            int x = 6 + (col % 2) * width;
+                            int y = 4 + (col / 2) * 39;
+                            label.Bounds = new Rectangle(x, y, width - 5, 36);
+                            label.Visible = true;
+                            label.Font = new Font("Segoe UI", 7.3f);
+                        }
+                        else
+                        {
+                            // Two complete eight-line tuner columns (labels 4+5 and 6+7).
+                            int width = Math.Max(75, (pagePanel.ClientSize.Width - 12) / 2);
+                            label.Visible = col == 0 || col == 2;
+                            if (label.Visible)
+                                label.Bounds = new Rectangle(6 + (col / 2) * width, 4,
+                                    width - 5, Math.Max(75, pagePanel.ClientSize.Height - 8));
+                            label.Font = new Font("Segoe UI", 7.3f);
+                        }
+                    }
+                    else
+                    {
+                        int width = Math.Max(70, (pagePanel.ClientSize.Width - 12) / 4);
+                        label.Visible = true;
+                        label.Font = new Font("Segoe UI", 8f);
+                        label.Bounds = page == 1
+                            ? new Rectangle(6 + col * width, 3, width - 5, 43)
+                            : new Rectangle(6 + col * width, 4, width - 5,
+                                Math.Max(38, pagePanel.ClientSize.Height - 6));
+                    }
                 }
             if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed)
             {
                 Panel tsPage = infoPages[tuner, 1];
-                int graphTop = compact4 ? 36 : 48;
-                tsGraphs[tuner].Bounds = new Rectangle(6, graphTop,
+                int top = compact4 ? 85 : 48;
+                tsGraphs[tuner].Bounds = new Rectangle(6, top,
                     Math.Max(110, tsPage.ClientSize.Width - 12),
-                    Math.Max(25, tsPage.ClientSize.Height - graphTop - 5));
+                    Math.Max(24, tsPage.ClientSize.Height - top - 5));
             }
             Label details = FindDetailsLabel(infoPages[tuner, 2]);
             if (details != null)
