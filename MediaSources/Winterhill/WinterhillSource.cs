@@ -117,16 +117,28 @@ namespace opentuner.MediaSources.WinterHill
                     ts_devices = 4;
                     hw_device = 3;
                     break;
-                case 2: // udp pico wh
+                case 2: // PicoTuner Ethernet, optionally two devices
                     udp_port = _settings.WinterHillUdpBasePort;
-                    // Start receiving status only after source initialisation is complete.
-
+                    bool dualPico = _settings.SecondPicoTunerEnabled;
+                    if (dualPico)
+                    {
+                        System.Net.IPAddress first, second;
+                        if (!System.Net.IPAddress.TryParse(_settings.WinterHillUdpHost, out first) ||
+                            !System.Net.IPAddress.TryParse(_settings.SecondPicoTunerUdpHost, out second) ||
+                            first.Equals(second) ||
+                            _settings.SecondPicoTunerUdpBasePort == udp_port ||
+                            System.Math.Abs(_settings.SecondPicoTunerUdpBasePort - udp_port) < 100)
+                        {
+                            Log.Error("Dual PicoTuner configuration invalid: unique IPv4 addresses and non-overlapping UDP port ranges required");
+                            return -1;
+                        }
+                    }
+                    ts_devices = dualPico ? 4 : 2;
+                    hw_device = 2;
                     UDPSetVoltage(0, _settings.LNBVoltage[0]);
                     UDPSetVoltage(1, _settings.LNBVoltage[1]);
-
-
-                    ts_devices = 2;
-                    hw_device = 2;
+                    Log.Information("PicoTuner Ethernet mode: {Count} receivers, second unit enabled={Dual}",
+                        ts_devices, dualPico);
                     break;
             }
 
@@ -142,7 +154,9 @@ namespace opentuner.MediaSources.WinterHill
 
             for (int c = 0; c < ts_devices; c++)
             {
-                int port = udp_port + 41 + c;
+                int port = _settings.DefaultInterface == 2 && _settings.SecondPicoTunerEnabled && c >= 2
+                    ? _settings.SecondPicoTunerUdpBasePort + 41 + (c - 2)
+                    : udp_port + 41 + c;
 
                 Log.Information("TS UDP Ports: " + port.ToString());
 
@@ -385,7 +399,8 @@ namespace opentuner.MediaSources.WinterHill
             switch (hw_device)
             {
                 case 1: return "WinterHill (ZR6TG Variant)";
-                case 2: return "PicoTuner (G4EWJ Ethernet WH)";
+                case 2: return _settings.SecondPicoTunerEnabled ?
+                    "Dual PicoTuner Ethernet (4 RX)" : "PicoTuner (G4EWJ Ethernet WH)";
                 case 3: return "Winter Hill UDP (BATC 4 RX)";
             }
 
