@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyDescription("Modern DATV receiver frontend for Minitiouner, PicoTuner and compatible variants")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("ZR6TG / M0CKE")]
-[assembly: AssemblyProduct("Open Tuner (ZR6TG) Version M0CKE 0.C.v6151.3.0")]
+[assembly: AssemblyProduct("Open Tuner (ZR6TG) Version M0CKE 1.4.0")]
 [assembly: AssemblyCopyright("Copyright ©  2023 - Tom Van den Bon")]
 [assembly: AssemblyTrademark("Open Tuner")]
 [assembly: AssemblyCulture("")]
@@ -31,6 +31,6 @@ using System.Runtime.InteropServices;
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
-// [assembly: AssemblyVersion("1.0.*")]
+// [assembly: AssemblyVersion("1.4.0.0")]
 [assembly: AssemblyVersion("15291.3.0.0")]
-[assembly: AssemblyFileVersion("15731.3.0.0")]
+[assembly: AssemblyFileVersion("1.4.0.0")]
