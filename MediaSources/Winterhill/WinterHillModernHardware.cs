@@ -9,26 +9,48 @@ namespace opentuner.MediaSources.WinterHill
             get { return ModernIsPicoTunerEthernet && _settings != null; }
         }
 
+        public bool ModernDualPicoTunerEnabled
+        {
+            get { return ModernIsPicoTunerEthernet && _settings != null &&
+                _settings.SecondPicoTunerEnabled; }
+        }
+
         public int ModernGetLnbVoltage(int output)
         {
-            if (_settings == null || _settings.LNBVoltage == null || output < 0 || output >= _settings.LNBVoltage.Length)
-                return 0;
+            if (_settings == null || output < 0 || output > 3) return 0;
+            if (output >= 2)
+            {
+                if (!ModernDualPicoTunerEnabled ||
+                    _settings.SecondPicoTunerLNBVoltage == null ||
+                    _settings.SecondPicoTunerLNBVoltage.Length < 2) return 0;
+                return (int)_settings.SecondPicoTunerLNBVoltage[output - 2];
+            }
+            if (_settings.LNBVoltage == null || _settings.LNBVoltage.Length < 2) return 0;
             return (int)_settings.LNBVoltage[output];
         }
 
         public void ModernSetLnbVoltage(int output, int volts)
         {
-            if (!ModernSupportsLnbPower || output < 0 || output > 1)
+            if (!ModernSupportsLnbPower || output < 0 || output > 3 ||
+                (output >= 2 && !ModernDualPicoTunerEnabled))
                 return;
 
             if (volts != 0 && volts != 13 && volts != 18)
                 return;
 
+            // Device 2 uses independent persistent LNB state and UDP routing.
             UDPSetVoltage(output, (uint)volts);
 
             try
             {
-                _settings.LNBVoltage[output] = (uint)volts;
+                if (output >= 2)
+                {
+                    if (_settings.SecondPicoTunerLNBVoltage == null ||
+                        _settings.SecondPicoTunerLNBVoltage.Length < 2)
+                        _settings.SecondPicoTunerLNBVoltage = new uint[] { 0, 0 };
+                    _settings.SecondPicoTunerLNBVoltage[output - 2] = (uint)volts;
+                }
+                else _settings.LNBVoltage[output] = (uint)volts;
                 _settingsManager.SaveSettings(_settings);
             }
             catch { }
