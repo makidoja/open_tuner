@@ -111,6 +111,7 @@ namespace opentuner.MediaSources.WinterHill
 
             int receiver = _settings.DefaultInterface == 3 && statusClient != null
                 ? statusClient.getID() + 1 : 1;
+            bool receiverIdentified = false;
 
             for (int c = 0; c < status_strings.Length; c++)
             {
@@ -135,6 +136,10 @@ namespace opentuner.MediaSources.WinterHill
                         if (_settings.DefaultInterface == 3 && statusClient != null &&
                             receiver != statusClient.getID() + 1)
                             return;
+                        receiverIdentified = true;
+                        // Some firmware sends status in partial batches. Do not
+                        // treat an omitted $1 demod state as an actual loss of lock.
+                        mm.rx[receiver].scanstate = demodstate[receiver - 1];
                         break;
 
                     case "$1":
@@ -199,6 +204,8 @@ namespace opentuner.MediaSources.WinterHill
                 }
             }
 
+            // Ignore unidentified packets rather than applying them to RX1.
+            if (!receiverIdentified) return;
             if (mm.rx[receiver].service_name == null) mm.rx[receiver].service_name = "";
             if (mm.rx[receiver].service_provider_name == null) mm.rx[receiver].service_provider_name = "";
             if (mm.rx[receiver].mer == null) mm.rx[receiver].mer = "";
