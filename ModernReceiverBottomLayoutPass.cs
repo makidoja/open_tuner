@@ -58,11 +58,19 @@ namespace opentuner
                     controls.Resize += delegate { Apply(form); };
 
                 bool compact4 = form.ModernReceiverCount >= 4;
+                // The diagnostics need only a compact area at the top of
+                // the 4-RX sidebar. Give the remaining height to tuning.
+                int infoHeight = compact4
+                    ? Math.Max(90, Math.Min(144, (int)(controls.ClientSize.Height * 0.40)))
+                    : 0;
+                int tunerHeight = compact4
+                    ? Math.Max(94, controls.ClientSize.Height - infoHeight - 12)
+                    : Math.Max(150, controls.ClientSize.Height - 8);
                 tunerBox.Size = compact4
-                    ? new Size(Math.Max(185, controls.ClientSize.Width - 8), 105)
-                    : new Size(188, Math.Max(150, controls.ClientSize.Height - 8));
+                    ? new Size(Math.Max(185, controls.ClientSize.Width - 8), tunerHeight)
+                    : new Size(188, tunerHeight);
                 tunerBox.Location = compact4
-                    ? new Point(4, Math.Max(4, controls.ClientSize.Height - tunerBox.Height - 4))
+                    ? new Point(4, infoHeight + 8)
                     : new Point(Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
                 tunerBox.Anchor = compact4 ? (AnchorStyles.Left | AnchorStyles.Bottom) :
                     (AnchorStyles.Right | AnchorStyles.Bottom);
@@ -106,33 +114,33 @@ namespace opentuner
                 int right = left + half + gap;
                 if (rf != null)
                 {
-                    rf.Bounds = new Rectangle(left, 4, half, 25);
+                    rf.Bounds = new Rectangle(left, 13, half, 29);
                     rf.Font = new Font("Segoe UI Semibold", 8f);
                 }
                 if (lo != null)
                 {
-                    lo.Bounds = new Rectangle(right, 4, Math.Max(42, half - 31), 25);
+                    lo.Bounds = new Rectangle(right, 13, Math.Max(42, half - 31), 29);
                     StyleEntry(lo, 8f);
                 }
                 if (loEnabled != null)
                 {
                     loEnabled.Text = "LO";
                     loEnabled.Font = new Font("Segoe UI", 7.5f);
-                    loEnabled.Bounds = new Rectangle(right + half - 30, 5, 30, 23);
+                    loEnabled.Bounds = new Rectangle(right + half - 30, 15, 30, 25);
                 }
                 if (freq != null)
                 {
-                    freq.Bounds = new Rectangle(left, 35, half, 25);
+                    freq.Bounds = new Rectangle(left, 60, half, 29);
                     StyleEntry(freq, 8f);
                 }
                 if (sr != null)
                 {
-                    sr.Bounds = new Rectangle(right, 35, half, 25);
+                    sr.Bounds = new Rectangle(right, 60, half, 29);
                     sr.Font = new Font("Segoe UI Semibold", 8f);
                 }
                 if (tune != null)
                 {
-                    tune.Bounds = new Rectangle(left + full - 78, 67, 78, 27);
+                    tune.Bounds = new Rectangle(left + full - 78, 109, 78, 29);
                     tune.Font = new Font("Segoe UI Semibold", 8f);
                 }
                 return;
@@ -346,7 +354,7 @@ namespace opentuner
                 : Math.Max(200, tunerBox.Left - gapToTuner - infoLeft);
             tabs.Bounds = compact4
                 ? new Rectangle(infoLeft, 4, available,
-                    Math.Max(100, tunerBox.Top - 8))
+                    Math.Max(85, tunerBox.Top - 8))
                 : new Rectangle(infoLeft, 4, available,
                     Math.Max(72, controls.ClientSize.Height - 8));
             int tabWidth = Math.Max(55, (tabs.ClientSize.Width - 2) / 3);
