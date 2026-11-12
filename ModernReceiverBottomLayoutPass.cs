@@ -121,15 +121,24 @@ namespace opentuner
             {
                 // Preserve the controls' existing event handlers and state:
                 // only their visual parent and bounds change.
-                Label volIcon = FindLabelExact(controls, "🔊");
-                TrackBar volume = FindFirst<TrackBar>(controls);
-                Button mute = FindButtonContains(controls, "MUTE");
-                Button record = FindButtonContains(controls, "RECORD");
-                if (record == null) record = FindButtonContains(controls, "STOP");
-                Button snapshot = FindButtonContains(controls, "SNAPSHOT");
-                Button fullscreen = FindButtonExact(controls, "⛶");
-                Label locked = FindLabelContains(controls, "LOCK");
-                Label service = FindServiceLabel(controls, locked);
+                // On subsequent layouts the controls already live inside
+                // the header. Search there first so window resize keeps all
+                // controls aligned without moving them back to the old strip.
+                Control source = header.Controls.Count > 1 ? (Control)header : controls;
+                Label volIcon = FindLabelExact(source, "🔊");
+                TrackBar volume = FindFirst<TrackBar>(source);
+                Button mute = FindButtonContains(source, "MUTE");
+                Button record = FindButtonContains(source, "RECORD");
+                if (record == null) record = FindButtonContains(source, "STOP");
+                Button snapshot = FindButtonContains(source, "SNAPSHOT");
+                Button fullscreen = FindButtonExact(source, "⛶");
+                Label locked = FindLabelContains(source, "LOCK");
+                Label service = FindByName<Label>(header, "ModernReceiverHeaderService" + tuner);
+                if (service == null)
+                {
+                    service = FindServiceLabel(controls, locked);
+                    if (service != null) service.Name = "ModernReceiverHeaderService" + tuner;
+                }
                 foreach (Control item in new Control[] {
                     volIcon, volume, mute, record, snapshot, fullscreen, locked, service })
                 {
