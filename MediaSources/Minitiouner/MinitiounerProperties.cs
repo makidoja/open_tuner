@@ -654,6 +654,9 @@ namespace opentuner.MediaSources.Minitiouner
 
                 }
 
+                // RX2 has its own margin; never inherit a previous RX1
+                // calculation when RX2 is unlocked or has unknown MODCOD.
+                dbmargin = 0;
                 // db margin / modcod
                 modcod_text = "Unknown";
                 db_margin_text = "";
