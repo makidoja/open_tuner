@@ -39,6 +39,7 @@ namespace opentuner.MediaSources.WinterHill
                 {
                     case 1: return "WebSocket (ZR6TG)";
                     case 2: return "PicoTuner Ethernet (G4EWJ)";
+                    case 3: return "Winter Hill UDP (BATC 4 RX)";
                     default: return "Always Ask";
                 }
             }
