@@ -361,8 +361,9 @@ namespace opentuner
                     }
                 };
 
-                LayoutTunerBox(controls, tunerBox);
-                controls.Resize += delegate { LayoutTunerBox(controls, tunerBox); };
+                // This pass constructs the controls only. The bottom/sidebar
+                // layout pass is the sole owner of their bounds and positioning,
+                // preventing two Resize handlers fighting over the same box.
                 tunerBox.BringToFront();
             }
         }
