@@ -132,10 +132,18 @@ namespace opentuner.MediaSources.WinterHill
                         }
                         receiver = reportedReceiver - receiver_num;
                         if (receiver < 1 || receiver > receiverCount)
+                        {
+                            Log.Warning("WinterHill status rejected: reported RX={Reported}, base={Base}, decoded={Decoded}, expected 1..{Count}",
+                                reportedReceiver, receiver_num, receiver, receiverCount);
                             return;
+                        }
                         if (_settings.DefaultInterface == 3 && statusClient != null &&
                             receiver != statusClient.getID() + 1)
+                        {
+                            Log.Warning("WinterHill status port/ID mismatch: UDP listener RX{PortReceiver} received status for RX{StatusReceiver}",
+                                statusClient.getID() + 1, receiver);
                             return;
+                        }
                         receiverIdentified = true;
                         // Some firmware sends status in partial batches. Do not
                         // treat an omitted $1 demod state as an actual loss of lock.
@@ -303,7 +311,9 @@ namespace opentuner.MediaSources.WinterHill
             }
             IPEndPoint WinterHill_end_point = new IPEndPoint(hostAddress, base_port);
 
-            Log.Information("UDP Set Frequency Device: " + device + " : " + controlHost + " : " + base_port.ToString());
+            Log.Information("WinterHill tune RX{Receiver}: destination={Host}:{Port}, receiver ID={ReceiverId}, freq={Frequency}, SR={Rate}, RF={Rf}",
+                device + 1, controlHost, base_port, receiver_num, freq, sr,
+                _settings.RFPort[device] == 0 ? "A" : "B");
 
             try
             {
