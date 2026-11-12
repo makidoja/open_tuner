@@ -12,6 +12,7 @@ namespace opentuner
         private static readonly ModernConstellationControl[] displays = new ModernConstellationControl[2];
         private static readonly CheckBox[] toggles = new CheckBox[2];
         private static readonly Panel[] statusHosts = new Panel[2];
+        private static readonly bool[] currentPageResizeHooked = new bool[2];
         private static bool attached;
 
         public static void Attach(ModernConceptForm form)
@@ -107,10 +108,23 @@ namespace opentuner
                 Panel current = pages[0] as Panel;
                 if (plot.Parent != current) current.Controls.Add(plot);
                 if (toggle.Parent != current) current.Controls.Add(toggle);
-                plot.Size = new Size(94, 80);
-                plot.Location = new Point(Math.Max(278, current.ClientSize.Width - 103), 3);
-                toggle.Size = new Size(105, 19);
-                toggle.Location = new Point(Math.Max(272, plot.Left - 5), plot.Bottom + 2);
+                if (!currentPageResizeHooked[tuner])
+                {
+                    currentPageResizeHooked[tuner] = true;
+                    int index = tuner;
+                    current.Resize += delegate { Position(index); };
+                }
+                // Use the full Current tab height. Keep the checkbox visibly
+                // below the chart rather than over the chart's bottom edge.
+                int plotWidth = current.ClientSize.Width >= 540 ? 176 : 112;
+                int plotHeight = Math.Max(85, Math.Min(145, current.ClientSize.Height - 37));
+                int plotLeft = Math.Max(275, current.ClientSize.Width - plotWidth - 12);
+                plot.Size = new Size(plotWidth, plotHeight);
+                plot.Location = new Point(plotLeft, 5);
+                toggle.AutoSize = false;
+                toggle.Size = new Size(Math.Max(110, plotWidth), 20);
+                toggle.Location = new Point(plotLeft, Math.Min(
+                    current.ClientSize.Height - 22, plot.Bottom + 7));
                 toggle.BackColor = current.BackColor;
             }
             else
