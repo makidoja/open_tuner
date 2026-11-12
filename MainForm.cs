@@ -383,6 +383,12 @@ namespace opentuner
             tabControl1.Update();
             videoSource.OnSourceData += VideoSource_OnSourceData;
 
+            // MiniTiouner USB and PicoTuner USB share this source. Its NIM
+            // status worker must not run before TS recorders/streamers exist.
+            var minitiouner = videoSource as opentuner.MediaSources.Minitiouner.MinitiounerSource;
+            if (minitiouner != null)
+                minitiouner.StartReceiverThreadsAfterConfiguration();
+
             return true;
         }
 
