@@ -915,6 +915,21 @@ namespace opentuner
 
         public override void hw_close()
         {
+            // OpenByIndex holds three independent D2XX handles. Close all
+            // previously opened interfaces so a subsequent USB connection
+            // does not see FT_DEVICE_NOT_OPENED / FT_DEVICE_NOT_FOUND.
+            foreach (var device in new[] { ftdiDevice_ts2, ftdiDevice_ts, ftdiDevice_i2c })
+            {
+                try
+                {
+                    device?.Close();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "[MINITIOUNER-USB] Closing FTDI handle");
+                }
+            }
+            Log.Information("[MINITIOUNER-USB] Released FTDI handles");
         }
 
         byte ftdi_gpio_write_lowbyte(byte pin_id, bool pin_value)
