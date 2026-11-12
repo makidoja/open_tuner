@@ -96,16 +96,45 @@ namespace opentuner
             int full = box.ClientSize.Width - left * 2;
             if (compact4)
             {
-                // Two rows, two columns and one full-width TUNE button.
-                // All five original controls retain their event handlers.
-                int gap = 5;
+                // Requested 4 RX tuner arrangement:
+                // [ TUNER       ] [ LO       ] [LO checkbox]
+                // [ FREQUENCY   ] [ SR                ]
+                //                  [ small TUNE button ]
+                // Preserve all existing event handlers and editable controls.
+                int gap = 6;
                 int half = (full - gap) / 2;
-                if (freq != null) { freq.Bounds = new Rectangle(left, 3, half, 24); StyleEntry(freq, 8.5f); }
-                if (rf != null) { rf.Bounds = new Rectangle(left + half + gap, 3, half, 24); rf.Font = new Font("Segoe UI Semibold", 8f); }
-                if (sr != null) { sr.Bounds = new Rectangle(left, 31, half, 24); sr.Font = new Font("Segoe UI Semibold", 8f); }
-                if (lo != null) { lo.Bounds = new Rectangle(left + half + gap, 31, Math.Max(40, half - 34), 24); StyleEntry(lo, 8f); }
-                if (loEnabled != null) { loEnabled.Text = "LO"; loEnabled.Bounds = new Rectangle(left + full - 33, 32, 33, 22); }
-                if (tune != null) { tune.Bounds = new Rectangle(left, 62, full, 30); tune.Font = new Font("Segoe UI Semibold", 8.5f); }
+                int right = left + half + gap;
+                if (rf != null)
+                {
+                    rf.Bounds = new Rectangle(left, 4, half, 25);
+                    rf.Font = new Font("Segoe UI Semibold", 8f);
+                }
+                if (lo != null)
+                {
+                    lo.Bounds = new Rectangle(right, 4, Math.Max(42, half - 31), 25);
+                    StyleEntry(lo, 8f);
+                }
+                if (loEnabled != null)
+                {
+                    loEnabled.Text = "LO";
+                    loEnabled.Font = new Font("Segoe UI", 7.5f);
+                    loEnabled.Bounds = new Rectangle(right + half - 30, 5, 30, 23);
+                }
+                if (freq != null)
+                {
+                    freq.Bounds = new Rectangle(left, 35, half, 25);
+                    StyleEntry(freq, 8f);
+                }
+                if (sr != null)
+                {
+                    sr.Bounds = new Rectangle(right, 35, half, 25);
+                    sr.Font = new Font("Segoe UI Semibold", 8f);
+                }
+                if (tune != null)
+                {
+                    tune.Bounds = new Rectangle(left + full - 78, 67, 78, 27);
+                    tune.Font = new Font("Segoe UI Semibold", 8f);
+                }
                 return;
             }
             if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
