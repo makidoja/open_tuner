@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Drawing;
 using System.Globalization;
 using System.Reflection;
@@ -231,6 +232,13 @@ namespace opentuner
                     button.BringToFront();
                 }
                 Panel current = infoPages[tuner, 0];
+                TsBitrateGraph graph = new TsBitrateGraph
+                {
+                    Name = "ModernTsBitrateGraph" + tuner,
+                    BackColor = Color.FromArgb(7, 19, 31)
+                };
+                tsGraphs[tuner] = graph;
+                infoPages[tuner, 1].Controls.Add(graph);
                 current.Controls.Add(freq);
                 current.Controls.Add(mer);
                 current.Controls.Add(margin);
@@ -316,9 +324,22 @@ namespace opentuner
                     Label label = dataLabels[tuner, (page - 1) * 2 + col];
                     if (label == null) continue;
                     int left = col == 0 ? 7 : pageCurrent.ClientSize.Width / 2 + 2;
-                    label.Bounds = new Rectangle(left, 7,
-                        Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 86);
+                    if (page == 1)
+                    {
+                        label.Font = new Font("Segoe UI", 7.5f);
+                        label.Bounds = new Rectangle(left, 68,
+                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 45);
+                    }
+                    else
+                    {
+                        label.Font = new Font("Segoe UI", 8f);
+                        label.Bounds = new Rectangle(left, 7,
+                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 84);
+                    }
                 }
+            if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed)
+                tsGraphs[tuner].Bounds = new Rectangle(6, 3,
+                    Math.Max(200, infoPages[tuner, 1].ClientSize.Width - 12), 61);
             Label details = FindDetailsLabel(infoPages[tuner, 2]);
             if (details != null)
             {
@@ -364,6 +385,12 @@ namespace opentuner
                     {
                         if (form.IsDisposed || dataLabels[tuner, 0] == null ||
                             dataLabels[tuner, 0].IsDisposed) return;
+                        if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed &&
+                            (DateTime.UtcNow - lastTsSample[tuner]).TotalMilliseconds >= 900)
+                        {
+                            tsGraphs[tuner].PushSample(data.streaming ? data.ts_bitrate_mbps : 0);
+                            lastTsSample[tuner] = DateTime.UtcNow;
+                        }
                         string mbps = data.streaming && data.ts_bitrate_mbps > 0 ?
                             data.ts_bitrate_mbps.ToString("0.00", CultureInfo.InvariantCulture) + " Mbps" : "—";
                         string nulls = data.streaming ?
@@ -571,4 +598,57 @@ namespace opentuner
             return null;
         }
     }
+    // A lightweight, locally drawn bitrate history using actual receiver
+    // telemetry. The backend does not expose per-PID TS composition here,
+    // so the graph must never synthesize video/audio/overhead percentages.
+    internal sealed class TsBitrateGraph : Control
+    {
+        private readonly Queue<float> history = new Queue<float>();
+        private const int MaxSamples = 120;
+
+        public TsBitrateGraph()
+        {
+            DoubleBuffered = true;
+            Font = new Font("Segoe UI", 7f);
+        }
+
+        public void PushSample(double mbps)
+        {
+            float value = (float)Math.Max(0.0, Math.Min(100.0, mbps));
+            history.Enqueue(value);
+            while (history.Count > MaxSamples) history.Dequeue();
+            Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            Graphics g = e.Graphics;
+            g.Clear(BackColor);
+            Rectangle area = new Rectangle(7, 14, Math.Max(10, Width - 15),
+                Math.Max(12, Height - 19));
+            using (Pen grid = new Pen(Color.FromArgb(35, 85, 100)))
+            using (Pen trace = new Pen(Color.FromArgb(235, 216, 45), 1.3f))
+            using (Brush text = new SolidBrush(Color.FromArgb(190, 216, 230)))
+            {
+                g.DrawString("TS BITRATE · LAST 120 S", Font, text, 7, 1);
+                for (int i = 1; i < 4; i++)
+                    g.DrawLine(grid, area.Left, area.Top + area.Height * i / 4,
+                        area.Right, area.Top + area.Height * i / 4);
+                for (int i = 1; i < 8; i++)
+                    g.DrawLine(grid, area.Left + area.Width * i / 8, area.Top,
+                        area.Left + area.Width * i / 8, area.Bottom);
+                float[] values = history.ToArray();
+                if (values.Length < 2) return;
+                float max = Math.Max(1.0f, values.Max() * 1.15f);
+                PointF[] pts = new PointF[values.Length];
+                for (int i = 0; i < values.Length; i++)
+                    pts[i] = new PointF(area.Right -
+                        (values.Length - 1 - i) * area.Width / (float)(MaxSamples - 1),
+                        area.Bottom - values[i] / max * area.Height);
+                g.DrawLines(trace, pts);
+            }
+        }
+    }
+
 }
