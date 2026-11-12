@@ -949,8 +949,12 @@ namespace opentuner
             lockLabels[tuner].Text = data.demod_locked ? "● LOCKED" : "NO LOCK";
             lockLabels[tuner].ForeColor = data.demod_locked ? Green : Muted;
             lockLabels[tuner].BackColor = data.demod_locked ? Color.FromArgb(17, 56, 44) : Surface2;
-            merLabels[tuner].Text = "MER  " + data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB";
-            marginLabels[tuner].Text = "Margin  " + data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB";
+            merLabels[tuner].Text = data.demod_locked
+                ? "MER  " + data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB"
+                : "MER  — dB";
+            marginLabels[tuner].Text = data.demod_locked
+                ? "Margin  " + data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB"
+                : "Margin  — dB";
             if (data.frequency > 0) liveFreq[tuner].Text = (data.frequency / 1000M).ToString("0.000") + " MHz";
         }
 
