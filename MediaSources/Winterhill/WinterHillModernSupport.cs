@@ -30,6 +30,16 @@ namespace opentuner.MediaSources.WinterHill
             get { return _settings != null && _settings.DefaultInterface == 2; }
         }
 
+        public bool ModernIsStandardWinterHillUdp
+        {
+            get { return _settings != null && _settings.DefaultInterface == 3; }
+        }
+
+        public bool ModernUdpStatusLive
+        {
+            get { return ModernPicoStatusLive; }
+        }
+
         public string ModernInterfaceDescription
         {
             get
