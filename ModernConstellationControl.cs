@@ -57,7 +57,7 @@ namespace opentuner
             Rectangle plot = new Rectangle(10, 24, Math.Max(10, Width - 20), Math.Max(10, Height - 34));
             using (Pen border = new Pen(Color.FromArgb(65, 95, 120)))
             using (Pen axis = new Pen(Color.FromArgb(55, 110, 135)))
-            using (Brush dot = new SolidBrush(Color.FromArgb(80, 220, 255)))
+            using (Brush dot = new SolidBrush(Color.FromArgb(255, 218, 48)))
             using (Brush text = new SolidBrush(Color.FromArgb(225, 235, 245)))
             {
                 g.DrawRectangle(border, plot);
