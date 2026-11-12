@@ -115,6 +115,7 @@ namespace opentuner
             LoadPresets();
 
             Shown += delegate { StartBatcSpectrum(); };
+            Shown += delegate { ModernUpdateChecker.CheckOnStartup(this); };
 
             uiTimer = new Timer { Interval = 300 };
             uiTimer.Tick += delegate
