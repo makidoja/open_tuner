@@ -464,19 +464,18 @@ namespace opentuner
                         }
                         else
                         {
-                            // Two complete eight-line tuner columns (labels 4+5 and 6+7).
-                            // Use the full widened sidebar with a small gutter.
-                            // Avoid wrapping diagnostics such as Demod, System and Provider.
-                            int gutter = 10;
+                            // Four independent four-line metric groups instead of
+                            // two eight-line strings. This prevents long values
+                            // wrapping into the row below in narrow 4 RX panes.
+                            int gutter = 8;
                             int width = Math.Max(90, (pagePanel.ClientSize.Width - 12 - gutter) / 2);
-                            label.Visible = col == 0 || col == 2;
-                            if (label.Visible)
-                            {
-                                int x = 6 + (col / 2) * (width + gutter);
-                                label.Bounds = new Rectangle(x, 4,
-                                    width, Math.Max(75, pagePanel.ClientSize.Height - 8));
-                            }
-                            label.Font = new Font("Segoe UI", 8f);
+                            int x = 6 + (col % 2) * (width + gutter);
+                            int y = 4 + (col / 2) * 88;
+                            label.Bounds = new Rectangle(x, y, width, 83);
+                            label.AutoEllipsis = true;
+                            label.UseMnemonic = false;
+                            label.Visible = true;
+                            label.Font = new Font("Segoe UI", 7.5f);
                         }
                     }
                     else
@@ -585,13 +584,13 @@ namespace opentuner
                             "\nService: " + ValueOrDash(data.service_name) +
                             "\nProvider: " + ValueOrDash(data.service_provider) +
                             "\nLDPC: " + (data.tuner_metrics_available ? data.ldpc_errors.ToString() : "—");
-                        // Preserve all readings while stacking them into
-                        // two readable columns in the 4-receiver layout.
-                        bool compactTuner = form.ModernReceiverCount >= 4;
-                        if (compactTuner)
+                        // The 4 RX layout uses a true 2x2 grid: one metric
+                        // group per label. Do not concatenate four-line blocks
+                        // into eight-line columns, which caused clipping.
+                        if (form.ModernReceiverCount >= 4)
                         {
-                            dataLabels[tuner, 4].Text += "\n" + dataLabels[tuner, 5].Text;
-                            dataLabels[tuner, 6].Text += "\n" + dataLabels[tuner, 7].Text;
+                            for (int i = 4; i < 8; i++)
+                                dataLabels[tuner, i].AutoEllipsis = true;
                         }
                     });
                 }
