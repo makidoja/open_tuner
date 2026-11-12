@@ -51,10 +51,9 @@ namespace opentuner
                 Panel controls = tunerBox.Parent as Panel;
                 if (controls == null) continue;
 
-                tunerBox.Size = new Size(350, 140);
+                tunerBox.Size = new Size(188, Math.Max(155, controls.ClientSize.Height - 8));
                 tunerBox.Location = new Point(
-                    Math.Max(445, controls.ClientSize.Width - tunerBox.Width - 4),
-                    Math.Max(42, controls.ClientSize.Height - tunerBox.Height - 4));
+                    Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
 
                 LayoutTunerBox(tunerBox, tuner);
@@ -65,107 +64,102 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner)
         {
-            MoveLabel(box, "TUNER CONTROL", 10, 2, 130, 17, 8.5f, Muted);
-            MoveLabel(box, "FREQ", 10, 20, 150, 16, 8.5f, Muted);
-            MoveLabel(box, "SR", 175, 20, 80, 16, 8.5f, Muted);
-            MoveLabel(box, "TUNER", 10, 72, 150, 16, 8.5f, Muted);
-            MoveLabel(box, "LO FREQ", 175, 72, 90, 16, 8.5f, Muted);
-
-            Panel freqBorder = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
-            if (freqBorder != null)
+            // Compact, label-free vertical tuner stack. Keep the four
+            // existing interactive inputs and their change handlers.
+            foreach (Control child in box.Controls)
             {
-                freqBorder.Location = new Point(10, 37);
-                freqBorder.Size = new Size(150, 32);
-                StyleEntry(freqBorder, 10.5f);
+                Label caption = child as Label;
+                if (caption != null) caption.Visible = false;
             }
 
+            Panel freq = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
             ComboBox sr = FindByName<ComboBox>(box, "ModernSrCombo" + tuner);
+            ComboBox rf = FindByName<ComboBox>(box, "ModernRfInput" + tuner);
+            Panel lo = FindByName<Panel>(box, "ModernLoBorder" + tuner);
+            CheckBox loEnabled = FindByName<CheckBox>(box, "ModernLoEnabled" + tuner);
+            Button tune = FindButtonExact(box, "TUNE");
+
+            int left = 9;
+            int full = box.ClientSize.Width - 18;
+            if (freq != null)
+            {
+                freq.Bounds = new Rectangle(left, 8, full, 27);
+                StyleEntry(freq, 10f);
+            }
             if (sr != null)
             {
-                sr.Location = new Point(175, 37);
-                sr.Size = new Size(80, 32);
-                sr.Font = new Font("Segoe UI Semibold", 10f);
+                sr.Bounds = new Rectangle(left, 39, full, 27);
+                sr.Font = new Font("Segoe UI Semibold", 9.5f);
             }
-
-            ComboBox rf = FindByName<ComboBox>(box, "ModernRfInput" + tuner);
             if (rf != null)
             {
-                rf.Location = new Point(10, 89);
-                rf.Size = new Size(150, 32);
-                rf.Font = new Font("Segoe UI Semibold", 10f);
+                rf.Bounds = new Rectangle(left, 70, full, 27);
+                rf.Font = new Font("Segoe UI Semibold", 9.5f);
             }
-
-            Panel loBorder = FindByName<Panel>(box, "ModernLoBorder" + tuner);
-            if (loBorder != null)
-            {
-                loBorder.Location = new Point(175, 89);
-                loBorder.Size = new Size(90, 32);
-                StyleEntry(loBorder, 10.5f);
-            }
-
-            CheckBox lo = FindByName<CheckBox>(box, "ModernLoEnabled" + tuner);
             if (lo != null)
             {
-                lo.Text = "LO";
-                lo.Location = new Point(274, 93);
-                lo.Size = new Size(50, 24);
-                lo.Font = new Font("Segoe UI Semibold", 9f);
+                lo.Bounds = new Rectangle(left, 101, full - 50, 27);
+                StyleEntry(lo, 9.5f);
             }
-
-            Button tune = FindButtonExact(box, "TUNE");
+            if (loEnabled != null)
+            {
+                loEnabled.Text = "LO";
+                loEnabled.Bounds = new Rectangle(box.ClientSize.Width - 47, 103, 43, 22);
+            }
             if (tune != null)
             {
-                tune.Location = new Point(265, 37);
-                tune.Size = new Size(75, 32);
+                tune.Bounds = new Rectangle(left, Math.Max(133, box.ClientSize.Height - 36),
+                    full, 30);
                 tune.Font = new Font("Segoe UI Semibold", 9f);
             }
         }
 
         private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox, int tuner)
         {
-            Label volIcon = FindLabelExact(controls, "🔊");
-            if (volIcon != null) { volIcon.Location = new Point(4, 4); volIcon.Size = new Size(24, 30); }
-
-            TrackBar volume = FindFirst<TrackBar>(controls);
-            if (volume != null)
+            Panel header = FindByName<Panel>(controls.Parent, "ModernReceiverHeader" + tuner);
+            if (header != null)
             {
-                volume.Location = new Point(28, 3);
-                volume.Size = new Size(124, 32);
-            }
+                // Preserve the controls' existing event handlers and state:
+                // only their visual parent and bounds change.
+                Label volIcon = FindLabelExact(controls, "🔊");
+                TrackBar volume = FindFirst<TrackBar>(controls);
+                Button mute = FindButtonContains(controls, "MUTE");
+                Button record = FindButtonContains(controls, "RECORD");
+                if (record == null) record = FindButtonContains(controls, "STOP");
+                Button snapshot = FindButtonContains(controls, "SNAPSHOT");
+                Button fullscreen = FindButtonExact(controls, "⛶");
+                Label locked = FindLabelContains(controls, "LOCK");
+                Label service = FindServiceLabel(controls, locked);
+                foreach (Control item in new Control[] {
+                    volIcon, volume, mute, record, snapshot, fullscreen, locked, service })
+                {
+                    if (item != null && item.Parent != header)
+                        header.Controls.Add(item);
+                }
 
-            Button mute = FindButtonContains(controls, "MUTE");
-            Button record = FindButtonContains(controls, "RECORD");
-            if (record == null) record = FindButtonContains(controls, "STOP");
-            Button snapshot = FindButtonContains(controls, "SNAPSHOT");
-            Button fullscreen = FindButtonExact(controls, "⛶");
-
-            if (mute != null) { mute.Location = new Point(158, 4); mute.Size = new Size(72, 30); }
-            if (record != null) { record.Location = new Point(236, 4); record.Size = new Size(88, 30); }
-            if (snapshot != null) { snapshot.Location = new Point(330, 4); snapshot.Size = new Size(100, 30); }
-            if (fullscreen != null) { fullscreen.Location = new Point(436, 4); fullscreen.Size = new Size(42, 30); }
-
-            // Centre receiver state directly above the tuner control panel.
-            Label locked = FindLabelContains(controls, "LOCK");
-            Label service = FindServiceLabel(controls, locked);
-            int stateWidth = Math.Min(tunerBox.Width, 340);
-            int stateLeft = tunerBox.Left + Math.Max(0, (tunerBox.Width - stateWidth) / 2);
-            int lockWidth = 88;
-            int serviceWidth = Math.Max(120, stateWidth - lockWidth - 8);
-
-            if (locked != null)
-            {
-                locked.Location = new Point(stateLeft, 4);
-                locked.Size = new Size(lockWidth, 30);
-                locked.TextAlign = ContentAlignment.MiddleCenter;
-            }
-
-            if (service != null)
-            {
-                service.Location = new Point(stateLeft + lockWidth + 8, 4);
-                service.Size = new Size(serviceWidth, 30);
-                service.Font = new Font("Segoe UI Semibold", 11.5f);
-                service.ForeColor = Color.White;
-                service.TextAlign = ContentAlignment.MiddleCenter;
+                // RX title occupies the first 55px. Reserve at least 65px
+                // for service status; the volume slider flexes with width.
+                int x = 58;
+                if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, 20, 24);
+                x += 22;
+                int volumeWidth = Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
+                if (volume != null) volume.Bounds = new Rectangle(x, 4, volumeWidth, 30);
+                x += volumeWidth + 5;
+                if (mute != null) { mute.Bounds = new Rectangle(x, 5, 64, 27); x += 68; }
+                if (record != null) { record.Bounds = new Rectangle(x, 5, 89, 27); x += 93; }
+                if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, 99, 27); x += 103; }
+                if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, 34, 27); x += 39; }
+                if (locked != null)
+                {
+                    locked.Bounds = new Rectangle(x, 5, 86, 27);
+                    x += 90;
+                }
+                if (service != null)
+                {
+                    service.Bounds = new Rectangle(x, 5,
+                        Math.Max(68, header.ClientSize.Width - x - 6), 27);
+                    service.TextAlign = ContentAlignment.MiddleLeft;
+                }
             }
 
             LayoutInfoTabs(controls, tunerBox, tuner);
@@ -287,8 +281,8 @@ namespace opentuner
             int infoLeft = 4;
             int gapToTuner = 9;
             int available = Math.Max(355, tunerBox.Left - gapToTuner - infoLeft);
-            tabs.Bounds = new Rectangle(infoLeft, 39, available,
-                Math.Max(120, controls.ClientSize.Height - 43));
+            tabs.Bounds = new Rectangle(infoLeft, 4, available,
+                Math.Max(120, controls.ClientSize.Height - 8));
             int tabWidth = Math.Max(80, (tabs.ClientSize.Width - 2) / 3);
             for (int page = 0; page < 3; page++)
             {
