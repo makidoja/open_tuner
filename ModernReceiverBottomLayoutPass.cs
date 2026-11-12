@@ -187,9 +187,28 @@ namespace opentuner
                     // Windows ComboBox hidden behind the dark themed button.
                     rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
                 }
+                // The two top receiver panes can use dark selector proxies.
+                // Give them the full control height and explicitly align them
+                // with SR/RF fields after every responsive layout pass.
+                foreach (string key in new string[] {
+                    "ModernSrButton" + tuner, "ModernRfButton" + tuner })
+                {
+                    Control proxy = box.Controls[key];
+                    ComboBox native = key.StartsWith("ModernSrButton") ? sr : rf;
+                    if (proxy == null || native == null) continue;
+                    proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 30);
+                    proxy.Font = new Font("Segoe UI Semibold", 8f);
+                    Button button = proxy as Button;
+                    if (button != null)
+                    {
+                        button.Padding = new Padding(5, 0, 3, 0);
+                        button.TextAlign = ContentAlignment.MiddleLeft;
+                    }
+                    proxy.BringToFront();
+                }
                 if (tune != null)
                 {
-                    tune.Bounds = new Rectangle(left + full - 70, 105, 70, 26);
+                    tune.Bounds = new Rectangle(left + full - 70, 109, 70, 26);
                     tune.Font = new Font("Segoe UI Semibold", 8f);
                 }
                 return;
