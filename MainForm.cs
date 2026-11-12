@@ -922,7 +922,14 @@ namespace opentuner
 
             for (int c = 0; c < amount; c++)
             {
-                var media_player = ConfigureVideoPlayer(c, playerPreference[c], windowed[c]);
+                // The modern window supplies the actual video HWND. Never create an
+                // extra top-level VideoViewForm for a receiver that already has an
+                // embedded destination, regardless of a saved legacy preference.
+                bool separateWindow = windowed[c] && (external_video_panels == null ||
+                    c >= external_video_panels.Length ||
+                    external_video_panels[c] == null ||
+                    external_video_panels[c].IsDisposed);
+                var media_player = ConfigureVideoPlayer(c, playerPreference[c], separateWindow);
                 mediaPlayers.Add(media_player);
             }
 
