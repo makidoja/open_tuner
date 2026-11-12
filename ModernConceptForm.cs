@@ -459,7 +459,7 @@ namespace opentuner
             Label title = new Label
             {
                 Name = "ModernReceiverHeaderTitle" + tuner,
-                Text = "▣  Tuner " + (char)('A' + tuner),
+                Text = "▣  RX " + (char)('A' + tuner),
                 Location = new Point(4, 6),
                 Size = new Size(51, 24),
                 ForeColor = Text,
