@@ -81,7 +81,7 @@ namespace opentuner
         private static Version ParseVersion(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
-            Match m = Regex.Match(text.Trim(), @"(?:^|[^0-9])(\\d+)\\.(\\d+)\\.(\\d+)(?:\\.\\d+)?$");
+            Match m = Regex.Match(text.Trim(), @"(?:^|[^0-9])(\d+)\.(\d+)\.(\d+)$");
             if (!m.Success) return null;
             Version parsed;
             return Version.TryParse(m.Groups[1].Value + "." + m.Groups[2].Value +
