@@ -48,6 +48,17 @@ namespace opentuner.MediaSources.WinterHill
         private string[] last_service_provider = new string[4] { "", "", "", "" };
         private string[] last_dbm = new string[4] { "", "", "", "" };
         private string[] last_mer = new string[4] { "", "", "", "" };
+
+        // Actual transport bytes observed on the local four UDP TS sockets.
+        private readonly long[] tsReceivedBytes = new long[4];
+        private readonly long[] tsSampleBytes = new long[4];
+        private readonly DateTime[] tsSampleAt = new DateTime[4];
+        private readonly double[] tsActualMbps = new double[4];
+        private readonly object[] tsSampleLocks = new object[] { new object(), new object(), new object(), new object() };
+        private readonly string[] receivedVideoCodec = new string[4];
+        private readonly string[] receivedVideoResolution = new string[4];
+        private readonly string[] receivedAudioCodec = new string[4];
+        private readonly string[] receivedAudioRate = new string[4];
         
         private int[] demodstate = new int[4] {0, 0, 0, 0};
 
@@ -249,9 +260,10 @@ namespace opentuner.MediaSources.WinterHill
         {
             int device = ((UDPClient)sender).getID();
 
-            if (!playing[device])
+            if (!playing[device] || e == null || udp_buffer == null || udp_buffer[device] == null)
                 return;
 
+            System.Threading.Interlocked.Add(ref tsReceivedBytes[device], e.Length);
             for (int c = 0; c < e.Length; c++)
             {
                 udp_buffer[device].Enqueue(e[c]);
