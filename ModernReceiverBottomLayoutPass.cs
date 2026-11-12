@@ -159,6 +159,20 @@ namespace opentuner
 
                 // RX title occupies the first 55px. Reserve at least 65px
                 // for service status; the volume slider flexes with width.
+                if (compact4)
+                {
+                    foreach (Control item in header.Controls)
+                    {
+                        Button btn = item as Button;
+                        if (btn != null) btn.Font = new Font("Segoe UI Semibold", 7f);
+                        Label lbl = item as Label;
+                        if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
+                        {
+                            lbl.Font = new Font("Segoe UI Semibold", 9f);
+                            lbl.Size = new Size(44, 23);
+                        }
+                    }
+                }
                 int x = compact4 ? 48 : 58;
                 if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, compact4 ? 15 : 20, 24);
                 x += compact4 ? 16 : 22;
@@ -328,7 +342,7 @@ namespace opentuner
                 currentMer[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(97, 30, Math.Max(60, pageCurrent.ClientSize.Width - 112), 11) : new Rectangle(147, 55, 180, 19);
+                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(97, 30, Math.Max(45, pageCurrent.ClientSize.Width - 215), 11) : new Rectangle(147, 55, 180, 19);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
@@ -336,7 +350,7 @@ namespace opentuner
                 currentMargin[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(97, 52, Math.Max(60, pageCurrent.ClientSize.Width - 112), 11) : new Rectangle(147, 107, 180, 19);
+                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(97, 52, Math.Max(45, pageCurrent.ClientSize.Width - 215), 11) : new Rectangle(147, 107, 180, 19);
             for (int page = 1; page <= 2; page++)
                 for (int col = 0; col < 2; col++)
                 {
