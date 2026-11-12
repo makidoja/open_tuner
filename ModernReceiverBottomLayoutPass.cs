@@ -183,8 +183,9 @@ namespace opentuner
                     rf.BackColor = Color.FromArgb(18, 38, 60);
                     rf.ForeColor = Text;
                     rf.Font = new Font("Segoe UI Semibold", 8f);
-                    rf.Visible = true;
-                    rf.BringToFront();
+                    // When themed button proxy exists, keep the native white
+                    // Windows ComboBox hidden behind the dark themed button.
+                    rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
                 }
                 if (tune != null)
                 {
@@ -195,7 +196,8 @@ namespace opentuner
             }
             foreach (Control child in box.Controls)
                 if (child is Label) child.Visible = false;
-            if (rf != null) rf.Visible = true;
+            if (rf != null)
+                rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
             if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
             if (sr != null) { sr.Bounds = new Rectangle(left, 39, full, 27); sr.Font = new Font("Segoe UI Semibold", 9.5f); }
             if (rf != null) { rf.Bounds = new Rectangle(left, 70, full, 27); rf.Font = new Font("Segoe UI Semibold", 9.5f); }
