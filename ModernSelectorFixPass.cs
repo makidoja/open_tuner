@@ -107,44 +107,20 @@ namespace opentuner
 
         private static void FixTunerSelectors(ModernConceptForm form)
         {
-            // The original pass only converted RX1/RX2 into button proxies,
-            // while RX3/RX4 retained native ComboBoxes. Those proxies were
-            // not moved by the layout pass and overlapped frequency/LO fields.
-            // Use the real, functional SR dropdown on all four receivers.
+            // Native WinForms dropdowns use a bright OS-themed arrow and
+            // selection area. Present both SR and RF connector as the same
+            // dark menu-backed button used elsewhere in the modern theme.
+            // Unlike the old RX1/2-only pass, apply to all four receivers
+            // and keep proxies exactly in sync with the real control bounds.
             for (int tuner = 0; tuner < 4; tuner++)
             {
                 ComboBox sr = FindControl<ComboBox>(form, "ModernSrCombo" + tuner);
                 ComboBox rf = FindControl<ComboBox>(form, "ModernRfInput" + tuner);
                 if (sr != null)
-                {
-                    HideTunerProxy(sr.Parent, "ModernSrButton" + tuner);
-                    sr.DropDownStyle = ComboBoxStyle.DropDownList;
-                    sr.FlatStyle = FlatStyle.Flat;
-                    sr.BackColor = Surface2;
-                    sr.ForeColor = Text;
-                    sr.Visible = true;
-                    sr.BringToFront();
-                }
+                    ReplaceSelector(sr, "ModernSrButton" + tuner, false);
                 if (rf != null)
-                {
-                    HideTunerProxy(rf.Parent, "ModernRfButton" + tuner);
-                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
-                    rf.FlatStyle = FlatStyle.Flat;
-                    rf.BackColor = Surface2;
-                    rf.ForeColor = Text;
-                    // Receiver pane A-D is fixed; RF input A/B is a
-                    // separate physical connector selection on each tuner.
-                    rf.Visible = true;
-                    rf.BringToFront();
-                }
+                    ReplaceSelector(rf, "ModernRfButton" + tuner, true);
             }
-        }
-
-        private static void HideTunerProxy(Control parent, string name)
-        {
-            if (parent == null) return;
-            Control proxy = parent.Controls[name];
-            if (proxy != null) proxy.Visible = false;
         }
 
         private static Button ReplaceSelector(ComboBox combo, string buttonName, bool raiseCommit)
@@ -152,7 +128,13 @@ namespace opentuner
             if (combo == null || combo.Parent == null) return null;
 
             Control existing = combo.Parent.Controls[buttonName];
-            if (existing is Button) return (Button)existing;
+            if (existing is Button)
+            {
+                existing.Bounds = combo.Bounds;
+                existing.Visible = true;
+                combo.Visible = false;
+                return (Button)existing;
+            }
 
             HideOldProxy(combo);
 
@@ -160,7 +142,7 @@ namespace opentuner
             {
                 Name = buttonName,
                 Location = combo.Location,
-                Size = new Size(combo.Width, Math.Max(30, combo.Height + 4)),
+                Size = combo.Size,
                 Anchor = combo.Anchor,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = Surface2,
@@ -224,6 +206,19 @@ namespace opentuner
             combo.SelectedIndexChanged += delegate { refresh(); };
             combo.TextChanged += delegate { refresh(); };
             combo.EnabledChanged += delegate { if (!button.IsDisposed) button.Enabled = combo.Enabled; };
+            // The bottom layout pass owns actual dropdown positions. Follow
+            // every bounds change so proxies cannot drift over FREQ or LO.
+            EventHandler syncBounds = delegate
+            {
+                if (!button.IsDisposed && !combo.IsDisposed)
+                {
+                    button.Bounds = combo.Bounds;
+                    button.Anchor = combo.Anchor;
+                    button.BringToFront();
+                }
+            };
+            combo.LocationChanged += syncBounds;
+            combo.SizeChanged += syncBounds;
 
             combo.Parent.Controls.Add(button);
             button.BringToFront();
