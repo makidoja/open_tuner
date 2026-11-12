@@ -130,13 +130,21 @@ namespace opentuner.MediaSources.WinterHill
             {
                 if (statusClient == null || sourceUnit < 0 || sourceUnit > 1)
                     return;
-                // Reject broadcasts/status originating from the other PicoTuner
-                // rather than assigning them to the wrong pair of receivers.
+                // The local destination UDP port identifies the device.
+                // PicoTuner firmware can report a different source address
+                // when network interfaces, DHCP or NAT are involved. A strict
+                // equality check here silently discarded every RX C/D packet.
+                // Keep distinct local ports and receiver ID ranges as the
+                // routing boundary; log any sender-IP discrepancy for diagnosis.
                 string expectedHost = sourceUnit == 0 ? _settings.WinterHillUdpHost :
                     _settings.SecondPicoTunerUdpHost;
-                if (!string.Equals(statusClient.LastRemoteAddress, expectedHost,
+                if (!string.IsNullOrWhiteSpace(statusClient.LastRemoteAddress) &&
+                    !string.Equals(statusClient.LastRemoteAddress, expectedHost,
                     StringComparison.OrdinalIgnoreCase))
-                    return;
+                {
+                    Log.Debug("Dual PicoTuner {Unit} status received from {Sender}, configured IP {Configured}; mapping by local UDP port and RX ID",
+                        sourceUnit + 1, statusClient.LastRemoteAddress, expectedHost);
+                }
             }
             int udp_base_port = DualPicoEnabled && sourceUnit == 1 ?
                 _settings.SecondPicoTunerUdpBasePort : _settings.WinterHillUdpBasePort;
@@ -191,6 +199,9 @@ namespace opentuner.MediaSources.WinterHill
                         }
                         receiverIdentified = true;
                         mm.rx[receiver].rx = receiver;
+                        if (DualPicoEnabled && sourceUnit == 1)
+                            Log.Debug("PicoTuner 2 status mapped local RX{Local} to OpenTuner RX{Global}",
+                                localReceiver, receiver);
                         // Some firmware sends status in partial batches. Do not
                         // treat an omitted $1 demod state as a loss of lock.
                         mm.rx[receiver].scanstate = demodstate[receiver - 1];
