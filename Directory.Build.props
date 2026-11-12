@@ -24,6 +24,7 @@
     <Compile Include="ModernSelectorFixPass.cs" Condition="Exists('ModernSelectorFixPass.cs')" />
     <Compile Include="ModernFinalPolishPass.cs" Condition="Exists('ModernFinalPolishPass.cs')" />
     <Compile Include="ModernBranding.cs" Condition="Exists('ModernBranding.cs')" />
+    <Compile Include="ModernUpdateChecker.cs" Condition="Exists('ModernUpdateChecker.cs')" />
     <Compile Include="ModernBatcChatEnhancements.cs" Condition="Exists('ModernBatcChatEnhancements.cs')" />
     <Compile Include="ModernBatcSpectrumControl.cs" Condition="Exists('ModernBatcSpectrumControl.cs')" />
     <Compile Include="ModernBatcSpectrumPass.cs" Condition="Exists('ModernBatcSpectrumPass.cs')" />
