@@ -473,6 +473,8 @@ namespace opentuner
 
             videoHosts[tuner] = new Panel { Dock = DockStyle.Fill, BackColor = Color.Black };
             card.Controls.Add(videoHosts[tuner]); videoHosts[tuner].BringToFront();
+            int receiverIndex = tuner;
+            card.Resize += delegate { PositionReceiverVideo(receiverIndex); };
 
             liveFreq[tuner] = new Label { Text = "— MHz", Location = new Point(4, 6), Size = new Size(230, 38), ForeColor = Text, Font = new Font("Segoe UI Semibold", 21f), TextAlign = ContentAlignment.MiddleLeft };
             controls.Controls.Add(liveFreq[tuner]);
@@ -843,6 +845,7 @@ namespace opentuner
                     if (control is Label && control.Text.StartsWith("Frequency and SR"))
                         control.Visible = true;
                 }
+                PositionReceiverVideo(rx);
                 return;
             }
 
@@ -869,6 +872,46 @@ namespace opentuner
                 if (header != null) header.BringToFront();
             }
             panel.ResumeLayout(true);
+            PositionReceiverVideo(rx);
+        }
+
+        private void PositionReceiverVideo(int rx)
+        {
+            if (rx < 0 || rx >= videoHosts.Length) return;
+            Panel card = receiverCards[rx];
+            Panel host = videoHosts[rx];
+            Panel sidebar = receiverControls[rx];
+            if (card == null || host == null || sidebar == null || card.IsDisposed)
+                return;
+
+            if (sidebar.Dock != DockStyle.Left)
+            {
+                // Restore the original responsive fill layout for 1/2 RX.
+                if (host.Dock != DockStyle.Fill)
+                {
+                    host.Anchor = AnchorStyles.Top | AnchorStyles.Bottom |
+                        AnchorStyles.Left | AnchorStyles.Right;
+                    host.Dock = DockStyle.Fill;
+                }
+                return;
+            }
+
+            // Position the native video host explicitly against the right
+            // edge of its receiver card. The left sidebar is not permitted to
+            // steal horizontal space by overlapping a fill-docked host.
+            Panel header = card.Controls.OfType<Panel>()
+                .FirstOrDefault(x => x.Name == "ModernReceiverHeader" + rx);
+            int top = header == null ? card.Padding.Top : header.Bottom;
+            int left = sidebar.Right + 4;
+            int right = card.ClientSize.Width - card.Padding.Right;
+            int bottom = card.ClientSize.Height - card.Padding.Bottom;
+            Rectangle wanted = new Rectangle(left, top,
+                Math.Max(8, right - left), Math.Max(8, bottom - top));
+            if (host.Dock != DockStyle.None)
+                host.Dock = DockStyle.None;
+            host.Anchor = AnchorStyles.None;
+            if (host.Bounds != wanted)
+                host.Bounds = wanted;
         }
 
         // Active presentation may show fewer receivers than the attached device.
