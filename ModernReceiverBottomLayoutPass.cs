@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.Reflection;
@@ -12,7 +13,11 @@ namespace opentuner
         private static bool attached;
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
         private static readonly Color Muted = Color.FromArgb(142, 165, 190);
-        private static readonly TabControl[] infoTabs = new TabControl[2];
+        private static readonly Panel[] infoTabs = new Panel[2];
+        private static readonly Panel[,] infoPages = new Panel[2, 3];
+        private static readonly Button[,] tabButtons = new Button[2, 3];
+        private static readonly TsBitrateGraph[] tsGraphs = new TsBitrateGraph[2];
+        private static readonly DateTime[] lastTsSample = new DateTime[2];
         private static readonly Label[] currentFreq = new Label[2];
         private static readonly Label[] currentMer = new Label[2];
         private static readonly Label[] currentMargin = new Label[2];
@@ -170,7 +175,7 @@ namespace opentuner
         // receiver event handlers.
         private static void LayoutInfoTabs(Panel controls, Panel tunerBox, int tuner)
         {
-            TabControl tabs = infoTabs[tuner];
+            Panel tabs = infoTabs[tuner];
             if (tabs == null || tabs.IsDisposed)
             {
                 Label freq = FindLargestFrequencyLabel(controls);
@@ -189,39 +194,43 @@ namespace opentuner
                     else if (IsMarginBar(bar)) currentMarginBar[tuner] = bar;
                 }
 
-                tabs = new TabControl
+                tabs = new Panel
                 {
                     Name = "ModernReceiverInfoTabs" + tuner,
-                    DrawMode = TabDrawMode.OwnerDrawFixed,
-                    SizeMode = TabSizeMode.Fixed,
-                    ItemSize = new Size(120, 21),
-                    BackColor = Color.FromArgb(13, 28, 45),
-                    ForeColor = Text,
-                    Font = new Font("Segoe UI Semibold", 8f)
+                    BackColor = Color.FromArgb(21, 42, 62),
+                    BorderStyle = BorderStyle.FixedSingle
                 };
-                tabs.DrawItem += delegate(object sender, DrawItemEventArgs e)
+                string[] names = { "Current", "TS Info", "Tuner Data" };
+                for (int page = 0; page < names.Length; page++)
                 {
-                    if (e.Index < 0) return;
-                    Rectangle rect = e.Bounds;
-                    bool selected = e.Index == tabs.SelectedIndex;
-                    using (Brush bg = new SolidBrush(selected ?
-                        Color.FromArgb(34, 68, 98) : Color.FromArgb(17, 35, 52)))
-                        e.Graphics.FillRectangle(bg, rect);
-                    TextRenderer.DrawText(e.Graphics, tabs.TabPages[e.Index].Text,
-                        tabs.Font, rect, selected ? Text : Muted,
-                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                };
-
-                foreach (string name in new[] { "Current", "TS Info", "Tuner Data" })
-                    tabs.TabPages.Add(new TabPage(name)
+                    int index = page;
+                    Button button = new Button
                     {
-                        BackColor = Color.FromArgb(13, 28, 45),
+                        Name = "ModernReceiverTabButton" + tuner + "_" + page,
+                        Text = names[page],
+                        FlatStyle = FlatStyle.Flat,
+                        TabStop = false,
+                        BackColor = page == 0 ? Color.FromArgb(34, 68, 98) :
+                            Color.FromArgb(17, 35, 52),
                         ForeColor = Text,
-                        UseVisualStyleBackColor = false,
-                        Padding = new Padding(3)
-                    });
-
-                TabPage current = tabs.TabPages[0];
+                        Font = new Font("Segoe UI Semibold", 8f),
+                        UseVisualStyleBackColor = false
+                    };
+                    button.FlatAppearance.BorderSize = 0;
+                    button.Click += delegate { SelectInfoPage(tuner, index); };
+                    Panel pagePanel = new Panel
+                    {
+                        Name = "ModernReceiverInfoPage" + page + "_" + tuner,
+                        BackColor = Color.FromArgb(13, 28, 45),
+                        Visible = page == 0
+                    };
+                    tabButtons[tuner, page] = button;
+                    infoPages[tuner, page] = pagePanel;
+                    tabs.Controls.Add(pagePanel);
+                    tabs.Controls.Add(button);
+                    button.BringToFront();
+                }
+                Panel current = infoPages[tuner, 0];
                 current.Controls.Add(freq);
                 current.Controls.Add(mer);
                 current.Controls.Add(margin);
@@ -242,7 +251,7 @@ namespace opentuner
                             TextAlign = ContentAlignment.TopLeft
                         };
                         dataLabels[tuner, (page - 1) * 2 + col] = label;
-                        tabs.TabPages[page].Controls.Add(label);
+                        infoPages[tuner, page].Controls.Add(label);
                     }
                 }
 
@@ -252,7 +261,7 @@ namespace opentuner
                 Label detail = FindDetailsLabel(controls);
                 if (detail != null)
                 {
-                    tabs.TabPages[2].Controls.Add(detail);
+                    infoPages[tuner, 2].Controls.Add(detail);
                     detail.Font = new Font("Segoe UI", 8f);
                     detail.ForeColor = Muted;
                     detail.Anchor = AnchorStyles.Left | AnchorStyles.Top;
@@ -261,12 +270,22 @@ namespace opentuner
                 controls.Controls.Add(tabs);
                 tabs.BringToFront();
                 infoTabs[tuner] = tabs;
+                SelectInfoPage(tuner, 0);
             }
 
             int available = Math.Max(355, tunerBox.Left - 9);
             tabs.Bounds = new Rectangle(4, 39, Math.Min(438, available),
                 Math.Max(120, controls.ClientSize.Height - 43));
-            TabPage pageCurrent = tabs.TabPages[0];
+            int tabWidth = Math.Max(80, (tabs.ClientSize.Width - 2) / 3);
+            for (int page = 0; page < 3; page++)
+            {
+                tabButtons[tuner, page].Bounds = new Rectangle(page * tabWidth, 0,
+                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, 23);
+                infoPages[tuner, page].Bounds = new Rectangle(0, 23,
+                    tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - 23));
+                infoPages[tuner, page].SendToBack();
+            }
+            Panel pageCurrent = infoPages[tuner, 0];
             if (currentFreq[tuner] != null)
             {
                 currentFreq[tuner].Location = new Point(5, 1);
@@ -300,11 +319,27 @@ namespace opentuner
                     label.Bounds = new Rectangle(left, 7,
                         Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 86);
                 }
-            Label details = FindDetailsLabel(tabs.TabPages[2]);
+            Label details = FindDetailsLabel(infoPages[tuner, 2]);
             if (details != null)
             {
                 details.Bounds = new Rectangle(7, 88, Math.Max(250, pageCurrent.ClientSize.Width - 14), 18);
                 details.AutoSize = false;
+            }
+        }
+
+        private static void SelectInfoPage(int tuner, int selected)
+        {
+            for (int page = 0; page < 3; page++)
+            {
+                Panel panel = infoPages[tuner, page];
+                Button button = tabButtons[tuner, page];
+                if (panel == null || button == null) continue;
+                panel.Visible = page == selected;
+                button.BackColor = page == selected ? Color.FromArgb(34, 68, 98) :
+                    Color.FromArgb(17, 35, 52);
+                button.ForeColor = page == selected ? Text : Muted;
+                if (page == selected) panel.BringToFront();
+                button.BringToFront();
             }
         }
 
