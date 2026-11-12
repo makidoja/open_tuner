@@ -128,8 +128,7 @@ namespace opentuner
                         case "LO": x = right; y = 5; labelText = "LO"; break;
                         case "SR": x = left; y = 51; labelText = "SR"; break;
                         case "TUNER":
-                            caption.Visible = false;
-                            continue;
+                        case "RF INPUT": x = right; y = 51; labelText = "RF INPUT"; break;
                         default:
                             caption.Visible = false;
                             continue;
@@ -174,9 +173,19 @@ namespace opentuner
                     sr.Font = new Font("Segoe UI Semibold", 8f);
                     sr.BringToFront();
                 }
-                // RF input A/B is not a receiver selector. Hide it only in
-                // four-RX mode; each quadrant has its own fixed receiver index.
-                if (rf != null) rf.Visible = false;
+                // Each fixed receiver (A-D) has its own physical RF input A/B.
+                // Keep that hardware selection separate from the pane title.
+                if (rf != null)
+                {
+                    rf.Bounds = new Rectangle(right, 65, half, fieldHeight);
+                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
+                    rf.FlatStyle = FlatStyle.Flat;
+                    rf.BackColor = Color.FromArgb(18, 38, 60);
+                    rf.ForeColor = Text;
+                    rf.Font = new Font("Segoe UI Semibold", 8f);
+                    rf.Visible = true;
+                    rf.BringToFront();
+                }
                 if (tune != null)
                 {
                     tune.Bounds = new Rectangle(left + full - 70, 105, 70, 26);
