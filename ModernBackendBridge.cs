@@ -357,6 +357,8 @@ namespace opentuner
                     try { stop_video(i); }
                     catch (Exception ex) { Log.Warning(ex, "Stopping receiver {Receiver}", i + 1); }
                 }
+                bool wasMinitiounerUsb = videoSource is MinitiounerSource;
+                int disconnectedSourceIndex = BackendSelectedSourceIndex;
                 videoSource.Close();
 
                 if (_mediaPlayers != null)
@@ -372,6 +374,16 @@ namespace opentuner
                     foreach (var streamer in _ts_streamers) { try { streamer.Close(); } catch { } }
                 if (_ts_recorders != null)
                     foreach (var recorder in _ts_recorders) { try { recorder.Close(); } catch { } }
+
+                // The source instance owns USB-interface and worker state.
+                // Make the next CONNECT a completely new USB session rather
+                // than reusing an object with aborted Thread instances.
+                if (wasMinitiounerUsb && disconnectedSourceIndex >= 0 &&
+                    disconnectedSourceIndex < _availableSources.Count)
+                {
+                    _availableSources[disconnectedSourceIndex] = new MinitiounerSource();
+                    Log.Information("[MINITIOUNER-USB] Fresh USB source prepared for reconnect");
+                }
 
                 // Release obsolete renderer controls before a fresh connection.
                 for (int i = 0; i < 2 && i < video_panels.Length; i++)
