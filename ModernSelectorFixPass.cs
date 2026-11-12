@@ -64,14 +64,18 @@ namespace opentuner
 
             ComboBox lnbA = FindControl<ComboBox>(form, "ModernLnbA");
             ComboBox lnbB = FindControl<ComboBox>(form, "ModernLnbB");
+            ComboBox lnb2A = FindControl<ComboBox>(form, "ModernLnb2A");
+            ComboBox lnb2B = FindControl<ComboBox>(form, "ModernLnb2B");
             Label hw = FindControl<Label>(form, "ModernHardwareLabel");
 
             Button a = ReplaceSelector(lnbA, "ModernLnbAButton", true);
             Button b = ReplaceSelector(lnbB, "ModernLnbBButton", true);
+            Button c = ReplaceSelector(lnb2A, "ModernLnb2AButton", true);
+            Button d = ReplaceSelector(lnb2B, "ModernLnb2BButton", true);
 
             // Match the SOURCE SETTINGS toolbar button (30px tall).
             // A and B must sit together, in that order, after HW.
-            foreach (Button button in new Button[] { a, b })
+            foreach (Button button in new Button[] { a, b, c, d })
             {
                 if (button == null) continue;
                 button.AutoSize = false;
@@ -86,34 +90,43 @@ namespace opentuner
                 button.TextAlign = ContentAlignment.MiddleLeft;
             }
 
-            HideStaleLnbButtons(bar, a, b);
+            HideStaleLnbButtons(bar, a, b, c, d);
 
             if (hw != null && a != null && b != null)
             {
-                // Rebuild the pair's order explicitly. Moving B with
-                // SetChildIndex against a previously calculated A index
-                // was sending B to the far-left of the FlowLayoutPanel.
+                // Add the four buttons in one stable sequence. FlowLayoutPanel
+                // child indices determine display order, so never BringToFront.
                 bar.SuspendLayout();
                 try
                 {
-                    bar.Controls.Remove(a);
-                    bar.Controls.Remove(b);
+                    Button[] pairOrQuad = { a, b, c, d };
+                    foreach (Button button in pairOrQuad)
+                        if (button != null) bar.Controls.Remove(button);
                     int afterHardware = bar.Controls.GetChildIndex(hw, false) + 1;
-                    bar.Controls.Add(a);
-                    bar.Controls.Add(b);
-                    bar.Controls.SetChildIndex(a, afterHardware);
-                    bar.Controls.SetChildIndex(b, afterHardware + 1);
+                    for (int i = 0; i < pairOrQuad.Length; i++)
+                    {
+                        Button button = pairOrQuad[i];
+                        if (button == null) continue;
+                        bar.Controls.Add(button);
+                        bar.Controls.SetChildIndex(button, afterHardware + i);
+                    }
+                    // The second PicoTuner buttons exist at startup but are
+                    // visible only when dual-device mode is selected.
+                    bool dual = lnb2A != null && lnb2A.Enabled;
+                    if (c != null) c.Visible = dual;
+                    if (d != null) d.Visible = dual;
                 }
                 finally { bar.ResumeLayout(true); }
             }
         }
 
-        private static void HideStaleLnbButtons(FlowLayoutPanel bar, Button keepA, Button keepB)
+        private static void HideStaleLnbButtons(FlowLayoutPanel bar, Button keepA, Button keepB, Button keep2A, Button keep2B)
         {
             foreach (Control c in bar.Controls)
             {
                 Button button = c as Button;
-                if (button == null || button == keepA || button == keepB) continue;
+                if (button == null || button == keepA || button == keepB ||
+                    button == keep2A || button == keep2B) continue;
 
                 string text = button.Text ?? string.Empty;
                 if (text.StartsWith("LNB A:", StringComparison.OrdinalIgnoreCase) ||
