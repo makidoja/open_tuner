@@ -132,9 +132,10 @@ namespace opentuner
                     rf.FlatStyle = FlatStyle.Flat;
                     rf.BackColor = Surface2;
                     rf.ForeColor = Text;
-                    // Four-RX mode maps each pane to its own fixed
-                    // hardware receiver. RF A/B selection is not relevant.
-                    rf.Visible = form.ModernReceiverCount < 4;
+                    // Receiver pane A-D is fixed; RF input A/B is a
+                    // separate physical connector selection on each tuner.
+                    rf.Visible = true;
+                    rf.BringToFront();
                 }
             }
         }
