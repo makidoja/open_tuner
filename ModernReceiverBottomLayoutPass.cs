@@ -63,7 +63,7 @@ namespace opentuner
                 // then set its height from the lowest visible control.
                 tunerBox.Size = compact4
                     ? new Size(Math.Max(185, controls.ClientSize.Width - 8), 138)
-                    : new Size(188, Math.Max(150, controls.ClientSize.Height - 8));
+                    : new Size(188, 138);
                 tunerBox.Anchor = compact4 ? AnchorStyles.Left | AnchorStyles.Top :
                     AnchorStyles.Right | AnchorStyles.Bottom;
                 LayoutTunerBox(tunerBox, tuner, compact4);
@@ -85,7 +85,8 @@ namespace opentuner
                 else
                 {
                     tunerBox.Location = new Point(
-                        Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
+                        Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4),
+                        Math.Max(4, controls.ClientSize.Height - tunerBox.Height - 4));
                 }
                 LayoutReceiverStatusAndButtons(controls, tunerBox, tuner, compact4);
                 tunerBox.BringToFront();
@@ -213,19 +214,61 @@ namespace opentuner
                 }
                 return;
             }
+            // PicoTuner/two-receiver compact layout (top to bottom):
+            // Frequency, LO frequency + enable, SR | RF input, small Tune.
+            // Only rearrange existing controls; keep hardware callbacks.
             foreach (Control child in box.Controls)
                 if (child is Label) child.Visible = false;
+            int gap2 = 7;
+            int half2 = (full - gap2) / 2;
+            int right2 = left + half2 + gap2;
+            if (freq != null)
+            {
+                freq.Bounds = new Rectangle(left, 6, full, 26);
+                StyleEntry(freq, 9f);
+            }
+            if (lo != null)
+            {
+                lo.Bounds = new Rectangle(left, 37, full - 38, 26);
+                StyleEntry(lo, 9f);
+            }
+            if (loEnabled != null)
+            {
+                loEnabled.Text = "LO";
+                loEnabled.Font = new Font("Segoe UI", 8f);
+                loEnabled.Bounds = new Rectangle(left + full - 35, 38, 35, 24);
+                loEnabled.BringToFront();
+            }
+            if (sr != null)
+            {
+                sr.Bounds = new Rectangle(left, 69, half2, 26);
+                sr.Font = new Font("Segoe UI Semibold", 8.5f);
+                sr.Visible = box.Controls["ModernSrButton" + tuner] == null;
+            }
             if (rf != null)
+            {
+                rf.Bounds = new Rectangle(right2, 69, half2, 26);
+                rf.Font = new Font("Segoe UI Semibold", 8.5f);
                 rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
-            if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
-            if (sr != null) { sr.Bounds = new Rectangle(left, 39, full, 27); sr.Font = new Font("Segoe UI Semibold", 9.5f); }
-            if (rf != null) { rf.Bounds = new Rectangle(left, 70, full, 27); rf.Font = new Font("Segoe UI Semibold", 9.5f); }
-            if (lo != null) { lo.Bounds = new Rectangle(left, 101, full - 50, 27); StyleEntry(lo, 9.5f); }
-            if (loEnabled != null) { loEnabled.Text = "LO"; loEnabled.Bounds = new Rectangle(box.ClientSize.Width - 47, 103, 43, 22); }
+            }
+            // The dark selector proxies must follow both the size and the
+            // position of the native combos, not their old stacked bounds.
+            foreach (string key in new string[] {
+                "ModernSrButton" + tuner, "ModernRfButton" + tuner })
+            {
+                Control proxy = box.Controls[key];
+                ComboBox native = key.StartsWith("ModernSrButton") ? sr : rf;
+                if (proxy == null || native == null) continue;
+                proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 26);
+                proxy.Font = new Font("Segoe UI Semibold", 8.5f);
+                proxy.Visible = true;
+                proxy.BringToFront();
+            }
             if (tune != null)
             {
-                tune.Bounds = new Rectangle(left, Math.Max(119, box.ClientSize.Height - 35), full, 30);
-                tune.Font = new Font("Segoe UI Semibold", 9f);
+                tune.Bounds = new Rectangle(left + full - 70, 105, 70, 25);
+                tune.Font = new Font("Segoe UI Semibold", 8f);
+                tune.BringToFront();
             }
         }
 
