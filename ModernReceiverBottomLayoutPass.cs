@@ -130,21 +130,18 @@ namespace opentuner
                 // On subsequent layouts the controls already live inside
                 // the header. Search there first so window resize keeps all
                 // controls aligned without moving them back to the old strip.
-                Control source = header.Controls.Count > 1 ? (Control)header : controls;
-                Label volIcon = FindLabelExact(source, "🔊");
-                TrackBar volume = FindFirst<TrackBar>(source);
-                Button mute = FindButtonContains(source, "MUTE");
-                Button record = FindButtonContains(source, "RECORD");
-                if (record == null) record = FindButtonContains(source, "STOP");
-                Button snapshot = FindButtonContains(source, "SNAPSHOT");
-                Button fullscreen = FindButtonExact(source, "⛶");
-                Label locked = FindLabelContains(source, "LOCK");
-                Label service = FindByName<Label>(header, "ModernReceiverHeaderService" + tuner);
-                if (service == null)
-                {
-                    service = FindServiceLabel(controls, locked);
-                    if (service != null) service.Name = "ModernReceiverHeaderService" + tuner;
-                }
+                // Search the entire card by stable control identity: after
+                // switching layouts some controls have already been moved
+                // into the header while others remain in the sidebar.
+                Control root = controls.Parent;
+                Label volIcon = FindByName<Label>(root, "ModernReceiverSpeaker" + tuner);
+                TrackBar volume = FindByName<TrackBar>(root, "ModernReceiverVolume" + tuner);
+                Button mute = FindByName<Button>(root, "ModernReceiverMute" + tuner);
+                Button record = FindByName<Button>(root, "ModernReceiverRecord" + tuner);
+                Button snapshot = FindByName<Button>(root, "ModernReceiverSnapshot" + tuner);
+                Button fullscreen = FindByName<Button>(root, "ModernReceiverFullscreen" + tuner);
+                Label locked = FindByName<Label>(root, "ModernReceiverLock" + tuner);
+                Label service = FindByName<Label>(root, "ModernReceiverService" + tuner);
                 foreach (Control item in new Control[] {
                     volIcon, volume, mute, record, snapshot, fullscreen, locked, service })
                 {
