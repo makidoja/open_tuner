@@ -894,10 +894,16 @@ namespace opentuner
             if (tuner >= visibleTuners || tuner < 0) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting for service" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
-            if (data.demod_locked && activeQuickTuneSpectrum != null && data.frequency > 0)
+            if (activeQuickTuneSpectrum != null)
             {
-                activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
-                    tuner, data.frequency / 1000.0, data.symbol_rate / 1000f);
+                if (data.demod_locked && data.frequency > 0)
+                    activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
+                        tuner, data.frequency / 1000.0, data.symbol_rate / 1000f);
+                // Only a genuine demodulator lock supplies a meaningful MER.
+                // The service name is shown as transmitted; never guess a call.
+                activeQuickTuneSpectrum.UpdateReceiverSignalInfo(
+                    tuner, data.frequency / 1000.0, data.symbol_rate / 1000f,
+                    data.service_name, data.mer, data.demod_locked);
             }
             lockLabels[tuner].Text = data.demod_locked ? "● LOCKED" : "NO LOCK";
             lockLabels[tuner].ForeColor = data.demod_locked ? Green : Muted;
