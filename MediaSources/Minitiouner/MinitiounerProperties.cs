@@ -566,7 +566,7 @@ namespace opentuner.MediaSources.Minitiouner
             source_data.frequency = GetFrequency(0, true);
             source_data.video_number = 0;
             source_data.mer = mer;
-            source_data.db_margin = dbmargin;
+            source_data.db_margin = new_status.T1P2_demod_status > 1 ? dbmargin : 0;
             source_data.service_name = _tuner1_properties.GetValue("service_name");
             source_data.symbol_rate = (int)(new_status.T1P2_symbol_rate / 1000);
 
@@ -694,7 +694,7 @@ namespace opentuner.MediaSources.Minitiouner
                 source_data_2.frequency = GetFrequency(1, true);
                 source_data_2.video_number = 1;
                 source_data_2.mer = mer2;
-                source_data_2.db_margin = dbmargin;
+                source_data_2.db_margin = new_status.T2P1_demod_status > 1 ? dbmargin : 0;
                 source_data_2.service_name = _tuner2_properties.GetValue("service_name");
                 source_data_2.demod_locked = (new_status.T2P1_demod_status > 1);
                 source_data_2.constellation = source_data_2.demod_locked ? new_status.T2P1_constellation : null;
