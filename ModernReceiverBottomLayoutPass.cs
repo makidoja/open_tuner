@@ -58,14 +58,14 @@ namespace opentuner
                     controls.Resize += delegate { Apply(form); };
 
                 bool compact4 = form.ModernReceiverCount >= 4;
-                // The diagnostics need only a compact area at the top of
-                // the 4-RX sidebar. Give the remaining height to tuning.
+                // Keep tuning to its actual two-row + Tune height rather than
+                // stretching the box down the sidebar. Diagnostics get all
+                // remaining height (normally about 55-60% in 4 RX).
+                int tunerHeight = compact4 ? 143 :
+                    Math.Max(150, controls.ClientSize.Height - 8);
                 int infoHeight = compact4
-                    ? Math.Max(90, Math.Min(144, (int)(controls.ClientSize.Height * 0.40)))
+                    ? Math.Max(0, controls.ClientSize.Height - tunerHeight - 12)
                     : 0;
-                int tunerHeight = compact4
-                    ? Math.Max(94, controls.ClientSize.Height - infoHeight - 12)
-                    : Math.Max(150, controls.ClientSize.Height - 8);
                 tunerBox.Size = compact4
                     ? new Size(Math.Max(185, controls.ClientSize.Width - 8), tunerHeight)
                     : new Size(188, tunerHeight);
@@ -85,12 +85,15 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner, bool compact4)
         {
-            // Compact, label-free vertical tuner stack. Keep the four
-            // existing interactive inputs and their change handlers.
+            // One shared layout for all four receivers; move existing widgets,
+            // never replace them (their live tuner event handlers must survive).
             foreach (Control child in box.Controls)
             {
                 Label caption = child as Label;
-                if (caption != null) caption.Visible = false;
+                if (caption != null)
+                    caption.Visible = compact4 && (
+                        caption.Text == "TUNER" || caption.Text == "LO FREQ" ||
+                        caption.Text == "FREQ" || caption.Text == "SR");
             }
 
             Panel freq = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
@@ -100,47 +103,74 @@ namespace opentuner
             CheckBox loEnabled = FindByName<CheckBox>(box, "ModernLoEnabled" + tuner);
             Button tune = FindButtonExact(box, "TUNE");
 
-            int left = compact4 ? 5 : 9;
-            int full = box.ClientSize.Width - left * 2;
+            int left = compact4 ? 7 : 9;
+            int full = Math.Max(100, box.ClientSize.Width - left * 2);
             if (compact4)
             {
-                // Requested 4 RX tuner arrangement:
-                // [ TUNER       ] [ LO       ] [LO checkbox]
-                // [ FREQUENCY   ] [ SR                ]
-                //                  [ small TUNE button ]
-                // Preserve all existing event handlers and editable controls.
-                int gap = 6;
+                int gap = 8;
                 int half = (full - gap) / 2;
                 int right = left + half + gap;
+                int fieldHeight = 27;
+                foreach (Control child in box.Controls)
+                {
+                    Label caption = child as Label;
+                    if (caption == null) continue;
+                    int x;
+                    int y;
+                    string name;
+                    switch ((caption.Text ?? "").Trim())
+                    {
+                        case "TUNER": x = left; y = 5; name = "TUNER"; break;
+                        case "LO FREQ": x = right; y = 5; name = "LO"; break;
+                        case "FREQ": x = left; y = 51; name = "FREQ"; break;
+                        case "SR": x = right; y = 51; name = "SR"; break;
+                        default: continue;
+                    }
+                    caption.Text = name;
+                    caption.Bounds = new Rectangle(x, y, half, 13);
+                    caption.Font = new Font("Segoe UI Semibold", 7f);
+                    caption.ForeColor = Muted;
+                    caption.Visible = true;
+                }
                 if (rf != null)
                 {
-                    rf.Bounds = new Rectangle(left, 13, half, 29);
+                    rf.Bounds = new Rectangle(left, 19, half, fieldHeight);
+                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
+                    rf.FlatStyle = FlatStyle.Flat;
                     rf.Font = new Font("Segoe UI Semibold", 8f);
                 }
+                // Reserve the checkbox entirely outside the LO entry field.
+                int loCheckWidth = 25;
                 if (lo != null)
                 {
-                    lo.Bounds = new Rectangle(right, 13, Math.Max(42, half - 31), 29);
+                    lo.Bounds = new Rectangle(right, 19,
+                        Math.Max(45, half - loCheckWidth - 3), fieldHeight);
                     StyleEntry(lo, 8f);
                 }
                 if (loEnabled != null)
                 {
-                    loEnabled.Text = "LO";
+                    loEnabled.Text = "L";
                     loEnabled.Font = new Font("Segoe UI", 7.5f);
-                    loEnabled.Bounds = new Rectangle(right + half - 30, 15, 30, 25);
+                    loEnabled.Bounds = new Rectangle(right + half - loCheckWidth, 20,
+                        loCheckWidth, 24);
+                    loEnabled.BringToFront();
                 }
                 if (freq != null)
                 {
-                    freq.Bounds = new Rectangle(left, 60, half, 29);
+                    freq.Bounds = new Rectangle(left, 65, half, fieldHeight);
                     StyleEntry(freq, 8f);
                 }
                 if (sr != null)
                 {
-                    sr.Bounds = new Rectangle(right, 60, half, 29);
+                    sr.Bounds = new Rectangle(right, 65, half, fieldHeight);
+                    sr.DropDownStyle = ComboBoxStyle.DropDownList;
+                    sr.FlatStyle = FlatStyle.Flat;
                     sr.Font = new Font("Segoe UI Semibold", 8f);
+                    sr.BringToFront();
                 }
                 if (tune != null)
                 {
-                    tune.Bounds = new Rectangle(left + full - 78, 109, 78, 29);
+                    tune.Bounds = new Rectangle(left + full - 70, 105, 70, 26);
                     tune.Font = new Font("Segoe UI Semibold", 8f);
                 }
                 return;
