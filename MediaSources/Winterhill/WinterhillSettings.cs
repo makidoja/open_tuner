@@ -23,6 +23,8 @@
         
         // lnba1, lnbb1, lnba2, lnbb2
         public uint[] LNBVoltage = new uint[] { 0, 0 };
+        // Device 2 LNB X/Y states, persisted separately from device 1.
+        public uint[] SecondPicoTunerLNBVoltage = new uint[] { 0, 0 };
 
         public uint[] DefaultFrequency = new uint[] { 10491500, 10491500, 10491500, 10491500 };
         public uint[] DefaultSR = new uint[] { 1500, 1500, 1500, 1500 };
