@@ -281,8 +281,13 @@ namespace opentuner
                 SelectInfoPage(tuner, 0);
             }
 
-            int available = Math.Max(355, tunerBox.Left - 9);
-            tabs.Bounds = new Rectangle(4, 39, Math.Min(438, available),
+            // Fill the space between the left edge and Tuner Control,
+            // retaining a consistent 9px visual gap instead of capping the
+            // information panel at 438px.
+            int infoLeft = 4;
+            int gapToTuner = 9;
+            int available = Math.Max(355, tunerBox.Left - gapToTuner - infoLeft);
+            tabs.Bounds = new Rectangle(infoLeft, 39, available,
                 Math.Max(120, controls.ClientSize.Height - 43));
             int tabWidth = Math.Max(80, (tabs.ClientSize.Width - 2) / 3);
             for (int page = 0; page < 3; page++)
