@@ -363,7 +363,12 @@ namespace opentuner.MediaSources.WinterHill
         {
             int physicalDevice = GetPicoLocalReceiver(device);
             int physicalBase = GetPicoBasePort(device);
-            int base_port = physicalBase + 21 + physicalDevice;
+            // PicoTunerWH accepts [to@wh] WinterHill-format control commands
+            // at base+20. Base+21/+22 are MiniTioune-format receiver ports.
+            // Preserve the proven PicoTuner 1 path while fixing PicoTuner 2,
+            // whose TS targets remain 0.0.0.0 after commands to 9821/9822.
+            int base_port = DualPicoEnabled && device >= 2 ?
+                physicalBase + 20 : physicalBase + 21 + physicalDevice;
             int receiver_num = (physicalBase % 100) + 1 + physicalDevice;
             string controlHost = GetRuntimeUdpHost(device);
             IPAddress hostAddress;
