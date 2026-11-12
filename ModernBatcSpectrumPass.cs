@@ -14,6 +14,13 @@ namespace opentuner
         private static Label spectrumTitle;
         private static readonly Label[] receiverSquares = new Label[2];
 
+        internal static void SetReceiverIndicatorVisibility(int receiverCount)
+        {
+            for (int i = 0; i < receiverSquares.Length; i++)
+                if (receiverSquares[i] != null && !receiverSquares[i].IsDisposed)
+                    receiverSquares[i].Visible = i < receiverCount;
+        }
+
         public static void Attach(ModernConceptForm form)
         {
             if (attached || form == null) return;
@@ -201,6 +208,7 @@ namespace opentuner
             }
 
             LayoutDisplay(card);
+            SetReceiverIndicatorVisibility(form.ModernReceiverCount);
             display.BringToFront();
             if (form.ModernReceiverCount == 1)
             {
