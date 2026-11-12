@@ -484,21 +484,21 @@ namespace opentuner
             Button tune = FlatButton("TUNE", true); tune.Location = new Point(452, 7); tune.Size = new Size(76, 32); tune.Click += delegate { Tune(tuner); };
             controls.Controls.Add(tune);
 
-            lockLabels[tuner] = new Label { Text = "NO LOCK", Location = new Point(4, 51), Size = new Size(105, 28), TextAlign = ContentAlignment.MiddleCenter, ForeColor = Muted, BackColor = Surface2, Font = new Font("Segoe UI Semibold", 9f) };
+            lockLabels[tuner] = new Label { Name = "ModernReceiverLock" + tuner, Text = "NO LOCK", Location = new Point(4, 51), Size = new Size(105, 28), TextAlign = ContentAlignment.MiddleCenter, ForeColor = Muted, BackColor = Surface2, Font = new Font("Segoe UI Semibold", 9f) };
             controls.Controls.Add(lockLabels[tuner]);
-            serviceLabels[tuner] = new Label { Text = "Waiting for service", Location = new Point(120, 55), Size = new Size(220, 24), ForeColor = Muted };
+            serviceLabels[tuner] = new Label { Name = "ModernReceiverService" + tuner, Text = "Waiting for service", Location = new Point(120, 55), Size = new Size(220, 24), ForeColor = Muted };
             controls.Controls.Add(serviceLabels[tuner]);
             merLabels[tuner] = new Label { Text = "MER  — dB", Location = new Point(350, 55), Size = new Size(95, 24), ForeColor = Text };
             controls.Controls.Add(merLabels[tuner]);
             marginLabels[tuner] = new Label { Text = "Margin  — dB", Location = new Point(445, 55), AutoSize = true, MinimumSize = new Size(100, 24), ForeColor = Text };
             controls.Controls.Add(marginLabels[tuner]);
 
-            Label volIcon = new Label { Text = "🔊", Location = new Point(4, 99), Size = new Size(28, 26), ForeColor = Text, TextAlign = ContentAlignment.MiddleCenter };
+            Label volIcon = new Label { Name = "ModernReceiverSpeaker" + tuner, Text = "🔊", Location = new Point(4, 99), Size = new Size(28, 26), ForeColor = Text, TextAlign = ContentAlignment.MiddleCenter };
             controls.Controls.Add(volIcon);
-            volumeBars[tuner] = new TrackBar { Minimum = 0, Maximum = 100, Value = 60, TickStyle = TickStyle.None, Location = new Point(34, 96), Width = 160, Height = 30, BackColor = Surface };
+            volumeBars[tuner] = new TrackBar { Name = "ModernReceiverVolume" + tuner, Minimum = 0, Maximum = 100, Value = 60, TickStyle = TickStyle.None, Location = new Point(34, 96), Width = 160, Height = 30, BackColor = Surface };
             volumeBars[tuner].Scroll += delegate { savedVolume[tuner] = volumeBars[tuner].Value; backend.BackendSetVolume(tuner, volumeBars[tuner].Value); muteButtons[tuner].Text = volumeBars[tuner].Value == 0 ? "UNMUTE" : "MUTE"; };
             controls.Controls.Add(volumeBars[tuner]);
-            muteButtons[tuner] = FlatButton("MUTE", false); muteButtons[tuner].Location = new Point(200, 95); muteButtons[tuner].Size = new Size(74, 32);
+            muteButtons[tuner] = FlatButton("MUTE", false); muteButtons[tuner].Name = "ModernReceiverMute" + tuner; muteButtons[tuner].Location = new Point(200, 95); muteButtons[tuner].Size = new Size(74, 32);
             muteButtons[tuner].Click += delegate
             {
                 int current = backend.BackendGetVolume(tuner);
@@ -507,9 +507,9 @@ namespace opentuner
             };
             controls.Controls.Add(muteButtons[tuner]);
 
-            Button record = FlatButton("● RECORD", false); record.Location = new Point(282, 95); record.Size = new Size(88, 32); controls.Controls.Add(record);
-            Button snap = FlatButton("▣ SNAPSHOT", false); snap.Location = new Point(378, 95); snap.Size = new Size(96, 32); controls.Controls.Add(snap);
-            Button full = FlatButton("⛶", false); full.Location = new Point(482, 95); full.Size = new Size(46, 32); controls.Controls.Add(full);
+            Button record = FlatButton("● RECORD", false); record.Name = "ModernReceiverRecord" + tuner; record.Location = new Point(282, 95); record.Size = new Size(88, 32); controls.Controls.Add(record);
+            Button snap = FlatButton("▣ SNAPSHOT", false); snap.Name = "ModernReceiverSnapshot" + tuner; snap.Location = new Point(378, 95); snap.Size = new Size(96, 32); controls.Controls.Add(snap);
+            Button full = FlatButton("⛶", false); full.Name = "ModernReceiverFullscreen" + tuner; full.Location = new Point(482, 95); full.Size = new Size(46, 32); controls.Controls.Add(full);
 
             Label hint = new Label { Text = "Frequency and SR edit boxes are independent from live telemetry", Location = new Point(4, 142), AutoSize = true, ForeColor = Muted, Font = new Font("Segoe UI", 8.5f) };
             controls.Controls.Add(hint);
