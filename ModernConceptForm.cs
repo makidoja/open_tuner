@@ -922,8 +922,8 @@ namespace opentuner
                 if (data.demod_locked && data.frequency > 0)
                     activeQuickTuneSpectrum.UpdateLockedReceiverMarker(
                         tuner, data.frequency / 1000.0, data.symbol_rate / 1000f);
-                // Only a genuine demodulator lock supplies a meaningful MER.
-                // The service name is shown as transmitted; never guess a call.
+                // A demodulator lock identifies the transmitted service name.
+                // The spectrum's beacon-relative dBb is computed from BATC FFT data.
                 activeQuickTuneSpectrum.UpdateReceiverSignalInfo(
                     tuner, data.frequency / 1000.0, data.symbol_rate / 1000f,
                     data.service_name, data.demod_locked);
