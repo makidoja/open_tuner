@@ -9,6 +9,8 @@ namespace opentuner
     {
         public const int CircularBufferStartingCapacity = 250000;
         public const string Version = "M0CKE 0.C.v2781.3.0";
+        // Public releases always use major.minor.patch; internal build IDs are independent.
+        public const string PublicReleaseVersion = "1.3.0";
     }
 
     /// <summary>
