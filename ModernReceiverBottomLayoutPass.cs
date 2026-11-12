@@ -322,8 +322,17 @@ namespace opentuner
                     }
                 }
                 int x = compact4 ? 100 : 108;
-                if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, compact4 ? 15 : 20, 24);
-                x += compact4 ? 16 : 22;
+                // Give the speaker glyph a readable size in both 2-RX and
+                // 4-RX headers. Keep its centre aligned with the volume slider.
+                int speakerWidth = compact4 ? 24 : 28;
+                if (volIcon != null)
+                {
+                    volIcon.AutoSize = false;
+                    volIcon.Bounds = new Rectangle(x, 5, speakerWidth, 29);
+                    volIcon.Font = new Font("Segoe UI Emoji", compact4 ? 13f : 16f);
+                    volIcon.TextAlign = ContentAlignment.MiddleCenter;
+                }
+                x += speakerWidth + 3;
                 int volumeWidth = compact4 ? 55 : Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
                 if (volume != null) volume.Bounds = new Rectangle(x, 4, volumeWidth, 30);
                 x += volumeWidth + (compact4 ? 2 : 5);
