@@ -331,16 +331,25 @@ namespace opentuner
                 if (record != null) { record.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
                 if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 78 : 99, 27); x += compact4 ? 80 : 103; }
                 if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
+                // Keep lock state and service callsign together, flush to
+                // the far right of the RX header instead of immediately
+                // following Fullscreen. Leave a gap from the left controls.
+                int lockWidth = compact4 ? 65 : 86;
+                int servicePreferred = compact4 ? 110 : 170;
+                int statusGap = 5;
+                int rightPadding = 6;
+                int statusLeft = Math.Max(x + 6,
+                    header.ClientSize.Width - rightPadding - lockWidth -
+                    statusGap - servicePreferred);
+                int serviceLeft = statusLeft + lockWidth + statusGap;
                 if (locked != null)
-                {
-                    locked.Bounds = new Rectangle(x, 5, compact4 ? 65 : 86, 27);
-                    x += compact4 ? 67 : 90;
-                }
+                    locked.Bounds = new Rectangle(statusLeft, 5, lockWidth, 27);
                 if (service != null)
                 {
-                    service.Bounds = new Rectangle(x, 5,
-                        Math.Max(38, header.ClientSize.Width - x - 6), 27);
+                    service.Bounds = new Rectangle(serviceLeft, 5,
+                        Math.Max(0, header.ClientSize.Width - serviceLeft - rightPadding), 27);
                     service.TextAlign = ContentAlignment.MiddleLeft;
+                    service.AutoEllipsis = true;
                 }
             }
 
