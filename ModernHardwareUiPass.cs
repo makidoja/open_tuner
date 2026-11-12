@@ -382,7 +382,9 @@ namespace opentuner
         {
             if (controls == null || box == null) return;
             int x = Math.Max(300, controls.ClientSize.Width - box.Width - 4);
-            int y = Math.Max(44, controls.ClientSize.Height - box.Height - 4);
+            // Honour the compact 4-RX panel: forcing a 44px top margin
+            // pushes tuner controls below the shorter information strip.
+            int y = Math.Max(4, controls.ClientSize.Height - box.Height - 4);
             box.Location = new Point(x, y);
         }
 
