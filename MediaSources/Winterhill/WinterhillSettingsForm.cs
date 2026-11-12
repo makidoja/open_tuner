@@ -36,7 +36,7 @@ namespace opentuner.MediaSources.WinterHill
             };
         }
 
-        // Configuration stage only; network routing for RX C/D is separate.
+        // Two PicoTuner units provide four independently controlled receivers.
         private void BuildSecondPicoSettings()
         {
             AutoSize = false;
@@ -70,7 +70,7 @@ namespace opentuner.MediaSources.WinterHill
             second.Controls.Add(txtSecondPicoBasePort);
             second.Controls.Add(new Label
             {
-                Text = "Configuration only - dual-device connection support is pending.",
+                Text = "PicoTuner 1: RX A/B   |   PicoTuner 2: RX C/D",
                 Location = new Point(24, 117), Size = new Size(430, 25),
                 ForeColor = Color.DimGray
             });
