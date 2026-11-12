@@ -60,7 +60,7 @@ namespace opentuner
                 bool compact4 = form.ModernReceiverCount >= 4;
                 tunerBox.Size = compact4
                     ? new Size(144, Math.Max(96, controls.ClientSize.Height - 8))
-                    : new Size(188, Math.Max(155, controls.ClientSize.Height - 8));
+                    : new Size(188, Math.Max(150, controls.ClientSize.Height - 8));
                 tunerBox.Location = new Point(
                     Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
@@ -120,7 +120,7 @@ namespace opentuner
             if (tune != null)
             {
                 tune.Bounds = compact4 ? new Rectangle(left, Math.Max(76, box.ClientSize.Height - 22), full, 18) :
-                    new Rectangle(left, Math.Max(133, box.ClientSize.Height - 36), full, 30);
+                    new Rectangle(left, Math.Max(119, box.ClientSize.Height - 35), full, 30);
                 tune.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9f);
             }
         }
