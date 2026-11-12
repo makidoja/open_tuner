@@ -803,17 +803,45 @@ namespace opentuner.MediaSources.Minitiouner
 
         public override void Close()
         {
+            // Shut down worker threads before releasing the USB handles.
+            // Aborted .NET Framework workers must finish before the next
+            // MiniTiouner/PicoTuner USB connection begins.
             _settingsManager.SaveSettings(_settings);
-
-            // switch off TS led's
-            hardware_interface?.hw_ts_led(0, false);
-            hardware_interface?.hw_ts_led(1, false);
-
-            ts_parser_t?.Abort();
-            ts_parser_2_t?.Abort();
-            ts_thread_t?.Abort();
-            ts_thread_2_t?.Abort();
-            nim_thread_t?.Abort();
+            foreach (Thread worker in new[] {
+                nim_thread_t, ts_parser_t, ts_parser_2_t, ts_thread_t, ts_thread_2_t })
+            {
+                if (worker == null || !worker.IsAlive) continue;
+                try { worker.Abort(); }
+                catch (System.Threading.ThreadStateException) { }
+            }
+            foreach (Thread worker in new[] {
+                nim_thread_t, ts_parser_t, ts_parser_2_t, ts_thread_t, ts_thread_2_t })
+            {
+                if (worker == null || !worker.IsAlive) continue;
+                try
+                {
+                    if (!worker.Join(2000))
+                        Log.Warning("[MINITIOUNER-USB] Worker {Thread} has not stopped yet", worker.Name ?? "(unnamed)");
+                }
+                catch (System.Threading.ThreadStateException) { }
+            }
+            try
+            {
+                if (hardware_connected && hardware_interface != null)
+                {
+                    hardware_interface.hw_ts_led(0, false);
+                    hardware_interface.hw_ts_led(1, false);
+                }
+            }
+            catch (Exception ex) { Log.Warning(ex, "[MINITIOUNER-USB] Turning off TS LEDs"); }
+            try { hardware_interface?.hw_close(); }
+            catch (Exception ex) { Log.Warning(ex, "[MINITIOUNER-USB] Closing hardware"); }
+            finally
+            {
+                hardware_connected = false;
+                receiverThreadsStarted = false;
+            }
+            Log.Information("[MINITIOUNER-USB] Receiver closed and USB interfaces released");
         }
 
         public override void ShowSettings()
