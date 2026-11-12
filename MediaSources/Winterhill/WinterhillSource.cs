@@ -137,6 +137,12 @@ namespace opentuner.MediaSources.WinterHill
                     hw_device = 2;
                     UDPSetVoltage(0, _settings.LNBVoltage[0]);
                     UDPSetVoltage(1, _settings.LNBVoltage[1]);
+                    if (dualPico && _settings.SecondPicoTunerLNBVoltage != null &&
+                        _settings.SecondPicoTunerLNBVoltage.Length >= 2)
+                    {
+                        UDPSetVoltage(2, _settings.SecondPicoTunerLNBVoltage[0]);
+                        UDPSetVoltage(3, _settings.SecondPicoTunerLNBVoltage[1]);
+                    }
                     Log.Information("PicoTuner Ethernet mode: {Count} receivers, second unit enabled={Dual}",
                         ts_devices, dualPico);
                     break;
