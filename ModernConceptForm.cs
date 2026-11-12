@@ -445,8 +445,26 @@ namespace opentuner
             Panel card = Card(); card.Dock = DockStyle.Fill; card.Margin = tuner % 2 == 0 ? new Padding(0,0,6,4) : new Padding(6,0,0,4); card.Padding = new Padding(10);
             receiverCards[tuner] = card;
 
-            Label title = new Label { Text = "▣  RX" + (tuner + 1), Dock = DockStyle.Top, Height = 30, ForeColor = Text, Font = new Font("Segoe UI Semibold", 11f) };
-            card.Controls.Add(title);
+            // Header is a real container, allowing the existing receiver
+            // buttons and volume slider to move alongside the RX label.
+            Panel header = new Panel
+            {
+                Name = "ModernReceiverHeader" + tuner,
+                Dock = DockStyle.Top,
+                Height = 38,
+                BackColor = Surface
+            };
+            Label title = new Label
+            {
+                Name = "ModernReceiverHeaderTitle" + tuner,
+                Text = "▣  RX" + (tuner + 1),
+                Location = new Point(4, 6),
+                Size = new Size(51, 24),
+                ForeColor = Text,
+                Font = new Font("Segoe UI Semibold", 11f)
+            };
+            header.Controls.Add(title);
+            card.Controls.Add(header);
 
             Panel controls = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Surface };
             card.Controls.Add(controls);
