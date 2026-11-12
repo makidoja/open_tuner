@@ -636,7 +636,7 @@ namespace opentuner
                     // Interface 0 asks at connection time which hardware to use.
                     // Keep probing the configured Ethernet target even before
                     // that choice, rather than presenting false CONNECT.
-                    if (settings.DefaultInterface == 2 || settings.DefaultInterface == 0)
+                    if (settings.DefaultInterface == 2 || settings.DefaultInterface == 3 || settings.DefaultInterface == 0)
                         newHost = settings.WinterHillUdpHost;
                 }
             }
@@ -1329,7 +1329,7 @@ namespace opentuner
             bool initialised = backend.BackendSourceInitialised;
             bool live = initialised && backend.BackendTransportConnected;
             bool connected = initialised && live;
-            bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
+            bool offline = initialised && !live;
             bool picoSelected = sourceCombo != null && sourceCombo.SelectedItem != null &&
                 sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
             // An ICMP probe is meaningful only for a WinterHill/PicoTuner
