@@ -12,6 +12,7 @@ namespace opentuner
         private static bool attached;
         private static ModernBatcSpectrumControl display;
         private static Label spectrumTitle;
+        private static readonly Label[] receiverSquares = new Label[2];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -134,7 +135,7 @@ namespace opentuner
                             Text = "RX" + (rx + 1) + " Auto Scan",
                             Checked = false,
                             AutoSize = false,
-                            Size = new Size(180, 22),
+                            Size = new Size(110, 22),
                             BackColor = Color.FromArgb(18, 38, 60),
                             ForeColor = Color.White,
                             Font = new Font("Segoe UI Semibold", 8f)
@@ -142,7 +143,9 @@ namespace opentuner
                         scanChecks[rx] = check;
                     }
                     check.Text = "RX" + (rx + 1) + " Auto Scan";
-                    check.Size = new Size(180, 22);
+                    check.AutoSize = false;
+                    check.Width = TextRenderer.MeasureText(check.Text, check.Font).Width + 20;
+                    check.Height = 22;
                     // The old checkbox was disposed with the legacy PictureBox.
                     // Wire the replacement control to the scan state machine.
                     check.CheckedChanged += delegate
@@ -151,6 +154,30 @@ namespace opentuner
                     };
                     card.Controls.Add(check);
                     check.BringToFront();
+
+                    // Match each Auto Scan group to the receiver's spectrum
+                    // marker: RX1 green, RX2 yellow.
+                    Label square = new Label
+                    {
+                        Name = "AutoScanReceiverColourRX" + (rx + 1),
+                        Text = "",
+                        AutoSize = false,
+                        Size = new Size(11, 11),
+                        BackColor = rx == 0 ? Color.FromArgb(40, 222, 126) : Color.Gold
+                    };
+                    receiverSquares[rx] = square;
+                    card.Controls.Add(square);
+                    square.BringToFront();
+
+                    // Rotate was created by ModernConceptForm but is laid out
+                    // with the scan selector here, not by competing offsets.
+                    CheckBox[] rotateChecks = GetField<CheckBox[]>(form, "rotate30Seconds");
+                    if (rotateChecks != null && rotateChecks[rx] != null &&
+                        !rotateChecks[rx].IsDisposed)
+                    {
+                        rotateChecks[rx].Parent = card;
+                        rotateChecks[rx].BringToFront();
+                    }
                     form.ModernAutoScanChanged(index, check.Checked);
 
                     Label[] statusLabels = GetField<Label[]>(form, "autoScanStatusLabels");
@@ -209,9 +236,9 @@ namespace opentuner
                 spectrumTitle.Width = Math.Max(100, card.ClientSize.Width - 24);
             }
 
-            // Reserve a dedicated control strip to the right of the actual
-            // spectrum, so checkboxes never obscure the upper or lower RX plot.
-            const int stripWidth = 190;
+            // One layout authority for the RX1/RX2 control strip; both
+            // selectors and their coloured square share the exact row.
+            const int stripWidth = 265;
             int usableWidth = Math.Max(300, card.ClientSize.Width - 36 - stripWidth);
             int width = Math.Min(1140, usableWidth);
             int height = 108;
@@ -220,16 +247,38 @@ namespace opentuner
 
             display.Size = new Size(width, height);
             display.Location = new Point(left, 31);
-            CheckBox[] checkboxes = GetField<CheckBox[]>(FindOwnerForm(card), "autoScanEnabled");
-            if (checkboxes != null)
-                for (int rx = 0; rx < Math.Min(2, checkboxes.Length); rx++)
-                    if (checkboxes[rx] != null && !checkboxes[rx].IsDisposed)
-                    {
-                        checkboxes[rx].Location = new Point(display.Right + 8, display.Top + (rx == 0 ? 5 : 54));
-                        Label[] statuses = GetField<Label[]>(FindOwnerForm(card), "autoScanStatusLabels");
-                        if (statuses != null && statuses[rx] != null)
-                            statuses[rx].Location = new Point(display.Right + 11, display.Top + (rx == 0 ? 27 : 76));
-                    }
+            ModernConceptForm form = FindOwnerForm(card);
+            CheckBox[] checkboxes = GetField<CheckBox[]>(form, "autoScanEnabled");
+            CheckBox[] rotates = GetField<CheckBox[]>(form, "rotate30Seconds");
+            Label[] statuses = GetField<Label[]>(form, "autoScanStatusLabels");
+            for (int rx = 0; rx < 2; rx++)
+            {
+                CheckBox scan = checkboxes != null ? checkboxes[rx] : null;
+                CheckBox rotate = rotates != null ? rotates[rx] : null;
+                Label square = receiverSquares[rx];
+                int rowTop = display.Top + (rx == 0 ? 5 : 54);
+                int x = display.Right + 9;
+                if (square != null && !square.IsDisposed)
+                {
+                    square.Location = new Point(x, rowTop + 5);
+                    x = square.Right + 5;
+                }
+                if (scan != null && !scan.IsDisposed)
+                {
+                    scan.Width = TextRenderer.MeasureText(scan.Text, scan.Font).Width + 20;
+                    scan.Height = 22;
+                    scan.Location = new Point(x, rowTop);
+                    x = scan.Right + 7;
+                }
+                if (rotate != null && !rotate.IsDisposed)
+                {
+                    rotate.Width = TextRenderer.MeasureText(rotate.Text, rotate.Font).Width + 20;
+                    rotate.Height = 22;
+                    rotate.Location = new Point(x, rowTop);
+                }
+                if (statuses != null && statuses[rx] != null && !statuses[rx].IsDisposed)
+                    statuses[rx].Location = new Point(display.Right + 12, rowTop + 23);
+            }
         }
     }
 }
