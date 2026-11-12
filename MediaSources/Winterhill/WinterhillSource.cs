@@ -101,6 +101,11 @@ namespace opentuner.MediaSources.WinterHill
                     hw_device = 1;
 
                     break;
+                case 3: // standard BATC Winter Hill on Raspberry Pi, four UDP receivers
+                    udp_port = _settings.WinterHillUdpBasePort;
+                    ts_devices = 4;
+                    hw_device = 3;
+                    break;
                 case 2: // udp pico wh
                     udp_port = _settings.WinterHillUdpBasePort;
                     // Start receiving status only after source initialisation is complete.
@@ -176,7 +181,7 @@ namespace opentuner.MediaSources.WinterHill
             }
 
             // Previously a live PicoTuner could deliver status during setup.
-            if (defaultInterface == 2)
+            if (defaultInterface == 2 || defaultInterface == 3)
                 ConnectWinterHillUDP(udp_port + 1);
 
             return ts_devices;
@@ -272,6 +277,7 @@ namespace opentuner.MediaSources.WinterHill
                     DisconnectWebsockets();
                     break;
                 case 2: // udp pico wh
+                case 3: // standard Winter Hill UDP
                     DisconnectWinterHillUDP();
                     break;
             }
@@ -357,7 +363,8 @@ namespace opentuner.MediaSources.WinterHill
             return "WinterHill Client, Compatible with:" +
             Environment.NewLine + Environment.NewLine +
             "ZR6TG - WH Variant (websocket)" + Environment.NewLine +
-            "G4EWJ - PicoTuner WH (Ethernet)" + Environment.NewLine;
+            "G4EWJ - PicoTuner WH (Ethernet)" + Environment.NewLine +
+            "BATC - Winter Hill UDP (4 RX)" + Environment.NewLine;
 
         }
 
@@ -367,6 +374,7 @@ namespace opentuner.MediaSources.WinterHill
             {
                 case 1: return "WinterHill (ZR6TG Variant)";
                 case 2: return "PicoTuner (G4EWJ Ethernet WH)";
+                case 3: return "Winter Hill UDP (BATC 4 RX)";
             }
 
             return "Unknown";
@@ -433,7 +441,8 @@ namespace opentuner.MediaSources.WinterHill
                 {
                     case 1: WSSetFrequency(device, (int)frequency, (int)symbol_rate);
                         break;
-                    case 2: UDPSetFrequency(device, (int)frequency, (int)symbol_rate);
+                    case 2:
+                    case 3: UDPSetFrequency(device, (int)frequency, (int)symbol_rate);
                         break;
                 }
 
@@ -444,7 +453,8 @@ namespace opentuner.MediaSources.WinterHill
                 {
                     case 1:  WSSetFrequency(device, (int)frequency + (int)_current_offset[device], (int)symbol_rate);
                         break;
-                    case 2: UDPSetFrequency(device, (int)frequency + (int)_current_offset[device], (int)symbol_rate);
+                    case 2:
+                    case 3: UDPSetFrequency(device, (int)frequency + (int)_current_offset[device], (int)symbol_rate);
                         break;
                 }
             }
