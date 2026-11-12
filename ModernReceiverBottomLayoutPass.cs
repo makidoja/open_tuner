@@ -85,17 +85,9 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner, bool compact4)
         {
-            // One shared layout for all four receivers; move existing widgets,
-            // never replace them (their live tuner event handlers must survive).
-            foreach (Control child in box.Controls)
-            {
-                Label caption = child as Label;
-                if (caption != null)
-                    caption.Visible = compact4 && (
-                        caption.Text == "TUNER" || caption.Text == "LO FREQ" ||
-                        caption.Text == "FREQ" || caption.Text == "SR");
-            }
-
+            // One identical 4 RX grid. Typed entries above dropdowns:
+            // FREQ | LO + enable; SR | TUNER; small TUNE below.
+            // Reposition the original controls, preserving event handlers.
             Panel freq = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
             ComboBox sr = FindByName<ComboBox>(box, "ModernSrCombo" + tuner);
             ComboBox rf = FindByName<ComboBox>(box, "ModernRfInput" + tuner);
@@ -111,35 +103,36 @@ namespace opentuner
                 int half = (full - gap) / 2;
                 int right = left + half + gap;
                 int fieldHeight = 27;
+
                 foreach (Control child in box.Controls)
                 {
                     Label caption = child as Label;
                     if (caption == null) continue;
-                    int x;
-                    int y;
-                    string name;
+                    int x, y;
+                    string labelText;
                     switch ((caption.Text ?? "").Trim())
                     {
-                        case "TUNER": x = left; y = 5; name = "TUNER"; break;
-                        case "LO FREQ": x = right; y = 5; name = "LO"; break;
-                        case "FREQ": x = left; y = 51; name = "FREQ"; break;
-                        case "SR": x = right; y = 51; name = "SR"; break;
-                        default: continue;
+                        case "FREQ": x = left; y = 5; labelText = "FREQ"; break;
+                        case "LO FREQ":
+                        case "LO": x = right; y = 5; labelText = "LO"; break;
+                        case "SR": x = left; y = 51; labelText = "SR"; break;
+                        case "TUNER": x = right; y = 51; labelText = "TUNER"; break;
+                        default:
+                            caption.Visible = false;
+                            continue;
                     }
-                    caption.Text = name;
+                    caption.Text = labelText;
                     caption.Bounds = new Rectangle(x, y, half, 13);
                     caption.Font = new Font("Segoe UI Semibold", 7f);
                     caption.ForeColor = Muted;
                     caption.Visible = true;
                 }
-                if (rf != null)
+
+                if (freq != null)
                 {
-                    rf.Bounds = new Rectangle(left, 19, half, fieldHeight);
-                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
-                    rf.FlatStyle = FlatStyle.Flat;
-                    rf.Font = new Font("Segoe UI Semibold", 8f);
+                    freq.Bounds = new Rectangle(left, 19, half, fieldHeight);
+                    StyleEntry(freq, 8f);
                 }
-                // Reserve the checkbox entirely outside the LO entry field.
                 int loCheckWidth = 25;
                 if (lo != null)
                 {
@@ -151,22 +144,25 @@ namespace opentuner
                 {
                     loEnabled.Text = "L";
                     loEnabled.Font = new Font("Segoe UI", 7.5f);
-                    loEnabled.Bounds = new Rectangle(right + half - loCheckWidth, 20,
-                        loCheckWidth, 24);
+                    loEnabled.Bounds = new Rectangle(right + half - loCheckWidth,
+                        20, loCheckWidth, 24);
                     loEnabled.BringToFront();
-                }
-                if (freq != null)
-                {
-                    freq.Bounds = new Rectangle(left, 65, half, fieldHeight);
-                    StyleEntry(freq, 8f);
                 }
                 if (sr != null)
                 {
-                    sr.Bounds = new Rectangle(right, 65, half, fieldHeight);
+                    sr.Bounds = new Rectangle(left, 65, half, fieldHeight);
                     sr.DropDownStyle = ComboBoxStyle.DropDownList;
                     sr.FlatStyle = FlatStyle.Flat;
                     sr.Font = new Font("Segoe UI Semibold", 8f);
                     sr.BringToFront();
+                }
+                if (rf != null)
+                {
+                    rf.Bounds = new Rectangle(right, 65, half, fieldHeight);
+                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
+                    rf.FlatStyle = FlatStyle.Flat;
+                    rf.Font = new Font("Segoe UI Semibold", 8f);
+                    rf.BringToFront();
                 }
                 if (tune != null)
                 {
@@ -175,6 +171,8 @@ namespace opentuner
                 }
                 return;
             }
+            foreach (Control child in box.Controls)
+                if (child is Label) child.Visible = false;
             if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
             if (sr != null) { sr.Bounds = new Rectangle(left, 39, full, 27); sr.Font = new Font("Segoe UI Semibold", 9.5f); }
             if (rf != null) { rf.Bounds = new Rectangle(left, 70, full, 27); rf.Font = new Font("Segoe UI Semibold", 9.5f); }
