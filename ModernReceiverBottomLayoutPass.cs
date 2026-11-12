@@ -12,6 +12,8 @@ namespace opentuner
     internal static class ModernReceiverBottomLayoutPass
     {
         private static bool attached;
+        private static readonly HashSet<Panel> observedReceiverPanels = new HashSet<Panel>();
+        private static bool applyingLayout;
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
         private static readonly Color Muted = Color.FromArgb(142, 165, 190);
         private static readonly Panel[] infoTabs = new Panel[2];
@@ -41,8 +43,10 @@ namespace opentuner
 
         private static void Apply(ModernConceptForm form)
         {
-            if (form == null || form.IsDisposed) return;
-
+            if (form == null || form.IsDisposed || applyingLayout) return;
+            applyingLayout = true;
+            try
+            {
             for (int tuner = 0; tuner < 2; tuner++)
             {
                 Panel tunerBox = FindByName<Panel>(form, "ModernTunerControlBox" + tuner);
@@ -50,6 +54,8 @@ namespace opentuner
 
                 Panel controls = tunerBox.Parent as Panel;
                 if (controls == null) continue;
+                if (observedReceiverPanels.Add(controls))
+                    controls.Resize += delegate { Apply(form); };
 
                 tunerBox.Size = new Size(188, Math.Max(155, controls.ClientSize.Height - 8));
                 tunerBox.Location = new Point(
@@ -60,6 +66,8 @@ namespace opentuner
                 LayoutReceiverStatusAndButtons(controls, tunerBox, tuner);
                 tunerBox.BringToFront();
             }
+            }
+            finally { applyingLayout = false; }
         }
 
         private static void LayoutTunerBox(Panel box, int tuner)
