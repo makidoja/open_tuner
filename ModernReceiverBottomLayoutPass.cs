@@ -313,7 +313,7 @@ namespace opentuner
             if (currentFreq[tuner] != null)
             {
                 currentFreq[tuner].Location = new Point(5, 1);
-                currentFreq[tuner].Size = new Size(245, 35);
+                currentFreq[tuner].Size = new Size(270, 37);
                 currentFreq[tuner].Font = new Font("Segoe UI Semibold", 17f);
             }
             // Restore the original vertical metric order under the live
@@ -321,19 +321,19 @@ namespace opentuner
             if (currentMer[tuner] != null)
             {
                 currentMer[tuner].AutoSize = false;
-                currentMer[tuner].Bounds = new Rectangle(5, 38, 128, 21);
-                currentMer[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
+                currentMer[tuner].Bounds = new Rectangle(8, 51, 130, 26);
+                currentMer[tuner].Font = new Font("Segoe UI Semibold", 11f);
             }
             if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = new Rectangle(142, 43, 113, 11);
+                currentMerBar[tuner].Bounds = new Rectangle(147, 55, 180, 19);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
-                currentMargin[tuner].Bounds = new Rectangle(5, 68, 133, 21);
-                currentMargin[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
+                currentMargin[tuner].Bounds = new Rectangle(8, 103, 133, 26);
+                currentMargin[tuner].Font = new Font("Segoe UI Semibold", 11f);
             }
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = new Rectangle(142, 73, 113, 11);
+                currentMarginBar[tuner].Bounds = new Rectangle(147, 107, 180, 19);
             for (int page = 1; page <= 2; page++)
                 for (int col = 0; col < 2; col++)
                 {
@@ -343,24 +343,27 @@ namespace opentuner
                     if (page == 1)
                     {
                         label.Font = new Font("Segoe UI", 7.5f);
-                        label.Bounds = new Rectangle(left, 68,
-                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 45);
+                        label.Bounds = new Rectangle(left, 121,
+                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8),
+                            Math.Max(50, infoPages[tuner, 1].ClientSize.Height - 125));
                     }
                     else
                     {
-                        label.Font = new Font("Segoe UI", 8f);
-                        label.Bounds = new Rectangle(left, 7,
-                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8), 84);
+                        label.Font = new Font("Segoe UI", 9f);
+                        label.Bounds = new Rectangle(left, 8,
+                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8),
+                            Math.Max(105, infoPages[tuner, 2].ClientSize.Height - 15));
                     }
                 }
             if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed)
                 tsGraphs[tuner].Bounds = new Rectangle(6, 3,
-                    Math.Max(200, infoPages[tuner, 1].ClientSize.Width - 12), 61);
+                    Math.Max(200, infoPages[tuner, 1].ClientSize.Width - 12), 112);
             Label details = FindDetailsLabel(infoPages[tuner, 2]);
             if (details != null)
             {
-                details.Bounds = new Rectangle(7, 88, Math.Max(250, pageCurrent.ClientSize.Width - 14), 18);
-                details.AutoSize = false;
+                // Tuner Data's two full-height columns now include everything
+                // previously compressed into the small detail footer.
+                details.Visible = false;
             }
         }
 
@@ -404,26 +407,41 @@ namespace opentuner
                         if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed &&
                             (DateTime.UtcNow - lastTsSample[tuner]).TotalMilliseconds >= 900)
                         {
-                            tsGraphs[tuner].PushSample(data.streaming ? data.ts_bitrate_mbps : 0);
+                            tsGraphs[tuner].PushSample(data.ts_metrics_available ? data.ts_bitrate_mbps : 0);
                             lastTsSample[tuner] = DateTime.UtcNow;
                         }
-                        string mbps = data.streaming && data.ts_bitrate_mbps > 0 ?
+                        string mbps = data.ts_metrics_available && data.ts_bitrate_mbps > 0 ?
                             data.ts_bitrate_mbps.ToString("0.00", CultureInfo.InvariantCulture) + " Mbps" : "—";
-                        string nulls = data.streaming ?
+                        string nulls = data.ts_metrics_available ?
                             data.null_packets_percent.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—";
-                        dataLabels[tuner, 0].Text = "TS bitrate:  " + mbps + "\nNull packets:  " + nulls +
-                            "\nStreaming:  " + (data.streaming ? "Yes" : "No");
-                        dataLabels[tuner, 1].Text = "Video:  " + ValueOrDash(data.video_codec) +
-                            "\nResolution:  " + ValueOrDash(data.video_resolution) +
-                            "\nAudio:  " + ValueOrDash(data.audio_codec) +
-                            "\nAudio rate:  " + ValueOrDash(data.audio_rate);
-                        dataLabels[tuner, 2].Text = "Demod:  " + ValueOrDash(data.demode_state) +
-                            "\nSystem:  " + ValueOrDash(data.delivery_system) +
-                            "\nModcod:  " + ValueOrDash(data.modcode);
-                        dataLabels[tuner, 3].Text = "Symbol rate:  " +
-                            (data.symbol_rate > 0 ? data.symbol_rate + " kS" : "—") +
-                            "\nService:  " + ValueOrDash(data.service_name) +
-                            "\nProvider:  " + ValueOrDash(data.service_provider);
+                        dataLabels[tuner, 0].Text = "TS bitrate: " + mbps +
+                            "\nNull packets: " + nulls +
+                            "\nReceiving TS: " + (data.streaming ? "Yes" : "No");
+                        dataLabels[tuner, 1].Text = "Video: " + ValueOrDash(data.video_codec) +
+                            "\nResolution: " + ValueOrDash(data.video_resolution) +
+                            "\nAudio: " + ValueOrDash(data.audio_codec) +
+                            "\nAudio rate: " + ValueOrDash(data.audio_rate);
+                        string f = data.frequency > 0 ?
+                            (data.frequency / 1000.0).ToString("0.000", CultureInfo.InvariantCulture) + " MHz" : "—";
+                        dataLabels[tuner, 2].Text =
+                            "Demod: " + ValueOrDash(data.demode_state) +
+                            "\nSystem: " + ValueOrDash(data.delivery_system) +
+                            "\nModcod: " + ValueOrDash(data.modcode) +
+                            "\nMER: " + data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB" +
+                            "\nMargin: " + data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB" +
+                            "\nRF input: " + ValueOrDash(data.rf_input) +
+                            "\nRF level: " + (double.IsNaN(data.rf_input_level) ? "—" :
+                                data.rf_input_level.ToString("0", CultureInfo.InvariantCulture) + " dB") +
+                            "\nBER: " + (data.tuner_metrics_available ? data.ber.ToString() : "—");
+                        dataLabels[tuner, 3].Text =
+                            "Frequency: " + f +
+                            "\nNIM freq: " + (data.nim_frequency > 0 ? data.nim_frequency + " kHz" : "—") +
+                            "\nLO offset: " + (data.tuner_metrics_available ? data.frequency_offset + " kHz" : "—") +
+                            "\nSR: " + (data.symbol_rate > 0 ? data.symbol_rate + " kS" : "—") +
+                            "\nCarrier offset: " + (data.tuner_metrics_available ? data.carrier_offset + " Hz" : "—") +
+                            "\nService: " + ValueOrDash(data.service_name) +
+                            "\nProvider: " + ValueOrDash(data.service_provider) +
+                            "\nLDPC errors: " + (data.tuner_metrics_available ? data.ldpc_errors.ToString() : "—");
                     });
                 }
                 catch (InvalidOperationException) { }
