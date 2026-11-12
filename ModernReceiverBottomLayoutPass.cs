@@ -151,28 +151,33 @@ namespace opentuner
                 service.TextAlign = ContentAlignment.MiddleCenter;
             }
 
+            // Compact the live frequency readout and group MER/Margin
+            // immediately below it. Leave the right-hand status area free
+            // for additional telemetry in a future release.
             Label freq = FindLargestFrequencyLabel(controls);
             if (freq != null)
             {
                 freq.Location = new Point(4, 42);
-                freq.Size = new Size(195, 42);
-                freq.Font = new Font("Segoe UI Semibold", 21f);
+                freq.Size = new Size(225, 36);
+                freq.Font = new Font("Segoe UI Semibold", 18f);
             }
 
             Label mer = FindLabelStarts(controls, "MER");
             Label margin = FindLabelStarts(controls, "Margin");
             if (mer != null)
             {
-                mer.Location = new Point(236, 44);
-                mer.Size = new Size(92, 24);
-                mer.Font = new Font("Segoe UI Semibold", 11.5f);
+                mer.AutoSize = false;
+                mer.Location = new Point(4, 83);
+                mer.Size = new Size(122, 23);
+                mer.Font = new Font("Segoe UI Semibold", 10f);
                 mer.ForeColor = Text;
             }
             if (margin != null)
             {
-                margin.Location = new Point(236, 94);
-                margin.Size = new Size(92, 24);
-                margin.Font = new Font("Segoe UI Semibold", 11.5f);
+                margin.AutoSize = false;
+                margin.Location = new Point(133, 83);
+                margin.Size = new Size(132, 23);
+                margin.Font = new Font("Segoe UI Semibold", 10f);
                 margin.ForeColor = Text;
             }
 
@@ -183,13 +188,13 @@ namespace opentuner
 
                 if (IsMerBar(p))
                 {
-                    p.Location = new Point(236, 71);
-                    p.Size = new Size(88, 12);
+                    p.Location = new Point(4, 109);
+                    p.Size = new Size(115, 11);
                 }
                 else if (IsMarginBar(p))
                 {
-                    p.Location = new Point(236, 121);
-                    p.Size = new Size(88, 12);
+                    p.Location = new Point(133, 109);
+                    p.Size = new Size(115, 11);
                 }
             }
 
