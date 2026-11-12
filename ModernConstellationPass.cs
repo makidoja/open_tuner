@@ -123,7 +123,9 @@ namespace opentuner
                 plot.Location = new Point(plotLeft, 5);
                 toggle.AutoSize = false;
                 toggle.Size = new Size(118, 20);
-                toggle.Location = new Point(285, 10);
+                // Align the end of the 'Constellation' label with the ends
+                // of the MER/Margin signal bars, rather than the plot edge.
+                toggle.Location = new Point(210, 10);
                 toggle.BackColor = current.BackColor;
             }
             else
