@@ -20,6 +20,10 @@ namespace opentuner
         private ushort[] fft;
         private List<signal.Sig> signals = new List<signal.Sig>();
         private readonly signal.Sig?[] tuned = new signal.Sig?[2];
+        private readonly double[] lockedFrequencyMHz = new double[2];
+        private readonly double[] lockedMerDb = new double[2];
+        private readonly string[] lockedServiceName = new string[2];
+        private readonly DateTime[] lockedAtUtc = new DateTime[2];
         private bool connected;
         private int receiverCount = 2;
         private DateTime lastFrame = DateTime.MinValue;
@@ -83,8 +87,14 @@ namespace opentuner
             List<signal.Sig> detected;
             try
             {
-                detected = detector.detect_signals(copy).ToList();
-                detector.updateSignalList();
+                lock (signalLock)
+                {
+                    detector.detect_signals(copy);
+                    detector.updateSignalList();
+                    // The reconciled list retains callsigns matched to the
+                    // previous FFT detections; the raw list does not.
+                    detected = detector.signalsData.ToList();
+                }
             }
             catch
             {
@@ -226,30 +236,97 @@ namespace opentuner
                 g.DrawLines(edge, points.Skip(1).Take(points.Length - 2).ToArray());
         }
 
+        // Keep station identity/quality above the trace and frequency/SR in
+        // the otherwise unused lower blue area. MER only comes from a locked
+        // receiver, never from the uncalibrated BATC FFT strength.
         private void DrawSignals(Graphics g, Rectangle plot, List<signal.Sig> localSignals)
         {
-            using (Font labelFont = new Font("Segoe UI Semibold", 8f))
+            using (Font labelFont = new Font("Segoe UI Semibold", 7.5f))
             using (Brush labelBrush = new SolidBrush(Text))
             using (Brush blockBrush = new SolidBrush(Color.FromArgb(35, Accent2)))
             using (Pen blockPen = new Pen(Color.FromArgb(135, Accent2)))
             {
-                foreach (signal.Sig s in localSignals)
+                float topRight = plot.Left;
+                float bottomRight = plot.Left;
+                foreach (signal.Sig sig in localSignals.OrderBy(item => item.frequency))
                 {
-                    double rel = (s.frequency - StartMHz) / SpanMHz;
+                    double rel = (sig.frequency - StartMHz) / SpanMHz;
                     if (rel < 0 || rel > 1) continue;
                     float x = plot.Left + (float)(rel * plot.Width);
-                    float width = Math.Max(5f, (s.sr / (float)SpanMHz) * plot.Width);
+                    float width = Math.Max(5f, (sig.sr / (float)SpanMHz) * plot.Width);
                     RectangleF block = new RectangleF(x - width / 2f, plot.Top + 2, width, plot.Height - 4);
                     g.FillRectangle(blockBrush, block);
                     g.DrawRectangle(blockPen, block.X, block.Y, block.Width, block.Height);
 
-                    string callsign = string.IsNullOrWhiteSpace(s.callsign) ? "" : s.callsign + "  ";
-                    string text = callsign + s.frequency.ToString("0.000") + "  " + Math.Round(s.sr * 1000) + "kS";
-                    SizeF size = g.MeasureString(text, labelFont);
-                    float tx = Math.Max(plot.Left + 3, Math.Min(plot.Right - size.Width - 3, x - size.Width / 2f));
-                    g.DrawString(text, labelFont, labelBrush, tx, plot.Top + 5);
+                    string station = string.IsNullOrWhiteSpace(sig.callsign) ? "" : sig.callsign.Trim();
+                    string mer = "";
+                    lock (sync)
+                    {
+                        for (int rx = 0; rx < receiverCount; rx++)
+                        {
+                            if (lockedAtUtc[rx] == DateTime.MinValue ||
+                                (DateTime.UtcNow - lockedAtUtc[rx]).TotalSeconds > 8 ||
+                                Math.Abs(lockedFrequencyMHz[rx] - sig.frequency) >
+                                    Math.Max(0.10, sig.sr / 2.0 + 0.05))
+                                continue;
+                            if (string.IsNullOrEmpty(station))
+                                station = lockedServiceName[rx] ?? "";
+                            if (!Double.IsNaN(lockedMerDb[rx]) && !Double.IsInfinity(lockedMerDb[rx]))
+                                mer = "MER " + lockedMerDb[rx].ToString("0.0") + " dB";
+                            break;
+                        }
+                    }
+
+                    string top = string.IsNullOrEmpty(station) ? mer :
+                        string.IsNullOrEmpty(mer) ? station : station + "  " + mer;
+                    string bottom = sig.frequency.ToString("0.000") + "  " +
+                        Math.Round(sig.sr * 1000) + "kS";
+
+                    if (!string.IsNullOrWhiteSpace(top))
+                    {
+                        SizeF size = g.MeasureString(top, labelFont);
+                        float left = Math.Max(plot.Left + 3, Math.Min(plot.Right - size.Width - 3,
+                            x - size.Width / 2f));
+                        if (left >= topRight + 3 && left + size.Width <= plot.Right)
+                        {
+                            g.DrawString(top, labelFont, labelBrush, left, plot.Top + 3);
+                            topRight = left + size.Width;
+                        }
+                    }
+
+                    SizeF bottomSize = g.MeasureString(bottom, labelFont);
+                    float bottomLeft = Math.Max(plot.Left + 3, Math.Min(plot.Right - bottomSize.Width - 3,
+                        x - bottomSize.Width / 2f));
+                    if (bottomLeft >= bottomRight + 3 && bottomLeft + bottomSize.Width <= plot.Right)
+                    {
+                        g.DrawString(bottom, labelFont, labelBrush, bottomLeft,
+                            plot.Bottom - bottomSize.Height - 3);
+                        bottomRight = bottomLeft + bottomSize.Width;
+                    }
                 }
             }
+        }
+
+        internal void UpdateReceiverSignalInfo(int receiver, double frequencyMHz,
+            float symbolRateMs, string serviceName, double merDb, bool locked)
+        {
+            if (receiver < 0 || receiver >= lockedAtUtc.Length) return;
+            lock (sync)
+            {
+                if (!locked || frequencyMHz < StartMHz || frequencyMHz > StartMHz + SpanMHz)
+                {
+                    lockedAtUtc[receiver] = DateTime.MinValue;
+                    lockedServiceName[receiver] = null;
+                }
+                else
+                {
+                    lockedFrequencyMHz[receiver] = frequencyMHz;
+                    lockedMerDb[receiver] = merDb;
+                    lockedServiceName[receiver] = serviceName;
+                    lockedAtUtc[receiver] = DateTime.UtcNow;
+                }
+            }
+            SafeInvalidate();
         }
 
         private void DrawTunedMarkers(Graphics g, Rectangle plot)
