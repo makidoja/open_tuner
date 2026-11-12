@@ -273,22 +273,24 @@ namespace opentuner
                 currentFreq[tuner].Size = new Size(245, 35);
                 currentFreq[tuner].Font = new Font("Segoe UI Semibold", 17f);
             }
+            // Restore the original vertical metric order under the live
+            // frequency, while leaving the right side for Constellation.
             if (currentMer[tuner] != null)
             {
                 currentMer[tuner].AutoSize = false;
-                currentMer[tuner].Bounds = new Rectangle(5, 40, 119, 22);
+                currentMer[tuner].Bounds = new Rectangle(5, 38, 128, 21);
                 currentMer[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
             }
+            if (currentMerBar[tuner] != null)
+                currentMerBar[tuner].Bounds = new Rectangle(142, 43, 113, 11);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
-                currentMargin[tuner].Bounds = new Rectangle(130, 40, 140, 22);
+                currentMargin[tuner].Bounds = new Rectangle(5, 68, 133, 21);
                 currentMargin[tuner].Font = new Font("Segoe UI Semibold", 9.5f);
             }
-            if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = new Rectangle(5, 65, 111, 11);
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = new Rectangle(130, 65, 111, 11);
+                currentMarginBar[tuner].Bounds = new Rectangle(142, 73, 113, 11);
             for (int page = 1; page <= 2; page++)
                 for (int col = 0; col < 2; col++)
                 {
