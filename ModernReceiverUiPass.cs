@@ -11,12 +11,12 @@ namespace opentuner
         private static bool attached;
         private static int presetTargetTuner;
         private static Label presetTargetLabel;
-        private static readonly Label[] detailLabels = new Label[2];
-        private static readonly Button[] recordButtons = new Button[2];
-        private static readonly Panel[] merBarFill = new Panel[2];
-        private static readonly Panel[] marginBarFill = new Panel[2];
-        private static readonly Panel[] merBarBack = new Panel[2];
-        private static readonly Panel[] marginBarBack = new Panel[2];
+        private static readonly Label[] detailLabels = new Label[4];
+        private static readonly Button[] recordButtons = new Button[4];
+        private static readonly Panel[] merBarFill = new Panel[4];
+        private static readonly Panel[] marginBarFill = new Panel[4];
+        private static readonly Panel[] merBarBack = new Panel[4];
+        private static readonly Panel[] marginBarBack = new Panel[4];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -103,7 +103,7 @@ namespace opentuner
             Button[] mute = MuteButtons(form);
             if (backend == null || hosts == null) return;
 
-            for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
+            for (int tuner = 0; tuner < 4 && tuner < hosts.Length; tuner++)
             {
                 int captured = tuner;
                 Control card = hosts[tuner] == null ? null : hosts[tuner].Parent;
@@ -163,7 +163,7 @@ namespace opentuner
 
             backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
             {
-                if (data == null || tuner < 0 || tuner > 1 || form.IsDisposed) return;
+                if (data == null || tuner < 0 || tuner > 3 || form.IsDisposed) return;
                 form.BeginInvoke((MethodInvoker)delegate
                 {
                     if (detailLabels[tuner] != null)
@@ -317,7 +317,7 @@ namespace opentuner
         {
             Panel[] hosts = VideoHosts(form);
             if (hosts == null) return;
-            for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
+            for (int tuner = 0; tuner < 4 && tuner < hosts.Length; tuner++)
             {
                 int captured = tuner;
                 Control card = hosts[tuner] == null ? null : hosts[tuner].Parent;
@@ -329,7 +329,7 @@ namespace opentuner
 
         private static void SetPresetTarget(int tuner)
         {
-            presetTargetTuner = Math.Max(0, Math.Min(1, tuner));
+            presetTargetTuner = Math.Max(0, Math.Min(3, tuner));
             if (presetTargetLabel != null)
                 presetTargetLabel.Text = "Preset target: Tuner " + (presetTargetTuner + 1) + "  (click to switch)";
         }
