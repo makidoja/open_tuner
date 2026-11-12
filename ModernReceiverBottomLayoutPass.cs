@@ -57,20 +57,23 @@ namespace opentuner
                 if (observedReceiverPanels.Add(controls))
                     controls.Resize += delegate { Apply(form); };
 
-                tunerBox.Size = new Size(188, Math.Max(155, controls.ClientSize.Height - 8));
+                bool compact4 = form.ModernReceiverCount >= 4;
+                tunerBox.Size = compact4
+                    ? new Size(144, Math.Max(104, controls.ClientSize.Height - 8))
+                    : new Size(188, Math.Max(155, controls.ClientSize.Height - 8));
                 tunerBox.Location = new Point(
                     Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
                 tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
 
-                LayoutTunerBox(tunerBox, tuner);
-                LayoutReceiverStatusAndButtons(controls, tunerBox, tuner);
+                LayoutTunerBox(tunerBox, tuner, compact4);
+                LayoutReceiverStatusAndButtons(controls, tunerBox, tuner, compact4);
                 tunerBox.BringToFront();
             }
             }
             finally { applyingLayout = false; }
         }
 
-        private static void LayoutTunerBox(Panel box, int tuner)
+        private static void LayoutTunerBox(Panel box, int tuner, bool compact4)
         {
             // Compact, label-free vertical tuner stack. Keep the four
             // existing interactive inputs and their change handlers.
@@ -87,42 +90,42 @@ namespace opentuner
             CheckBox loEnabled = FindByName<CheckBox>(box, "ModernLoEnabled" + tuner);
             Button tune = FindButtonExact(box, "TUNE");
 
-            int left = 9;
-            int full = box.ClientSize.Width - 18;
+            int left = compact4 ? 5 : 9;
+            int full = box.ClientSize.Width - left * 2;
             if (freq != null)
             {
-                freq.Bounds = new Rectangle(left, 8, full, 27);
-                StyleEntry(freq, 10f);
+                freq.Bounds = new Rectangle(left, compact4 ? 3 : 8, full, compact4 ? 19 : 27);
+                StyleEntry(freq, compact4 ? 8f : 10f);
             }
             if (sr != null)
             {
-                sr.Bounds = new Rectangle(left, 39, full, 27);
-                sr.Font = new Font("Segoe UI Semibold", 9.5f);
+                sr.Bounds = new Rectangle(left, compact4 ? 25 : 39, full, compact4 ? 19 : 27);
+                sr.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9.5f);
             }
             if (rf != null)
             {
-                rf.Bounds = new Rectangle(left, 70, full, 27);
-                rf.Font = new Font("Segoe UI Semibold", 9.5f);
+                rf.Bounds = new Rectangle(left, compact4 ? 47 : 70, full, compact4 ? 19 : 27);
+                rf.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9.5f);
             }
             if (lo != null)
             {
-                lo.Bounds = new Rectangle(left, 101, full - 50, 27);
-                StyleEntry(lo, 9.5f);
+                lo.Bounds = new Rectangle(left, compact4 ? 69 : 101, full - (compact4 ? 35 : 50), compact4 ? 19 : 27);
+                StyleEntry(lo, compact4 ? 8f : 9.5f);
             }
             if (loEnabled != null)
             {
                 loEnabled.Text = "LO";
-                loEnabled.Bounds = new Rectangle(box.ClientSize.Width - 47, 103, 43, 22);
+                loEnabled.Bounds = compact4 ? new Rectangle(box.ClientSize.Width - 33, 69, 32, 19) : new Rectangle(box.ClientSize.Width - 47, 103, 43, 22);
             }
             if (tune != null)
             {
-                tune.Bounds = new Rectangle(left, Math.Max(133, box.ClientSize.Height - 36),
-                    full, 30);
-                tune.Font = new Font("Segoe UI Semibold", 9f);
+                tune.Bounds = compact4 ? new Rectangle(left, Math.Max(89, box.ClientSize.Height - 24), full, 20) :
+                    new Rectangle(left, Math.Max(133, box.ClientSize.Height - 36), full, 30);
+                tune.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9f);
             }
         }
 
-        private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox, int tuner)
+        private static void LayoutReceiverStatusAndButtons(Panel controls, Panel tunerBox, int tuner, bool compact4)
         {
             Panel header = FindByName<Panel>(controls.Parent, "ModernReceiverHeader" + tuner);
             if (header != null)
@@ -156,36 +159,36 @@ namespace opentuner
 
                 // RX title occupies the first 55px. Reserve at least 65px
                 // for service status; the volume slider flexes with width.
-                int x = 58;
-                if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, 20, 24);
-                x += 22;
-                int volumeWidth = Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
+                int x = compact4 ? 48 : 58;
+                if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, compact4 ? 15 : 20, 24);
+                x += compact4 ? 16 : 22;
+                int volumeWidth = compact4 ? 55 : Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
                 if (volume != null) volume.Bounds = new Rectangle(x, 4, volumeWidth, 30);
-                x += volumeWidth + 5;
-                if (mute != null) { mute.Bounds = new Rectangle(x, 5, 64, 27); x += 68; }
-                if (record != null) { record.Bounds = new Rectangle(x, 5, 89, 27); x += 93; }
-                if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, 99, 27); x += 103; }
-                if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, 34, 27); x += 39; }
+                x += volumeWidth + (compact4 ? 2 : 5);
+                if (mute != null) { mute.Bounds = new Rectangle(x, 5, compact4 ? 48 : 64, 27); x += compact4 ? 50 : 68; }
+                if (record != null) { record.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
+                if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 78 : 99, 27); x += compact4 ? 80 : 103; }
+                if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
                 if (locked != null)
                 {
-                    locked.Bounds = new Rectangle(x, 5, 86, 27);
-                    x += 90;
+                    locked.Bounds = new Rectangle(x, 5, compact4 ? 65 : 86, 27);
+                    x += compact4 ? 67 : 90;
                 }
                 if (service != null)
                 {
                     service.Bounds = new Rectangle(x, 5,
-                        Math.Max(68, header.ClientSize.Width - x - 6), 27);
+                        Math.Max(38, header.ClientSize.Width - x - 6), 27);
                     service.TextAlign = ContentAlignment.MiddleLeft;
                 }
             }
 
-            LayoutInfoTabs(controls, tunerBox, tuner);
+            LayoutInfoTabs(controls, tunerBox, tuner, compact4);
         }
 
         // The left-hand bottom section is selectable. Reparent existing live
         // telemetry controls, rather than creating duplicates or changing any
         // receiver event handlers.
-        private static void LayoutInfoTabs(Panel controls, Panel tunerBox, int tuner)
+        private static void LayoutInfoTabs(Panel controls, Panel tunerBox, int tuner, bool compact4)
         {
             Panel tabs = infoTabs[tuner];
             if (tabs == null || tabs.IsDisposed)
@@ -297,43 +300,43 @@ namespace opentuner
             // information panel at 438px.
             int infoLeft = 4;
             int gapToTuner = 9;
-            int available = Math.Max(355, tunerBox.Left - gapToTuner - infoLeft);
+            int available = Math.Max(200, tunerBox.Left - gapToTuner - infoLeft);
             tabs.Bounds = new Rectangle(infoLeft, 4, available,
                 Math.Max(120, controls.ClientSize.Height - 8));
-            int tabWidth = Math.Max(80, (tabs.ClientSize.Width - 2) / 3);
+            int tabWidth = Math.Max(55, (tabs.ClientSize.Width - 2) / 3);
             for (int page = 0; page < 3; page++)
             {
                 tabButtons[tuner, page].Bounds = new Rectangle(page * tabWidth, 0,
-                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, 23);
-                infoPages[tuner, page].Bounds = new Rectangle(0, 23,
-                    tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - 23));
+                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, compact4 ? 19 : 23);
+                infoPages[tuner, page].Bounds = new Rectangle(0, compact4 ? 19 : 23,
+                    tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - (compact4 ? 19 : 23)));
                 infoPages[tuner, page].SendToBack();
             }
             Panel pageCurrent = infoPages[tuner, 0];
             if (currentFreq[tuner] != null)
             {
                 currentFreq[tuner].Location = new Point(5, 1);
-                currentFreq[tuner].Size = new Size(270, 37);
-                currentFreq[tuner].Font = new Font("Segoe UI Semibold", 17f);
+                currentFreq[tuner].Size = new Size(compact4 ? 200 : 270, compact4 ? 23 : 37);
+                currentFreq[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 11f : 17f);
             }
             // Restore the original vertical metric order under the live
             // frequency, while leaving the right side for Constellation.
             if (currentMer[tuner] != null)
             {
                 currentMer[tuner].AutoSize = false;
-                currentMer[tuner].Bounds = new Rectangle(8, 51, 130, 26);
-                currentMer[tuner].Font = new Font("Segoe UI Semibold", 11f);
+                currentMer[tuner].Bounds = new Rectangle(8, compact4 ? 27 : 51, compact4 ? 90 : 130, compact4 ? 18 : 26);
+                currentMer[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMerBar[tuner] != null)
-                currentMerBar[tuner].Bounds = new Rectangle(147, 55, 180, 19);
+                currentMerBar[tuner].Bounds = compact4 ? new Rectangle(97, 30, Math.Max(60, pageCurrent.ClientSize.Width - 112), 11) : new Rectangle(147, 55, 180, 19);
             if (currentMargin[tuner] != null)
             {
                 currentMargin[tuner].AutoSize = false;
-                currentMargin[tuner].Bounds = new Rectangle(8, 103, 133, 26);
-                currentMargin[tuner].Font = new Font("Segoe UI Semibold", 11f);
+                currentMargin[tuner].Bounds = new Rectangle(8, compact4 ? 49 : 103, compact4 ? 90 : 133, compact4 ? 18 : 26);
+                currentMargin[tuner].Font = new Font("Segoe UI Semibold", compact4 ? 8f : 11f);
             }
             if (currentMarginBar[tuner] != null)
-                currentMarginBar[tuner].Bounds = new Rectangle(147, 107, 180, 19);
+                currentMarginBar[tuner].Bounds = compact4 ? new Rectangle(97, 52, Math.Max(60, pageCurrent.ClientSize.Width - 112), 11) : new Rectangle(147, 107, 180, 19);
             for (int page = 1; page <= 2; page++)
                 for (int col = 0; col < 2; col++)
                 {
@@ -343,21 +346,21 @@ namespace opentuner
                     if (page == 1)
                     {
                         label.Font = new Font("Segoe UI", 7.5f);
-                        label.Bounds = new Rectangle(left, 121,
-                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8),
-                            Math.Max(50, infoPages[tuner, 1].ClientSize.Height - 125));
+                        label.Bounds = new Rectangle(left, compact4 ? 58 : 121,
+                            Math.Max(90, pageCurrent.ClientSize.Width / 2 - 8),
+                            Math.Max(30, infoPages[tuner, 1].ClientSize.Height - (compact4 ? 59 : 125)));
                     }
                     else
                     {
                         label.Font = new Font("Segoe UI", 9f);
-                        label.Bounds = new Rectangle(left, 8,
-                            Math.Max(125, pageCurrent.ClientSize.Width / 2 - 8),
-                            Math.Max(105, infoPages[tuner, 2].ClientSize.Height - 15));
+                        label.Bounds = new Rectangle(left, compact4 ? 2 : 8,
+                            Math.Max(90, pageCurrent.ClientSize.Width / 2 - 8),
+                            Math.Max(40, infoPages[tuner, 2].ClientSize.Height - (compact4 ? 4 : 15)));
                     }
                 }
             if (tsGraphs[tuner] != null && !tsGraphs[tuner].IsDisposed)
                 tsGraphs[tuner].Bounds = new Rectangle(6, 3,
-                    Math.Max(200, infoPages[tuner, 1].ClientSize.Width - 12), 112);
+                    Math.Max(125, infoPages[tuner, 1].ClientSize.Width - 12), compact4 ? 54 : 112);
             Label details = FindDetailsLabel(infoPages[tuner, 2]);
             if (details != null)
             {
