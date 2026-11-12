@@ -114,17 +114,16 @@ namespace opentuner
                     int index = tuner;
                     current.Resize += delegate { Position(index); };
                 }
-                // Use the full Current tab height. Keep the checkbox visibly
-                // below the chart rather than over the chart's bottom edge.
-                int plotWidth = current.ClientSize.Width >= 540 ? 176 : 112;
-                int plotHeight = Math.Max(85, Math.Min(145, current.ClientSize.Height - 37));
-                int plotLeft = Math.Max(275, current.ClientSize.Width - plotWidth - 12);
+                // Put the checkbox beside the frequency and dedicate the
+                // full available Current-tab height to the constellation plot.
+                int plotWidth = current.ClientSize.Width >= 540 ? 180 : 126;
+                int plotHeight = Math.Max(90, current.ClientSize.Height - 12);
+                int plotLeft = Math.Max(270, current.ClientSize.Width - plotWidth - 10);
                 plot.Size = new Size(plotWidth, plotHeight);
                 plot.Location = new Point(plotLeft, 5);
                 toggle.AutoSize = false;
-                toggle.Size = new Size(Math.Max(110, plotWidth), 20);
-                toggle.Location = new Point(plotLeft, Math.Min(
-                    current.ClientSize.Height - 22, plot.Bottom + 7));
+                toggle.Size = new Size(118, 20);
+                toggle.Location = new Point(285, 10);
                 toggle.BackColor = current.BackColor;
             }
             else
