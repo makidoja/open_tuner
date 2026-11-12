@@ -99,10 +99,12 @@ namespace opentuner
             // The Current tab owns the constellation. Do not leave the
             // plot floating between the telemetry and tuner control panels.
             Control[] matches = host.Controls.Find("ModernReceiverInfoTabs" + tuner, true);
-            TabControl tabs = matches.Length > 0 ? matches[0] as TabControl : null;
-            if (tabs != null && tabs.TabPages.Count > 0)
+            Panel tabs = matches.Length > 0 ? matches[0] as Panel : null;
+            Control[] pages = tabs == null ? new Control[0] :
+                tabs.Controls.Find("ModernReceiverInfoPage0_" + tuner, true);
+            if (pages.Length > 0)
             {
-                TabPage current = tabs.TabPages[0];
+                Panel current = pages[0] as Panel;
                 if (plot.Parent != current) current.Controls.Add(plot);
                 if (toggle.Parent != current) current.Controls.Add(toggle);
                 plot.Size = new Size(94, 80);
