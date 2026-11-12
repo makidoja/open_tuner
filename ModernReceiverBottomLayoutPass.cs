@@ -58,24 +58,35 @@ namespace opentuner
                     controls.Resize += delegate { Apply(form); };
 
                 bool compact4 = form.ModernReceiverCount >= 4;
-                // Keep tuning to its actual two-row + Tune height rather than
-                // stretching the box down the sidebar. Diagnostics get all
-                // remaining height (normally about 55-60% in 4 RX).
-                int tunerHeight = compact4 ? 143 :
-                    Math.Max(150, controls.ClientSize.Height - 8);
-                int infoHeight = compact4
-                    ? Math.Max(0, controls.ClientSize.Height - tunerHeight - 12)
-                    : 0;
+                // In 4 RX the tuning box is content-sized, not a percentage
+                // of the sidebar. First lay out the two rows and TUNE button;
+                // then set its height from the lowest visible control.
                 tunerBox.Size = compact4
-                    ? new Size(Math.Max(185, controls.ClientSize.Width - 8), tunerHeight)
-                    : new Size(188, tunerHeight);
-                tunerBox.Location = compact4
-                    ? new Point(4, infoHeight + 8)
-                    : new Point(Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
-                tunerBox.Anchor = compact4 ? (AnchorStyles.Left | AnchorStyles.Bottom) :
-                    (AnchorStyles.Right | AnchorStyles.Bottom);
-
+                    ? new Size(Math.Max(185, controls.ClientSize.Width - 8), 138)
+                    : new Size(188, Math.Max(150, controls.ClientSize.Height - 8));
+                tunerBox.Anchor = compact4 ? AnchorStyles.Left | AnchorStyles.Top :
+                    AnchorStyles.Right | AnchorStyles.Bottom;
                 LayoutTunerBox(tunerBox, tuner, compact4);
+
+                if (compact4)
+                {
+                    Button tune = FindButtonExact(tunerBox, "TUNE");
+                    int contentBottom = tune != null ? tune.Bottom : 131;
+                    foreach (Control child in tunerBox.Controls)
+                        if (child.Visible && !(child is Label))
+                            contentBottom = Math.Max(contentBottom, child.Bottom);
+                    int tunerHeight = contentBottom + 7;
+                    if (tunerBox.Height != tunerHeight)
+                        tunerBox.Height = tunerHeight;
+                    // The information tabs fill *everything* above the box.
+                    int top = Math.Max(4, controls.ClientSize.Height - tunerHeight - 4);
+                    tunerBox.Location = new Point(4, top);
+                }
+                else
+                {
+                    tunerBox.Location = new Point(
+                        Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
+                }
                 LayoutReceiverStatusAndButtons(controls, tunerBox, tuner, compact4);
                 tunerBox.BringToFront();
             }
