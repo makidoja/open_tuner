@@ -116,10 +116,10 @@ namespace opentuner
                 }
                 // Put the checkbox beside the frequency and dedicate the
                 // full available Current-tab height to the constellation plot.
-                bool compact4 = current.ClientSize.Height < 105;
-                int plotWidth = compact4 ? 90 : (current.ClientSize.Width >= 540 ? 180 : 126);
-                int plotHeight = compact4 ? Math.Max(42, current.ClientSize.Height - 8) : Math.Max(90, current.ClientSize.Height - 12);
-                int plotLeft = compact4 ? Math.Max(165, current.ClientSize.Width - plotWidth - 5) :
+                bool compact4 = current.ClientSize.Width < 330 || current.ClientSize.Height < 105;
+                int plotWidth = compact4 ? 84 : (current.ClientSize.Width >= 540 ? 180 : 126);
+                int plotHeight = compact4 ? Math.Max(58, Math.Min(110, current.ClientSize.Height - 8)) : Math.Max(90, current.ClientSize.Height - 12);
+                int plotLeft = compact4 ? Math.Max(143, current.ClientSize.Width - plotWidth - 5) :
                     Math.Max(270, current.ClientSize.Width - plotWidth - 10);
                 plot.Size = new Size(plotWidth, plotHeight);
                 plot.Location = new Point(plotLeft, 5);
@@ -127,7 +127,7 @@ namespace opentuner
                 toggle.Size = compact4 ? new Size(104, 16) : new Size(118, 20);
                 // Align the end of the 'Constellation' label with the ends
                 // of the MER/Margin signal bars, rather than the plot edge.
-                toggle.Location = compact4 ? new Point(105, 2) : new Point(210, 10);
+                toggle.Location = compact4 ? new Point(6, 77) : new Point(210, 10);
                 toggle.Font = new Font("Segoe UI", compact4 ? 7f : 8f);
                 toggle.BackColor = current.BackColor;
             }
