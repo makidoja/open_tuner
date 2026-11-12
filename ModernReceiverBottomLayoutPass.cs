@@ -361,9 +361,16 @@ namespace opentuner
                     Label label = dataLabels[tuner, (page - 1) * 4 + col];
                     if (label == null) continue;
                     Panel pagePanel = infoPages[tuner, page];
-                    int cellWidth = Math.Max(70, (pagePanel.ClientSize.Width - 12) / 4);
-                    int left = 6 + col * cellWidth;
-                    label.Font = new Font("Segoe UI", compact4 ? 6.8f : 8f);
+                    // In 4-RX mode the TS tab stays at four columns, but
+                    // the longer tuner diagnostics need two columns to avoid
+                    // severe truncation on a half-width receiver panel.
+                    bool twoColumnTuner = compact4 && page == 2;
+                    label.Visible = !twoColumnTuner || col == 0 || col == 2;
+                    int columns = twoColumnTuner ? 2 : 4;
+                    int position = twoColumnTuner ? col / 2 : col;
+                    int cellWidth = Math.Max(70, (pagePanel.ClientSize.Width - 12) / columns);
+                    int left = 6 + position * cellWidth;
+                    label.Font = new Font("Segoe UI", twoColumnTuner ? 7.3f : (compact4 ? 7.1f : 8f));
                     label.Bounds = page == 1
                         ? new Rectangle(left, 3, cellWidth - 5, compact4 ? 31 : 43)
                         : new Rectangle(left, 4, cellWidth - 5, Math.Max(38, pagePanel.ClientSize.Height - 6));
@@ -463,6 +470,14 @@ namespace opentuner
                             "\nService: " + ValueOrDash(data.service_name) +
                             "\nProvider: " + ValueOrDash(data.service_provider) +
                             "\nLDPC: " + (data.tuner_metrics_available ? data.ldpc_errors.ToString() : "—");
+                        // Preserve all readings while stacking them into
+                        // two readable columns in the 4-receiver layout.
+                        bool compactTuner = form.ModernReceiverCount >= 4;
+                        if (compactTuner)
+                        {
+                            dataLabels[tuner, 4].Text += "\n" + dataLabels[tuner, 5].Text;
+                            dataLabels[tuner, 6].Text += "\n" + dataLabels[tuner, 7].Text;
+                        }
                     });
                 }
                 catch (InvalidOperationException) { }
