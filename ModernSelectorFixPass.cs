@@ -107,27 +107,43 @@ namespace opentuner
 
         private static void FixTunerSelectors(ModernConceptForm form)
         {
-            for (int tuner = 0; tuner < 2; tuner++)
+            // The original pass only converted RX1/RX2 into button proxies,
+            // while RX3/RX4 retained native ComboBoxes. Those proxies were
+            // not moved by the layout pass and overlapped frequency/LO fields.
+            // Use the real, functional SR dropdown on all four receivers.
+            for (int tuner = 0; tuner < 4; tuner++)
             {
                 ComboBox sr = FindControl<ComboBox>(form, "ModernSrCombo" + tuner);
                 ComboBox rf = FindControl<ComboBox>(form, "ModernRfInput" + tuner);
-
-                Button srButton = ReplaceSelector(sr, "ModernSrButton" + tuner, false);
-                Button rfButton = ReplaceSelector(rf, "ModernRfButton" + tuner, true);
-
-                if (srButton != null)
+                if (sr != null)
                 {
-                    srButton.Height = 30;
-                    srButton.Top = Math.Max(6, srButton.Top - 2);
+                    HideTunerProxy(sr.Parent, "ModernSrButton" + tuner);
+                    sr.DropDownStyle = ComboBoxStyle.DropDownList;
+                    sr.FlatStyle = FlatStyle.Flat;
+                    sr.BackColor = Surface2;
+                    sr.ForeColor = Text;
+                    sr.Visible = true;
+                    sr.BringToFront();
                 }
-
-                if (rfButton != null)
+                if (rf != null)
                 {
-                    rfButton.Height = 30;
-                    rfButton.Width = Math.Max(rfButton.Width, 90);
-                    rfButton.Top = Math.Max(6, rfButton.Top - 2);
+                    HideTunerProxy(rf.Parent, "ModernRfButton" + tuner);
+                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
+                    rf.FlatStyle = FlatStyle.Flat;
+                    rf.BackColor = Surface2;
+                    rf.ForeColor = Text;
+                    // Four-RX mode maps each pane to its own fixed
+                    // hardware receiver. RF A/B selection is not relevant.
+                    rf.Visible = form.ModernReceiverCount < 4;
                 }
             }
+        }
+
+        private static void HideTunerProxy(Control parent, string name)
+        {
+            if (parent == null) return;
+            Control proxy = parent.Controls[name];
+            if (proxy != null) proxy.Visible = false;
         }
 
         private static Button ReplaceSelector(ComboBox combo, string buttonName, bool raiseCommit)
