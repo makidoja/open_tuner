@@ -51,7 +51,8 @@
             this.comboHardwareInterface.FormattingEnabled = true;
             this.comboHardwareInterface.Items.AddRange(new object[] {
             "WinterHill (ZR6TG Variant)",
-            "PicoTuner (G4EWJ Ethernet WH)"});
+            "PicoTuner (G4EWJ Ethernet WH)",
+            "Winter Hill UDP (BATC 4 RX)"});
             this.comboHardwareInterface.Location = new System.Drawing.Point(151, 19);
             this.comboHardwareInterface.Name = "comboHardwareInterface";
             this.comboHardwareInterface.Size = new System.Drawing.Size(317, 24);
