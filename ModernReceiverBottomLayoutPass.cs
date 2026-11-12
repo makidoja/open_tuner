@@ -433,33 +433,36 @@ namespace opentuner
                         string nulls = data.ts_metrics_available ?
                             data.null_packets_percent.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—";
                         dataLabels[tuner, 0].Text = "TS bitrate: " + mbps +
-                            "\nNull packets: " + nulls +
-                            "\nReceiving TS: " + (data.streaming ? "Yes" : "No");
-                        dataLabels[tuner, 1].Text = "Video: " + ValueOrDash(data.video_codec) +
-                            "\nResolution: " + ValueOrDash(data.video_resolution) +
-                            "\nAudio: " + ValueOrDash(data.audio_codec) +
-                            "\nAudio rate: " + ValueOrDash(data.audio_rate);
+                            "\nNull: " + nulls;
+                        dataLabels[tuner, 1].Text = "TS: " + (data.streaming ? "Receiving" : "No stream") +
+                            "\nRecord: " + (data.recording ? "Yes" : "No");
+                        dataLabels[tuner, 2].Text = "Video: " + ValueOrDash(data.video_codec) +
+                            "\nSize: " + ValueOrDash(data.video_resolution);
+                        dataLabels[tuner, 3].Text = "Audio: " + ValueOrDash(data.audio_codec) +
+                            "\nRate: " + ValueOrDash(data.audio_rate);
                         string f = data.frequency > 0 ?
                             (data.frequency / 1000.0).ToString("0.000", CultureInfo.InvariantCulture) + " MHz" : "—";
-                        dataLabels[tuner, 2].Text =
+                        dataLabels[tuner, 4].Text =
                             "Demod: " + ValueOrDash(data.demode_state) +
                             "\nSystem: " + ValueOrDash(data.delivery_system) +
                             "\nModcod: " + ValueOrDash(data.modcode) +
-                            "\nMER: " + (data.demod_locked ? data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB" : "—") +
+                            "\nRF input: " + ValueOrDash(data.rf_input);
+                        dataLabels[tuner, 5].Text =
+                            "MER: " + (data.demod_locked ? data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB" : "—") +
                             "\nMargin: " + (data.demod_locked ? data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB" : "—") +
-                            "\nRF input: " + ValueOrDash(data.rf_input) +
                             "\nRF level: " + (double.IsNaN(data.rf_input_level) ? "—" :
                                 data.rf_input_level.ToString("0", CultureInfo.InvariantCulture) + " dB") +
                             "\nBER: " + (data.tuner_metrics_available ? data.ber.ToString() : "—");
-                        dataLabels[tuner, 3].Text =
-                            "Frequency: " + f +
-                            "\nNIM freq: " + (data.nim_frequency > 0 ? data.nim_frequency + " kHz" : "—") +
-                            "\nLO offset: " + (data.tuner_metrics_available ? data.frequency_offset + " kHz" : "—") +
-                            "\nSR: " + (data.symbol_rate > 0 ? data.symbol_rate + " kS" : "—") +
-                            "\nCarrier offset: " + (data.tuner_metrics_available ? data.carrier_offset + " Hz" : "—") +
+                        dataLabels[tuner, 6].Text =
+                            "Freq: " + f +
+                            "\nNIM: " + (data.nim_frequency > 0 ? data.nim_frequency + " kHz" : "—") +
+                            "\nLO: " + (data.frequency_offset > 0 ? (data.frequency_offset / 1000.0).ToString("0.###", CultureInfo.InvariantCulture) + " MHz" : "Off") +
+                            "\nSR: " + (data.symbol_rate > 0 ? data.symbol_rate + " kS" : "—");
+                        dataLabels[tuner, 7].Text =
+                            "Carrier: " + (data.tuner_metrics_available ? data.carrier_offset + " Hz" : "—") +
                             "\nService: " + ValueOrDash(data.service_name) +
                             "\nProvider: " + ValueOrDash(data.service_provider) +
-                            "\nLDPC errors: " + (data.tuner_metrics_available ? data.ldpc_errors.ToString() : "—");
+                            "\nLDPC: " + (data.tuner_metrics_available ? data.ldpc_errors.ToString() : "—");
                     });
                 }
                 catch (InvalidOperationException) { }
