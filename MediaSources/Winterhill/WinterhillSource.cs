@@ -435,16 +435,48 @@ namespace opentuner.MediaSources.WinterHill
 
         public void SetRFPort(int device, int port)
         {
-            Console.WriteLine("Set Device: " + device.ToString() + "," + port.ToString());
-            _settings.RFPort[device] = (uint)port;
+            if (device < 0 || device >= ts_devices || (port != 0 && port != 1))
+                return;
 
-            SetFrequency(device, (uint)_current_frequency[device], (uint)_current_sr[device], false);
+            _settings.RFPort[device] = (uint)port;
+            int frequency = _current_frequency[device];
+            int rate = _current_sr[device];
+            // A change of RF connector must not send freq=0/srate=0
+            // when no status has yet arrived from this receiver.
+            if (frequency <= 0 && device < _settings.DefaultFrequency.Length)
+                frequency = Math.Max(0, (int)_settings.DefaultFrequency[device] - _current_offset[device]);
+            if (rate <= 0 && device < _settings.DefaultSR.Length)
+                rate = (int)_settings.DefaultSR[device];
+
+            Log.Information("WinterHill RX{Receiver}: physical RF {Port}, base frequency {Frequency} kHz, SR {SymbolRate} kS",
+                device + 1, port == 0 ? "A" : "B", frequency, rate);
+            if (frequency > 0 && rate > 0)
+                SetFrequency(device, (uint)frequency, (uint)rate, false);
+            else
+                Log.Warning("WinterHill RX{Receiver}: RF port selected but tune deferred until frequency/SR available", device + 1);
         }
 
 
         public override void SetFrequency(int device, uint frequency, uint symbol_rate, bool offset_included)
         {
-            Log.Information("SetFrequency: " + device.ToString() + "," + frequency.ToString() + "," + symbol_rate.ToString() + "," + offset_included.ToString());
+            if (device < 0 || device >= ts_devices || frequency == 0 || symbol_rate == 0)
+            {
+                Log.Warning("WinterHill: rejecting invalid tune RX{Receiver}, frequency={Frequency}, SR={Rate}",
+                    device + 1, frequency, symbol_rate);
+                return;
+            }
+
+            // Maintain requested tune state independently of status packets.
+            // Status packets can be delayed or absent on RX2/RX4.
+            // Internal frequency stores the baseband value without LO offset.
+            int baseFrequency = offset_included
+                ? (int)frequency - _current_offset[device] : (int)frequency;
+            if (baseFrequency >= 0)
+                _current_frequency[device] = baseFrequency;
+            _current_sr[device] = (int)symbol_rate;
+            Log.Information("WinterHill RX{Receiver} tune: frequency={Frequency} kHz, SR={Rate} kS, offsetIncluded={OffsetIncluded}, RF={Rf}",
+                device + 1, frequency, symbol_rate, offset_included,
+                _settings.RFPort[device] == 0 ? "A" : "B");
 
 
             if (offset_included)
