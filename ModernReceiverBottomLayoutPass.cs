@@ -151,18 +151,22 @@ namespace opentuner
 
                 // RX title occupies the first 55px. Reserve at least 65px
                 // for service status; the volume slider flexes with width.
-                if (compact4)
+                foreach (Control item in header.Controls)
                 {
-                    foreach (Control item in header.Controls)
+                    Button btn = item as Button;
+                    if (btn != null)
                     {
-                        Button btn = item as Button;
-                        if (btn != null) btn.Font = new Font("Segoe UI Semibold", 7f);
-                        Label lbl = item as Label;
-                        if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
-                        {
-                            lbl.Font = new Font("Segoe UI Semibold", 9f);
-                            lbl.Size = new Size(44, 23);
-                        }
+                        float size = compact4 ? 7f : 8.5f;
+                        if (Math.Abs(btn.Font.Size - size) > 0.1f)
+                            btn.Font = new Font("Segoe UI Semibold", size);
+                    }
+                    Label lbl = item as Label;
+                    if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
+                    {
+                        float size = compact4 ? 9f : 11f;
+                        if (Math.Abs(lbl.Font.Size - size) > 0.1f)
+                            lbl.Font = new Font("Segoe UI Semibold", size);
+                        lbl.Size = compact4 ? new Size(44, 23) : new Size(51, 24);
                     }
                 }
                 int x = compact4 ? 48 : 58;
