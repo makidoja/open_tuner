@@ -427,8 +427,8 @@ namespace opentuner
                             "Demod: " + ValueOrDash(data.demode_state) +
                             "\nSystem: " + ValueOrDash(data.delivery_system) +
                             "\nModcod: " + ValueOrDash(data.modcode) +
-                            "\nMER: " + data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB" +
-                            "\nMargin: " + data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB" +
+                            "\nMER: " + (data.demod_locked ? data.mer.ToString("0.0", CultureInfo.InvariantCulture) + " dB" : "—") +
+                            "\nMargin: " + (data.demod_locked ? data.db_margin.ToString("0.0", CultureInfo.InvariantCulture) + " dB" : "—") +
                             "\nRF input: " + ValueOrDash(data.rf_input) +
                             "\nRF level: " + (double.IsNaN(data.rf_input_level) ? "—" :
                                 data.rf_input_level.ToString("0", CultureInfo.InvariantCulture) + " dB") +
