@@ -542,12 +542,19 @@ namespace opentuner
                     Math.Max(110, tsPage.ClientSize.Width - 12),
                     Math.Max(24, tsPage.ClientSize.Height - top - 5));
             }
-            Label details = FindDetailsLabel(infoPages[tuner, 2]);
-            if (details != null)
+            // Hide only the legacy details footer. FindDetailsLabel can also
+            // match our new Demod/System/Modcod group, which previously caused
+            // that entire upper-left Tuner Data block to disappear.
+            Panel tunerPage = infoPages[tuner, 2];
+            foreach (Control child in tunerPage.Controls)
             {
-                // Tuner Data's two full-height columns now include everything
-                // previously compressed into the small detail footer.
-                details.Visible = false;
+                Label legacy = child as Label;
+                if (legacy == null) continue;
+                bool isTelemetry = false;
+                for (int column = 4; column < 8; column++)
+                    if (Object.ReferenceEquals(legacy, dataLabels[tuner, column]))
+                        isTelemetry = true;
+                if (!isTelemetry) legacy.Visible = false;
             }
         }
 
