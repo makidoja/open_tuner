@@ -456,12 +456,18 @@ namespace opentuner
                         else
                         {
                             // Two complete eight-line tuner columns (labels 4+5 and 6+7).
-                            int width = Math.Max(75, (pagePanel.ClientSize.Width - 12) / 2);
+                            // Use the full widened sidebar with a small gutter.
+                            // Avoid wrapping diagnostics such as Demod, System and Provider.
+                            int gutter = 10;
+                            int width = Math.Max(90, (pagePanel.ClientSize.Width - 12 - gutter) / 2);
                             label.Visible = col == 0 || col == 2;
                             if (label.Visible)
-                                label.Bounds = new Rectangle(6 + (col / 2) * width, 4,
-                                    width - 5, Math.Max(75, pagePanel.ClientSize.Height - 8));
-                            label.Font = new Font("Segoe UI", 7.3f);
+                            {
+                                int x = 6 + (col / 2) * (width + gutter);
+                                label.Bounds = new Rectangle(x, 4,
+                                    width, Math.Max(75, pagePanel.ClientSize.Height - 8));
+                            }
+                            label.Font = new Font("Segoe UI", 8f);
                         }
                     }
                     else
