@@ -1328,11 +1328,16 @@ namespace opentuner
             bool offline = initialised && backend.BackendUsesPicoEthernet && !live;
             bool picoSelected = sourceCombo != null && sourceCombo.SelectedItem != null &&
                 sourceCombo.SelectedItem.ToString().IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
-            // Fail closed for the PicoTuner test: an unknown source name, an
-            // absent target or a stale/manual override must not show CONNECT.
-            // The explicit right-click recovery action remains available.
+            // An ICMP probe is meaningful only for a WinterHill/PicoTuner
+            // Ethernet source. A MiniTiouner USB (and Longmynd) has no ping
+            // target: its hardware/driver is validated by Initialize() when
+            // the operator presses CONNECT. Never trap USB sources in WAITING.
+            // Preserve the existing fail-closed ping requirement for Ethernet.
             bool detected = !string.IsNullOrWhiteSpace(picoProbeHost) && picoProbeAvailable;
-            bool ready = detected && !resetting && !switchingConnection && !connectRequested && !initialised;
+            bool sourceReady = sourceCombo != null && sourceCombo.SelectedIndex >= 0 &&
+                (!picoSelected || detected);
+            bool ready = sourceReady && !resetting && !switchingConnection &&
+                !connectRequested && !initialised;
             string diagnostic = string.Format("initialised={0} transport={1} reset={2} switching={3} request={4} ready={5} source={6}", initialised, live, resetting, switchingConnection, connectRequested, ready, sourceCombo != null ? sourceCombo.SelectedIndex : -1);
             if (diagnostic != lastConnectionDiagnostic)
             {
