@@ -13,13 +13,13 @@ namespace opentuner
         private static Label hardwareLabel;
         private static ComboBox lnbA;
         private static ComboBox lnbB;
-        private static readonly Label[] detailLabels = new Label[2];
-        private static readonly ComboBox[] rfInputs = new ComboBox[2];
-        private static readonly TextBox[] freqText = new TextBox[2];
-        private static readonly TextBox[] loText = new TextBox[2];
-        private static readonly CheckBox[] loEnabled = new CheckBox[2];
-        private static readonly Panel[] tunerControlBoxes = new Panel[2];
-        private static readonly decimal[] preferredLo = new decimal[] { 9750M, 9750M };
+        private static readonly Label[] detailLabels = new Label[4];
+        private static readonly ComboBox[] rfInputs = new ComboBox[4];
+        private static readonly TextBox[] freqText = new TextBox[4];
+        private static readonly TextBox[] loText = new TextBox[4];
+        private static readonly CheckBox[] loEnabled = new CheckBox[4];
+        private static readonly Panel[] tunerControlBoxes = new Panel[4];
+        private static readonly decimal[] preferredLo = new decimal[] { 9750M, 9750M, 9750M, 9750M };
 
         private static readonly Color Surface = Color.FromArgb(13, 28, 45);
         private static readonly Color Surface2 = Color.FromArgb(18, 38, 60);
@@ -110,7 +110,7 @@ namespace opentuner
 
                 NumericUpDown[] hiddenFreq = GetFreqInputs(form);
 
-                for (int tuner = 0; tuner < 2; tuner++)
+                for (int tuner = 0; tuner < 4; tuner++)
                 {
                     if (rfInputs[tuner] != null && !rfInputs[tuner].DroppedDown)
                     {
@@ -197,7 +197,7 @@ namespace opentuner
 
             if (freq != null)
             {
-                for (int i = 0; i < 2 && i < freq.Length; i++)
+                for (int i = 0; i < 4 && i < freq.Length; i++)
                 {
                     if (freq[i] == null) continue;
                     freq[i].Minimum = 400;
@@ -207,7 +207,7 @@ namespace opentuner
                 }
             }
 
-            for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
+            for (int tuner = 0; tuner < 4 && tuner < hosts.Length; tuner++)
             {
                 int captured = tuner;
                 Control card = hosts[tuner] == null ? null : hosts[tuner].Parent;
@@ -482,7 +482,7 @@ namespace opentuner
             Panel[] hosts = GetVideoHosts(form);
             if (hosts == null) return;
 
-            for (int tuner = 0; tuner < 2 && tuner < hosts.Length; tuner++)
+            for (int tuner = 0; tuner < 4 && tuner < hosts.Length; tuner++)
             {
                 Control card = hosts[tuner] == null ? null : hosts[tuner].Parent;
                 if (card != null) detailLabels[tuner] = FindDetailLabel(card);
@@ -490,7 +490,7 @@ namespace opentuner
 
             backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
             {
-                if (data == null || tuner < 0 || tuner > 1 || form.IsDisposed) return;
+                if (data == null || tuner < 0 || tuner > 3 || form.IsDisposed) return;
 
                 form.BeginInvoke((MethodInvoker)delegate
                 {
