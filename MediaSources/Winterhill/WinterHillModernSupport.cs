@@ -21,7 +21,10 @@ namespace opentuner.MediaSources.WinterHill
         public void ModernRetryPicoConnection()
         {
             if (!ModernIsPicoTunerEthernet) return;
-            ModernDiscoverPicoTuner(1200);
+            // A broadcast may originate from either unit; never allow
+            // single-device discovery to overwrite dual-unit addressing.
+            if (!(_settings != null && _settings.SecondPicoTunerEnabled))
+                ModernDiscoverPicoTuner(1200);
             ModernReapplyStartupTune();
         }
 
@@ -48,7 +51,8 @@ namespace opentuner.MediaSources.WinterHill
                 switch (_settings.DefaultInterface)
                 {
                     case 1: return "WebSocket (ZR6TG)";
-                    case 2: return "PicoTuner Ethernet (G4EWJ)";
+                    case 2: return _settings.SecondPicoTunerEnabled ?
+                        "Dual PicoTuner Ethernet (4 RX)" : "PicoTuner Ethernet (G4EWJ)";
                     case 3: return "Winter Hill UDP (BATC 4 RX)";
                     default: return "Always Ask";
                 }
@@ -113,7 +117,7 @@ namespace opentuner.MediaSources.WinterHill
         // which some firmware versions can format in a way that drops part of the address.
         public bool ModernDiscoverPicoTuner(int timeoutMs)
         {
-            if (!ModernIsPicoTunerEthernet)
+            if (!ModernIsPicoTunerEthernet || _settings.SecondPicoTunerEnabled)
                 return false;
 
             UdpClient listener = null;
@@ -187,7 +191,8 @@ namespace opentuner.MediaSources.WinterHill
                 }
             }
 
-            int count = System.Math.Min(2, _current_frequency.Length);
+            int count = System.Math.Min(_settings.SecondPicoTunerEnabled ? 4 : 2,
+                _current_frequency.Length);
             for (int tuner = 0; tuner < count; tuner++)
             {
                 if (_current_frequency[tuner] <= 0 || _current_sr[tuner] <= 0)
@@ -197,7 +202,8 @@ namespace opentuner.MediaSources.WinterHill
                     "Reapplying PicoTuner startup tune T{Tuner}: {Frequency} kHz / {SymbolRate} kS",
                     tuner + 1, _current_frequency[tuner], _current_sr[tuner]);
 
-                UDPSetFrequency(tuner, _current_frequency[tuner], _current_sr[tuner]);
+                UDPSetFrequency(tuner,
+                    _current_frequency[tuner] + _current_offset[tuner], _current_sr[tuner]);
             }
         }
     }
