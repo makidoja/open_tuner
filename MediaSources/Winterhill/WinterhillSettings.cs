@@ -12,6 +12,11 @@
         public string WinterHillUdpHost = "192.168.1.91";
         public int WinterHillUdpBasePort = 9900;
 
+        // Optional second device. Existing single-PicoTuner operation is unchanged.
+        public bool SecondPicoTunerEnabled = false;
+        public string SecondPicoTunerUdpHost = "";
+        public int SecondPicoTunerUdpBasePort = 10000;
+
 
         public uint[] RFPort = new uint[] { 0, 0, 0, 0 };
 
