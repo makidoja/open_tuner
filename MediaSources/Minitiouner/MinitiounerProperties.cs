@@ -446,7 +446,7 @@ namespace opentuner.MediaSources.Minitiouner
                 _tuner1_properties.UpdateValue("audio_rate", "");
 
                 // stop recording if recording
-                if (_ts_recorders[0].record)
+                if (_ts_recorders != null && _ts_recorders.Count > 0 && _ts_recorders[0] != null && _ts_recorders[0].record)
                 {
 //                    ClearIndicator(ref indicatorStatus1, PropertyIndicators.RecordingIndicator);
                     _ts_recorders[0].record = false;    // stop recording
@@ -455,7 +455,7 @@ namespace opentuner.MediaSources.Minitiouner
                 }
 
                 // stop streaming
-                if (_ts_streamers[0].stream)
+                if (_ts_streamers != null && _ts_streamers.Count > 0 && _ts_streamers[0] != null && _ts_streamers[0].stream)
                 {
 //                    ClearIndicator(ref indicatorStatus1, PropertyIndicators.StreamingIndicator);
                     _ts_streamers[0].stream = false;    // stop streaming
@@ -562,7 +562,7 @@ namespace opentuner.MediaSources.Minitiouner
 
 
                     // stop recording if recording
-                    if (_ts_recorders[1].record)
+                    if (_ts_recorders != null && _ts_recorders.Count > 1 && _ts_recorders[1] != null && _ts_recorders[1].record)
                     {
 //                        ClearIndicator(ref indicatorStatus2, PropertyIndicators.RecordingIndicator);
                         _ts_recorders[1].record = false;    // stop recording
@@ -571,7 +571,7 @@ namespace opentuner.MediaSources.Minitiouner
                     }
 
                     // stop streaming
-                    if (_ts_streamers[1].stream)
+                    if (_ts_streamers != null && _ts_streamers.Count > 1 && _ts_streamers[1] != null && _ts_streamers[1].stream)
                     {
 //                        ClearIndicator(ref indicatorStatus2, PropertyIndicators.StreamingIndicator);
                         _ts_streamers[1].stream = false;    // stop streaming
