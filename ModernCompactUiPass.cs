@@ -289,7 +289,7 @@ namespace opentuner
 
         private static void ReplaceSymbolRateControls(NumericUpDown[] inputs)
         {
-            for (int tuner = 0; tuner < 2 && tuner < inputs.Length; tuner++)
+            for (int tuner = 0; tuner < 4 && tuner < inputs.Length; tuner++)
             {
                 NumericUpDown input = inputs[tuner];
                 if (input == null || input.Parent == null) continue;
@@ -308,7 +308,8 @@ namespace opentuner
 
                 foreach (int sr in SymbolRates) combo.Items.Add(sr);
                 int initial = (int)input.Value;
-                combo.SelectedItem = Array.IndexOf(SymbolRates, initial) >= 0 ? (object)initial : 333;
+                if (!combo.Items.Contains(initial)) combo.Items.Add(initial);
+                combo.SelectedItem = initial;
 
                 combo.SelectedIndexChanged += delegate
                 {
@@ -320,8 +321,8 @@ namespace opentuner
                 input.ValueChanged += delegate
                 {
                     int value = (int)input.Value;
-                    if (Array.IndexOf(SymbolRates, value) >= 0 && !Equals(combo.SelectedItem, value))
-                        combo.SelectedItem = value;
+                    if (!combo.Items.Contains(value)) combo.Items.Add(value);
+                    if (!Equals(combo.SelectedItem, value)) combo.SelectedItem = value;
                 };
 
                 input.Parent.Controls.Add(combo);
