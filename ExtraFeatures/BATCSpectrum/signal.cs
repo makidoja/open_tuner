@@ -404,7 +404,7 @@ namespace opentuner
 
         public bool isOverPower(int beacon_strength, int signal_strength, float signal_bw)
         {
-            if (beacon_strength != 0)
+            if (beacon_strength > 0)
             {
                 if (signal_bw < 0.4)
                 {
@@ -430,6 +430,9 @@ namespace opentuner
             lock (list_lock)
             {
                 signals.Clear();
+                // Re-establish the beacon reference for every FFT frame.
+                // Old values must not create a false dBb measurement.
+                beacon_strength = -1;
                 int i;
                 int j;
 
@@ -503,7 +506,7 @@ namespace opentuner
                             // Exclude signals in beacon band
                             if (signal_bw >= 0.033)
                             {
-                                if (signal_freq < 10492000 && signal_bw > 1.0)
+                                if (Math.Abs(signal_freq - 10491.5) < 0.35 && signal_bw > 1.0)
                                 {
                                     beacon_strength = strength_signal;
                                     signals.Add(new Sig(start_signal, end_signal, Convert.ToInt32(mid_signal), strength_signal / 255, signal_freq, signal_bw, false, 0));
@@ -523,6 +526,30 @@ namespace opentuner
                         }
                     }
                 }
+                // dBb is power spectral density relative to the QO-100
+                // wideband beacon, NOT receiver MER. The BATC detector's
+                // existing over-power calculation uses 3276.8 FFT units/dB.
+                // fft_strength is the raw detector value divided by 255.
+                // Keep the dBb value invalid if this frame has no beacon.
+                int beaconIndex = -1;
+                for (int n = 0; n < signals.Count; n++)
+                {
+                    if (Math.Abs(signals[n].frequency - 10491.5) < 0.35 &&
+                        signals[n].sr > 1.0f)
+                    {
+                        beaconIndex = n;
+                        break;
+                    }
+                }
+                for (int n = 0; n < signals.Count; n++)
+                {
+                    Sig item = signals[n];
+                    item.dbb = beaconIndex < 0 ? float.NaN :
+                        (item.fft_strength - signals[beaconIndex].fft_strength)
+                        * (255.0f / 3276.8f);
+                    signals[n] = item;
+                }
+
                 updateSignalList();
 
             }
