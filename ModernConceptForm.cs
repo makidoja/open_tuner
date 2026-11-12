@@ -466,7 +466,7 @@ namespace opentuner
             header.Controls.Add(title);
             card.Controls.Add(header);
 
-            Panel controls = new Panel { Dock = DockStyle.Bottom, Height = 190, BackColor = Surface };
+            Panel controls = new Panel { Dock = DockStyle.Bottom, Height = 220, BackColor = Surface };
             card.Controls.Add(controls);
             receiverControls[tuner] = controls;
 
@@ -821,7 +821,7 @@ namespace opentuner
         {
             Panel panel = receiverControls[rx];
             if (panel == null) return;
-            panel.Height = compact ? 117 : 190;
+            panel.Height = compact ? 117 : 220;
             if (!compact)
             {
                 foreach (Control control in panel.Controls)
