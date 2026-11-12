@@ -69,25 +69,42 @@ namespace opentuner
             Button a = ReplaceSelector(lnbA, "ModernLnbAButton", true);
             Button b = ReplaceSelector(lnbB, "ModernLnbBButton", true);
 
-            if (a != null) a.Width = Math.Max(a.Width, 122);
-            if (b != null) b.Width = Math.Max(b.Width, 112);
+            // Match the SOURCE SETTINGS toolbar button (30px tall).
+            // A and B must sit together, in that order, after HW.
+            foreach (Button button in new Button[] { a, b })
+            {
+                if (button == null) continue;
+                button.AutoSize = false;
+                button.Size = new Size(122, 30);
+                button.Font = new Font("Segoe UI Semibold", 8.25f);
+                button.Padding = new Padding(6, 0, 6, 0);
+                button.Margin = new Padding(0, 0, 5, 0);
+                button.FlatStyle = FlatStyle.Flat;
+                button.FlatAppearance.BorderColor = Border;
+                button.BackColor = Surface2;
+                button.ForeColor = Text;
+                button.TextAlign = ContentAlignment.MiddleLeft;
+            }
 
             HideStaleLnbButtons(bar, a, b);
 
-            if (hw != null)
+            if (hw != null && a != null && b != null)
             {
-                int hwIndex = bar.Controls.GetChildIndex(hw, false);
-                if (a != null)
+                // Rebuild the pair's order explicitly. Moving B with
+                // SetChildIndex against a previously calculated A index
+                // was sending B to the far-left of the FlowLayoutPanel.
+                bar.SuspendLayout();
+                try
                 {
-                    bar.Controls.SetChildIndex(a, Math.Min(hwIndex + 1, bar.Controls.Count - 1));
-                    a.Margin = new Padding(4, 4, 3, 0);
+                    bar.Controls.Remove(a);
+                    bar.Controls.Remove(b);
+                    int afterHardware = bar.Controls.GetChildIndex(hw, false) + 1;
+                    bar.Controls.Add(a);
+                    bar.Controls.Add(b);
+                    bar.Controls.SetChildIndex(a, afterHardware);
+                    bar.Controls.SetChildIndex(b, afterHardware + 1);
                 }
-                if (b != null)
-                {
-                    int aIndex = a == null ? hwIndex : bar.Controls.GetChildIndex(a, false);
-                    bar.Controls.SetChildIndex(b, Math.Min(aIndex + 1, bar.Controls.Count - 1));
-                    b.Margin = new Padding(3, 4, 3, 0);
-                }
+                finally { bar.ResumeLayout(true); }
             }
         }
 
