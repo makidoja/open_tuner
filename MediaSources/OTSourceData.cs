@@ -10,6 +10,16 @@
         public double mer = 0.0;
         public long frequency = 0;
         public int symbol_rate = 0;
+        public long nim_frequency = 0;
+        public long frequency_offset = 0;
+        public string rf_input = "";
+        public double rf_input_level = double.NaN;
+        public uint ber = 0;
+        public int carrier_offset = 0;
+        public uint ldpc_errors = 0;
+        public bool ts_metrics_available = false;
+        public bool tuner_metrics_available = false;
+
         public string service_name = "";
         public string service_provider = "";
         public string modcode = "";
