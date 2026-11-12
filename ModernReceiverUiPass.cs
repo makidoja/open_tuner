@@ -176,8 +176,9 @@ namespace opentuner
                     if (recordButtons[tuner] != null)
                         ApplyRecordState(recordButtons[tuner], backend.BackendIsRecording(tuner));
 
-                    UpdateBar(merBarBack[tuner], merBarFill[tuner], data.mer, 12.0);
-                    UpdateBar(marginBarBack[tuner], marginBarFill[tuner], data.db_margin, 10.0);
+                    // MER and decode margin are valid only with demod lock.
+                    UpdateBar(merBarBack[tuner], merBarFill[tuner], data.demod_locked ? data.mer : 0, 12.0);
+                    UpdateBar(marginBarBack[tuner], marginBarFill[tuner], data.demod_locked ? data.db_margin : 0, 10.0);
                 });
             };
         }
