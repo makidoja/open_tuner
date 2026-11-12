@@ -26,26 +26,16 @@ namespace opentuner.MediaSources.WinterHill
         {
             runtimeUdpHost = _settings.WinterHillUdpHost;
 
-            if (_settings.DefaultInterface == 3)
-            {
-                // Standard BATC Winter Hill reports RX1..RX4 on base+1..base+4.
-                winterHillStatusClients = new UDPClient[4];
-                for (int i = 0; i < winterHillStatusClients.Length; i++)
-                {
-                    var client = new UDPClient(port + i, i);
-                    client.DataReceived += Longmynd_status_DataReceived;
-                    client.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
-                    winterHillStatusClients[i] = client;
-                    client.Connect();
-                }
-            }
-            else
-            {
-                longmynd_status = new UDPClient(port);
-                longmynd_status.DataReceived += Longmynd_status_DataReceived;
-                longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
-                longmynd_status.Connect();
-            }
+            // BATC WinterHill BIP+01 carries extended LongMynd status
+            // for ALL receivers, not just RX1. BIP+03 duplicates it.
+            // BIP+02/+04 carry four-line display text, not per-RX status.
+            // Listen to one authoritative stream and demultiplex by $0 IDs.
+            longmynd_status = new UDPClient(port);
+            longmynd_status.DataReceived += Longmynd_status_DataReceived;
+            longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
+            longmynd_status.Connect();
+            Log.Information("WinterHill status: listening on UDP {Port} for all {ReceiverCount} receivers",
+                port, _settings.DefaultInterface == 3 ? 4 : 2);
         }
 
         private void Longmynd_status_ConnectionStatusChanged(object sender, bool connection_status)
@@ -109,8 +99,9 @@ namespace opentuner.MediaSources.WinterHill
                 mm.rx[i].rx = 99;
             }
 
-            int receiver = _settings.DefaultInterface == 3 && statusClient != null
-                ? statusClient.getID() + 1 : 1;
+            // Multiple $0 receiver sections can arrive in ONE packet.
+            // No assumptions about receiver identity based on UDP port.
+            int receiver = 0;
             bool receiverIdentified = false;
 
             for (int c = 0; c < status_strings.Length; c++)
@@ -119,6 +110,8 @@ namespace opentuner.MediaSources.WinterHill
                 if (dt.Length == 0)
                     continue;
 
+                if (dt[0] != "$0" && receiver == 0)
+                    continue;
                 switch (dt[0])
                 {
                     case "$0":
@@ -127,26 +120,22 @@ namespace opentuner.MediaSources.WinterHill
                         int reportedReceiver;
                         if (!int.TryParse(dt[1].Trim(), out reportedReceiver))
                         {
-                            Log.Warning("Ignoring malformed PicoTuner receiver ID in UDP status: '{Id}'", dt[1]);
-                            return;
+                            Log.Warning("Ignoring malformed WinterHill receiver ID: '{Id}'", dt[1]);
+                            receiver = 0;
+                            break;
                         }
                         receiver = reportedReceiver - receiver_num;
                         if (receiver < 1 || receiver > receiverCount)
                         {
                             Log.Warning("WinterHill status rejected: reported RX={Reported}, base={Base}, decoded={Decoded}, expected 1..{Count}",
                                 reportedReceiver, receiver_num, receiver, receiverCount);
-                            return;
-                        }
-                        if (_settings.DefaultInterface == 3 && statusClient != null &&
-                            receiver != statusClient.getID() + 1)
-                        {
-                            Log.Warning("WinterHill status port/ID mismatch: UDP listener RX{PortReceiver} received status for RX{StatusReceiver}",
-                                statusClient.getID() + 1, receiver);
-                            return;
+                            receiver = 0;
+                            break;
                         }
                         receiverIdentified = true;
+                        mm.rx[receiver].rx = receiver;
                         // Some firmware sends status in partial batches. Do not
-                        // treat an omitted $1 demod state as an actual loss of lock.
+                        // treat an omitted $1 demod state as a loss of lock.
                         mm.rx[receiver].scanstate = demodstate[receiver - 1];
                         break;
 
@@ -212,17 +201,21 @@ namespace opentuner.MediaSources.WinterHill
                 }
             }
 
-            // Ignore unidentified packets rather than applying them to RX1.
+            // Deliver all identified receivers from the batch. Earlier
+            // code only marked the last receiver, discarding RX2/RX4.
             if (!receiverIdentified) return;
-            if (mm.rx[receiver].service_name == null) mm.rx[receiver].service_name = "";
-            if (mm.rx[receiver].service_provider_name == null) mm.rx[receiver].service_provider_name = "";
-            if (mm.rx[receiver].mer == null) mm.rx[receiver].mer = "";
-            if (mm.rx[receiver].modcod == null) mm.rx[receiver].modcod = "";
-            if (mm.rx[receiver].dbmargin == null) mm.rx[receiver].dbmargin = "";
-            if (mm.rx[receiver].ts_port == null) mm.rx[receiver].ts_port = "";
-            if (mm.rx[receiver].ts_addr == null) mm.rx[receiver].ts_addr = "";
-
-            mm.rx[receiver].rx = receiver;
+            for (int id = 1; id <= receiverCount; id++)
+            {
+                ReceiverMessage rx = mm.rx[id];
+                if (rx.rx == 99) continue;
+                if (rx.service_name == null) rx.service_name = "";
+                if (rx.service_provider_name == null) rx.service_provider_name = "";
+                if (rx.mer == null) rx.mer = "";
+                if (rx.modcod == null) rx.modcod = "";
+                if (rx.dbmargin == null) rx.dbmargin = "";
+                if (rx.ts_port == null) rx.ts_port = "";
+                if (rx.ts_addr == null) rx.ts_addr = "";
+            }
             UpdateInfo(mm);
             if (ModernIsPicoTunerEthernet || ModernIsStandardWinterHillUdp)
                 System.Threading.Interlocked.Exchange(ref lastPicoStatusTicks, DateTime.UtcNow.Ticks);
