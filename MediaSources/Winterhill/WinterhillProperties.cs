@@ -54,7 +54,7 @@ namespace opentuner.MediaSources.WinterHill
                 _tuner_properties[c].AddItem("demodstate", "Demod State", Color.PaleVioletRed);
                 _tuner_properties[c].AddItem("mer", "Mer");
 
-                if (hw_device == 2) // picotuner
+                if (hw_device == 2 || hw_device == 3) // UDP-controlled tuner RF input
                 {
                     _tuner_properties[c].AddItem("rf_input", "RF Input", _genericContextStrip);
                 }
@@ -98,9 +98,9 @@ namespace opentuner.MediaSources.WinterHill
             _source_properties.setID(99);
             _source_properties.AddItem("hardware", "Hardware");
 
-            if (hw_device == 1)
+            if (hw_device == 1 || hw_device == 3)
             {
-                _source_properties.UpdateValue("hardware", "WinterHill");
+                _source_properties.UpdateValue("hardware", hw_device == 3 ? "BATC Winter Hill UDP (4 RX)" : "WinterHill");
             }
             else
             {
@@ -615,7 +615,7 @@ namespace opentuner.MediaSources.WinterHill
                     _tuner_properties[c].UpdateValue("null_packets", rx.null_percentage);
                     _tuner_properties[c].UpdateValue("ts_addr", rx.ts_addr);
 
-                    if (hw_device == 2)
+                    if (hw_device == 2 || hw_device == 3)
                     {
                         _tuner_properties[c].UpdateValue("rf_input", (rx.rfport == 0 ? "A" : "B"));
                     }
