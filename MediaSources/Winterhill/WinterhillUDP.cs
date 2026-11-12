@@ -15,8 +15,27 @@ namespace opentuner.MediaSources.WinterHill
         private UDPClient[] winterHillStatusClients;
         private string runtimeUdpHost = "";
 
-        private string GetRuntimeUdpHost()
+        private bool DualPicoEnabled
         {
+            get { return _settings != null && _settings.DefaultInterface == 2 &&
+                _settings.SecondPicoTunerEnabled; }
+        }
+
+        private int GetPicoBasePort(int receiver)
+        {
+            return DualPicoEnabled && receiver >= 2 ?
+                _settings.SecondPicoTunerUdpBasePort : _settings.WinterHillUdpBasePort;
+        }
+
+        private int GetPicoLocalReceiver(int receiver)
+        {
+            return DualPicoEnabled ? receiver % 2 : receiver;
+        }
+
+        private string GetRuntimeUdpHost(int receiver = 0)
+        {
+            if (DualPicoEnabled)
+                return receiver >= 2 ? _settings.SecondPicoTunerUdpHost : _settings.WinterHillUdpHost;
             if (!string.IsNullOrWhiteSpace(runtimeUdpHost))
                 return runtimeUdpHost;
             return _settings.WinterHillUdpHost;
@@ -26,16 +45,37 @@ namespace opentuner.MediaSources.WinterHill
         {
             runtimeUdpHost = _settings.WinterHillUdpHost;
 
-            // BATC WinterHill BIP+01 carries extended LongMynd status
-            // for ALL receivers, not just RX1. BIP+03 duplicates it.
-            // BIP+02/+04 carry four-line display text, not per-RX status.
-            // Listen to one authoritative stream and demultiplex by $0 IDs.
-            longmynd_status = new UDPClient(port);
-            longmynd_status.DataReceived += Longmynd_status_DataReceived;
-            longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
-            longmynd_status.Connect();
-            Log.Information("WinterHill status: listening on UDP {Port} for all {ReceiverCount} receivers",
-                port, _settings.DefaultInterface == 3 ? 4 : 2);
+            // Each PicoTuner sends two receiver status sections on its own
+            // base+1 port. Keep their local IDs separate, then map into
+            // global RX A/B (unit 1) and C/D (unit 2).
+            if (DualPicoEnabled)
+            {
+                winterHillStatusClients = new UDPClient[2];
+                int[] statusPorts = new int[]
+                {
+                    _settings.WinterHillUdpBasePort + 1,
+                    _settings.SecondPicoTunerUdpBasePort + 1
+                };
+                for (int unit = 0; unit < 2; unit++)
+                {
+                    UDPClient listener = new UDPClient(statusPorts[unit], unit);
+                    listener.DataReceived += Longmynd_status_DataReceived;
+                    listener.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
+                    winterHillStatusClients[unit] = listener;
+                    listener.Connect();
+                    Log.Information("PicoTuner {Unit} status listening on UDP {Port}",
+                        unit + 1, statusPorts[unit]);
+                }
+            }
+            else
+            {
+                // BATC WinterHill BIP+01 carries extended status for all RX.
+                longmynd_status = new UDPClient(port);
+                longmynd_status.DataReceived += Longmynd_status_DataReceived;
+                longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
+                longmynd_status.Connect();
+                Log.Information("WinterHill status: listening on UDP {Port}", port);
+            }
         }
 
         private void Longmynd_status_ConnectionStatusChanged(object sender, bool connection_status)
@@ -68,7 +108,8 @@ namespace opentuner.MediaSources.WinterHill
             // Windows PC's own LAN address. Reception can still work in that situation
             // because status/TS arrive inbound, while control commands silently go nowhere.
             UDPClient statusClient = sender as UDPClient;
-            if (statusClient != null && !string.IsNullOrWhiteSpace(statusClient.LastRemoteAddress))
+            if (!DualPicoEnabled && statusClient != null &&
+                !string.IsNullOrWhiteSpace(statusClient.LastRemoteAddress))
             {
                 string detectedHost = statusClient.LastRemoteAddress;
                 if (!string.Equals(runtimeUdpHost, detectedHost, StringComparison.OrdinalIgnoreCase))
@@ -84,14 +125,28 @@ namespace opentuner.MediaSources.WinterHill
             {
             var data = Encoding.ASCII.GetString(e);
 
-            int udp_base_port = _settings.WinterHillUdpBasePort;
+            int sourceUnit = DualPicoEnabled && statusClient != null ? statusClient.getID() : 0;
+            if (DualPicoEnabled)
+            {
+                if (statusClient == null || sourceUnit < 0 || sourceUnit > 1)
+                    return;
+                // Reject broadcasts/status originating from the other PicoTuner
+                // rather than assigning them to the wrong pair of receivers.
+                string expectedHost = sourceUnit == 0 ? _settings.WinterHillUdpHost :
+                    _settings.SecondPicoTunerUdpHost;
+                if (!string.Equals(statusClient.LastRemoteAddress, expectedHost,
+                    StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+            int udp_base_port = DualPicoEnabled && sourceUnit == 1 ?
+                _settings.SecondPicoTunerUdpBasePort : _settings.WinterHillUdpBasePort;
 
             string[] status_strings = data.Split('\n');
 
             monitorMessage mm = new monitorMessage();
             mm.type = "RX";
             mm.timestamp = 0;
-            int receiverCount = _settings.DefaultInterface == 3 ? 4 : 2;
+            int receiverCount = _settings.DefaultInterface == 3 || DualPicoEnabled ? 4 : 2;
             mm.rx = new ReceiverMessage[receiverCount + 1];
             for (int i = 0; i < mm.rx.Length; i++)
             {
@@ -124,8 +179,10 @@ namespace opentuner.MediaSources.WinterHill
                             receiver = 0;
                             break;
                         }
-                        receiver = reportedReceiver - receiver_num;
-                        if (receiver < 1 || receiver > receiverCount)
+                        int localReceiver = reportedReceiver - receiver_num;
+                        receiver = DualPicoEnabled ? sourceUnit * 2 + localReceiver : localReceiver;
+                        if (localReceiver < 1 || (DualPicoEnabled && localReceiver > 2) ||
+                            receiver < 1 || receiver > receiverCount)
                         {
                             Log.Warning("WinterHill status rejected: reported RX={Reported}, base={Base}, decoded={Decoded}, expected 1..{Count}",
                                 reportedReceiver, receiver_num, receiver, receiverCount);
@@ -293,9 +350,11 @@ namespace opentuner.MediaSources.WinterHill
 
         public void UDPSetFrequency(int device, int freq, int sr)
         {
-            int base_port = _settings.WinterHillUdpBasePort + 21 + device;
-            int receiver_num = (_settings.WinterHillUdpBasePort % 100) + 1 + device;
-            string controlHost = GetRuntimeUdpHost();
+            int physicalDevice = GetPicoLocalReceiver(device);
+            int physicalBase = GetPicoBasePort(device);
+            int base_port = physicalBase + 21 + physicalDevice;
+            int receiver_num = (physicalBase % 100) + 1 + physicalDevice;
+            string controlHost = GetRuntimeUdpHost(device);
             IPAddress hostAddress;
             if (!IPAddress.TryParse(controlHost, out hostAddress))
             {
