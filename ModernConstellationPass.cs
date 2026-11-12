@@ -9,10 +9,10 @@ namespace opentuner
     // Keep diagnostics out of the native video renderer's host.
     internal static class ModernConstellationPass
     {
-        private static readonly ModernConstellationControl[] displays = new ModernConstellationControl[2];
-        private static readonly CheckBox[] toggles = new CheckBox[2];
-        private static readonly Panel[] statusHosts = new Panel[2];
-        private static readonly bool[] currentPageResizeHooked = new bool[2];
+        private static readonly ModernConstellationControl[] displays = new ModernConstellationControl[4];
+        private static readonly CheckBox[] toggles = new CheckBox[4];
+        private static readonly Panel[] statusHosts = new Panel[4];
+        private static readonly bool[] currentPageResizeHooked = new bool[4];
         private static bool attached;
 
         public static void Attach(ModernConceptForm form)
@@ -25,7 +25,7 @@ namespace opentuner
                 Panel[] videos = GetVideoHosts(form);
                 if (backend == null || videos == null) return;
 
-                for (int tuner = 0; tuner < 2; tuner++)
+                for (int tuner = 0; tuner < 4; tuner++)
                 {
                     int index = tuner;
                     Panel video = videos[tuner];
@@ -70,7 +70,7 @@ namespace opentuner
 
                 backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
                 {
-                    if (tuner < 0 || tuner >= 2 || form.IsDisposed) return;
+                    if (tuner < 0 || tuner >= 4 || form.IsDisposed) return;
                     byte[,] constellation = data != null && data.demod_locked ? data.constellation : null;
                     string mode = data == null ? "" : data.delivery_system;
                     if (data != null && !string.IsNullOrWhiteSpace(data.modcode))
