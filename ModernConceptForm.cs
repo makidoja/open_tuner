@@ -238,7 +238,18 @@ namespace opentuner
 
             sourceCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 190, Height = 30, BackColor = Surface2, ForeColor = Text, FlatStyle = FlatStyle.Flat };
             p.Controls.Add(sourceCombo);
-            sourceCombo.SelectedIndexChanged += delegate { RefreshPicoProbeTarget(); };
+            sourceCombo.SelectedIndexChanged += delegate
+            {
+                RefreshPicoProbeTarget();
+                // The LongMynd backend exposes exactly one TS. Do not offer a
+                // fictitious Tuner B while it is selected but disconnected.
+                if (!backend.BackendSourceInitialised)
+                {
+                    visibleTuners = SelectedSourceIsLongmynd() ? 1 : 2;
+                    RefreshLayoutOptions();
+                    ApplyReceiverCount();
+                }
+            };
             layoutCombo = new ComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
@@ -556,7 +567,7 @@ namespace opentuner
                     Serilog.Log.Information("[CONNECT-DIAG] Disconnect returned={Result}", resetOk);
                     connectRequested = false;
                     audioInitialised = false;
-                    visibleTuners = 2;
+                    visibleTuners = SelectedSourceIsLongmynd() ? 1 : 2;
                     RefreshLayoutOptions();
                     ApplyReceiverCount();
                     for (int i = 0; i < 2; i++)
@@ -723,12 +734,20 @@ namespace opentuner
             }
         }
 
+        private bool SelectedSourceIsLongmynd()
+        {
+            return sourceCombo != null && sourceCombo.SelectedItem != null &&
+                sourceCombo.SelectedItem.ToString().IndexOf(
+                    "Longmynd", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         private void RefreshLayoutOptions()
         {
             if (layoutCombo == null) return;
             // Only advertise layouts which the currently connected backend
             // can genuinely provide; never create fictional RX channels.
-            int count = backend.BackendSourceInitialised ? visibleTuners : 0;
+            int count = backend.BackendSourceInitialised ? visibleTuners :
+                (SelectedSourceIsLongmynd() ? 1 : 0);
             layoutCombo.BeginUpdate();
             try
             {
@@ -745,7 +764,9 @@ namespace opentuner
 
         private void ApplyReceiverCount()
         {
-            int displayed = visibleTuners;
+            // The hardware backend is authoritative after connection, but
+            // source selection must also apply its single-RX constraint.
+            int displayed = SelectedSourceIsLongmynd() ? 1 : visibleTuners;
             if (layoutCombo != null && layoutCombo.Enabled)
             {
                 string selection = layoutCombo.SelectedItem as string;
@@ -770,10 +791,12 @@ namespace opentuner
             for (int i = 0; i < receiverControls.Length; i++)
                 if (receiverControls[i] != null) ApplyCompactReceiverLayout(i, four);
             if (activeQuickTuneSpectrum != null)
-                activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, visibleTuners));
-            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = visibleTuners > 1;
-            if (rotate30Seconds[1] != null) rotate30Seconds[1].Visible = visibleTuners > 1;
-            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = visibleTuners > 1;
+                activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, displayed));
+            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = displayed > 1;
+            if (rotate30Seconds[1] != null) rotate30Seconds[1].Visible = displayed > 1;
+            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = displayed > 1;
+            // The modern spectrum pass owns additional RX-colour indicators.
+            ModernBatcSpectrumPass.SetReceiverIndicatorVisibility(displayed);
         }
 
         private void ApplyCompactReceiverLayout(int rx, bool compact)
