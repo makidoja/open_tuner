@@ -96,21 +96,36 @@ namespace opentuner
             ModernConstellationControl plot = displays[tuner];
             CheckBox toggle = toggles[tuner];
             if (host == null || plot == null || toggle == null || host.IsDisposed) return;
-            // The metrics begin directly under Record (x=236). Centre the square
-            // in the available horizontal space before the tuner control box.
-            Control tunerBox = null;
-            foreach (Control child in host.Controls)
-                if (child.Name == "ModernTunerControlBox" + tuner) { tunerBox = child; break; }
-            int metricsRight = 236 + 92;
-            int tunerLeft = tunerBox == null ? host.ClientSize.Width - 354 : tunerBox.Left;
-            int available = tunerLeft - metricsRight;
-            int plotLeft = metricsRight + (available - plot.Width) / 2;
-            plot.Location = new Point(Math.Max(metricsRight + 2, plotLeft), 40);
-            // Keep the selector centred directly beneath the plot, clear of
-            // the receiver-details text along the bottom of the status panel.
-            toggle.Location = new Point(
-                plot.Left + (plot.Width - toggle.Width) / 2,
-                plot.Bottom + 1);
+            // The Current tab owns the constellation. Do not leave the
+            // plot floating between the telemetry and tuner control panels.
+            Control[] matches = host.Controls.Find("ModernReceiverInfoTabs" + tuner, true);
+            TabControl tabs = matches.Length > 0 ? matches[0] as TabControl : null;
+            if (tabs != null && tabs.TabPages.Count > 0)
+            {
+                TabPage current = tabs.TabPages[0];
+                if (plot.Parent != current) current.Controls.Add(plot);
+                if (toggle.Parent != current) current.Controls.Add(toggle);
+                plot.Size = new Size(94, 80);
+                plot.Location = new Point(Math.Max(278, current.ClientSize.Width - 103), 3);
+                toggle.Size = new Size(105, 19);
+                toggle.Location = new Point(Math.Max(272, plot.Left - 5), plot.Bottom + 2);
+                toggle.BackColor = current.BackColor;
+            }
+            else
+            {
+                // Keep the original layout available for non-modern panels.
+                Control tunerBox = null;
+                foreach (Control child in host.Controls)
+                    if (child.Name == "ModernTunerControlBox" + tuner) { tunerBox = child; break; }
+                int metricsRight = 236 + 92;
+                int tunerLeft = tunerBox == null ? host.ClientSize.Width - 354 : tunerBox.Left;
+                int available = tunerLeft - metricsRight;
+                int plotLeft = metricsRight + (available - plot.Width) / 2;
+                plot.Location = new Point(Math.Max(metricsRight + 2, plotLeft), 40);
+                toggle.Location = new Point(
+                    plot.Left + (plot.Width - toggle.Width) / 2,
+                    plot.Bottom + 1);
+            }
             plot.BringToFront();
             toggle.BringToFront();
         }
