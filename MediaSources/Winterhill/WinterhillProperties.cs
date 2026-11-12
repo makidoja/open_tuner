@@ -501,6 +501,13 @@ namespace opentuner.MediaSources.WinterHill
             _tuner_properties[player].UpdateValue("video_resolution", video_res);
             _tuner_properties[player].UpdateValue("audio_codec", media_status.AudioCodec);
             _tuner_properties[player].UpdateValue("audio_rate", audio_rate);
+
+            // Forward real decoder metadata to the modern TS Info view.
+            receivedVideoCodec[player] = media_status.VideoCodec ?? "";
+            receivedVideoResolution[player] = media_status.VideoWidth > 0 && media_status.VideoHeight > 0
+                ? video_res : "";
+            receivedAudioCodec[player] = media_status.AudioCodec ?? "";
+            receivedAudioRate[player] = media_status.AudioRate > 0 ? audio_rate : "";
         }
 
         private void UpdateInfo(monitorMessage mm)
@@ -659,6 +666,55 @@ namespace opentuner.MediaSources.WinterHill
                     source_data.symbol_rate = symbol_rate_i;
                     source_data.demod_locked = (rx.scanstate == 2 || rx.scanstate == 3);
                     source_data.service_name = rx.service_name;
+                    source_data.service_provider = rx.service_provider_name;
+                    source_data.demode_state = scanstate_lookup.ContainsKey(rx.scanstate)
+                        ? scanstate_lookup[rx.scanstate] : "Unknown";
+                    source_data.delivery_system = rx.scanstate == 2 ? "DVB-S2" :
+                        rx.scanstate == 3 ? "DVB-S" : "";
+                    source_data.modcode = rx.modcod;
+                    source_data.nim_frequency = GetFrequency(c, false);
+                    source_data.frequency_offset = _current_offset[c];
+                    source_data.rf_input = rx.rfport == 0 ? "A" : "B";
+                    source_data.tuner_metrics_available = true;
+                    source_data.streaming = playing[c];
+                    source_data.recording = _recorders[c] != null && _recorders[c].record;
+                    source_data.video_codec = receivedVideoCodec[c] ?? "";
+                    source_data.video_resolution = receivedVideoResolution[c] ?? "";
+                    source_data.audio_codec = receivedAudioCodec[c] ?? "";
+                    source_data.audio_rate = receivedAudioRate[c] ?? "";
+                    double nullPercent;
+                    if (double.TryParse(rx.null_percentage, NumberStyles.Float,
+                        CultureInfo.InvariantCulture, out nullPercent))
+                    {
+                        source_data.ts_metrics_available = true;
+                        source_data.null_packets_percent = nullPercent;
+                    }
+
+                    // Compute bitrate from bytes actually received from this tuner.
+                    // Never invent bitrate from SR, MER or an estimated modcod.
+                    lock (tsSampleLocks[c])
+                    {
+                        long total = System.Threading.Interlocked.Read(ref tsReceivedBytes[c]);
+                        DateTime now = DateTime.UtcNow;
+                        double seconds = (now - tsSampleAt[c]).TotalSeconds;
+                        if (tsSampleAt[c] == DateTime.MinValue)
+                        {
+                            tsSampleAt[c] = now;
+                            tsSampleBytes[c] = total;
+                        }
+                        else if (seconds >= 0.8)
+                        {
+                            long delta = Math.Max(0, total - tsSampleBytes[c]);
+                            tsActualMbps[c] = delta * 8.0 / seconds / 1000000.0;
+                            tsSampleBytes[c] = total;
+                            tsSampleAt[c] = now;
+                        }
+                        if (tsSampleAt[c] != DateTime.MinValue && seconds < 5)
+                        {
+                            source_data.ts_metrics_available = true;
+                            source_data.ts_bitrate_mbps = tsActualMbps[c];
+                        }
+                    }
 
                     if (_media_player.Count() > c)
                     {
