@@ -96,8 +96,8 @@ namespace opentuner
 
         private static void LayoutTunerBox(Panel box, int tuner, bool compact4)
         {
-            // One identical 4 RX grid. Typed entries above dropdowns:
-            // FREQ | LO + enable; SR | TUNER; small TUNE below.
+            // Fixed receiver A/B/C/D is determined by its card position.
+            // FREQ | LO above one compact SR selector; small TUNE below.
             // Reposition the original controls, preserving event handlers.
             Panel freq = FindByName<Panel>(box, "ModernFrequencyBorder" + tuner);
             ComboBox sr = FindByName<ComboBox>(box, "ModernSrCombo" + tuner);
@@ -127,7 +127,9 @@ namespace opentuner
                         case "LO FREQ":
                         case "LO": x = right; y = 5; labelText = "LO"; break;
                         case "SR": x = left; y = 51; labelText = "SR"; break;
-                        case "TUNER": x = right; y = 51; labelText = "TUNER"; break;
+                        case "TUNER":
+                            caption.Visible = false;
+                            continue;
                         default:
                             caption.Visible = false;
                             continue;
@@ -161,20 +163,20 @@ namespace opentuner
                 }
                 if (sr != null)
                 {
+                    // Make the SR selector the same compact native flat combo
+                    // used throughout the interface (not a stretched field).
                     sr.Bounds = new Rectangle(left, 65, half, fieldHeight);
                     sr.DropDownStyle = ComboBoxStyle.DropDownList;
                     sr.FlatStyle = FlatStyle.Flat;
+                    sr.BackColor = Color.FromArgb(18, 38, 60);
+                    sr.ForeColor = Text;
+                    sr.IntegralHeight = false;
                     sr.Font = new Font("Segoe UI Semibold", 8f);
                     sr.BringToFront();
                 }
-                if (rf != null)
-                {
-                    rf.Bounds = new Rectangle(right, 65, half, fieldHeight);
-                    rf.DropDownStyle = ComboBoxStyle.DropDownList;
-                    rf.FlatStyle = FlatStyle.Flat;
-                    rf.Font = new Font("Segoe UI Semibold", 8f);
-                    rf.BringToFront();
-                }
+                // RF input A/B is not a receiver selector. Hide it only in
+                // four-RX mode; each quadrant has its own fixed receiver index.
+                if (rf != null) rf.Visible = false;
                 if (tune != null)
                 {
                     tune.Bounds = new Rectangle(left + full - 70, 105, 70, 26);
@@ -184,6 +186,7 @@ namespace opentuner
             }
             foreach (Control child in box.Controls)
                 if (child is Label) child.Visible = false;
+            if (rf != null) rf.Visible = true;
             if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
             if (sr != null) { sr.Bounds = new Rectangle(left, 39, full, 27); sr.Font = new Font("Segoe UI Semibold", 9.5f); }
             if (rf != null) { rf.Bounds = new Rectangle(left, 70, full, 27); rf.Font = new Font("Segoe UI Semibold", 9.5f); }
@@ -242,10 +245,10 @@ namespace opentuner
                         float size = compact4 ? 9f : 11f;
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
                             lbl.Font = new Font("Segoe UI Semibold", size);
-                        lbl.Size = compact4 ? new Size(44, 23) : new Size(51, 24);
+                        lbl.Size = compact4 ? new Size(92, 23) : new Size(100, 24);
                     }
                 }
-                int x = compact4 ? 48 : 58;
+                int x = compact4 ? 100 : 108;
                 if (volIcon != null) volIcon.Bounds = new Rectangle(x, 8, compact4 ? 15 : 20, 24);
                 x += compact4 ? 16 : 22;
                 int volumeWidth = compact4 ? 55 : Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
