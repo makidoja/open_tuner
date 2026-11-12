@@ -12,6 +12,7 @@ namespace opentuner.MediaSources.WinterHill
         UdpClient WH_Client = new UdpClient();
 
         UDPClient longmynd_status;
+        private UDPClient[] winterHillStatusClients;
         private string runtimeUdpHost = "";
 
         private string GetRuntimeUdpHost()
@@ -25,11 +26,26 @@ namespace opentuner.MediaSources.WinterHill
         {
             runtimeUdpHost = _settings.WinterHillUdpHost;
 
-            longmynd_status = new UDPClient(port);
-
-            longmynd_status.DataReceived += Longmynd_status_DataReceived;
-            longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
-            longmynd_status.Connect();
+            if (_settings.DefaultInterface == 3)
+            {
+                // Standard BATC Winter Hill reports RX1..RX4 on base+1..base+4.
+                winterHillStatusClients = new UDPClient[4];
+                for (int i = 0; i < winterHillStatusClients.Length; i++)
+                {
+                    var client = new UDPClient(port + i, i);
+                    client.DataReceived += Longmynd_status_DataReceived;
+                    client.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
+                    winterHillStatusClients[i] = client;
+                    client.Connect();
+                }
+            }
+            else
+            {
+                longmynd_status = new UDPClient(port);
+                longmynd_status.DataReceived += Longmynd_status_DataReceived;
+                longmynd_status.ConnectionStatusChanged += Longmynd_status_ConnectionStatusChanged;
+                longmynd_status.Connect();
+            }
         }
 
         private void Longmynd_status_ConnectionStatusChanged(object sender, bool connection_status)
@@ -46,6 +62,13 @@ namespace opentuner.MediaSources.WinterHill
         {
             System.Threading.Interlocked.Exchange(ref lastPicoStatusTicks, 0);
             longmynd_status?.Close();
+            longmynd_status = null;
+            if (winterHillStatusClients != null)
+            {
+                foreach (var client in winterHillStatusClients)
+                    client?.Close();
+                winterHillStatusClients = null;
+            }
         }
 
         private void Longmynd_status_DataReceived(object sender, byte[] e)
@@ -78,16 +101,16 @@ namespace opentuner.MediaSources.WinterHill
             monitorMessage mm = new monitorMessage();
             mm.type = "RX";
             mm.timestamp = 0;
-            mm.rx = new ReceiverMessage[3];
-            mm.rx[0] = new ReceiverMessage();
-            mm.rx[1] = new ReceiverMessage();
-            mm.rx[2] = new ReceiverMessage();
+            int receiverCount = _settings.DefaultInterface == 3 ? 4 : 2;
+            mm.rx = new ReceiverMessage[receiverCount + 1];
+            for (int i = 0; i < mm.rx.Length; i++)
+            {
+                mm.rx[i] = new ReceiverMessage();
+                mm.rx[i].rx = 99;
+            }
 
-            mm.rx[0].rx = 99;
-            mm.rx[1].rx = 99;
-            mm.rx[2].rx = 99;
-
-            int receiver = 1;
+            int receiver = _settings.DefaultInterface == 3 && statusClient != null
+                ? statusClient.getID() + 1 : 1;
 
             for (int c = 0; c < status_strings.Length; c++)
             {
@@ -107,7 +130,10 @@ namespace opentuner.MediaSources.WinterHill
                             return;
                         }
                         receiver = reportedReceiver - receiver_num;
-                        if (receiver < 1 || receiver > 2)
+                        if (receiver < 1 || receiver > receiverCount)
+                            return;
+                        if (_settings.DefaultInterface == 3 && statusClient != null &&
+                            receiver != statusClient.getID() + 1)
                             return;
                         break;
 
@@ -259,7 +285,7 @@ namespace opentuner.MediaSources.WinterHill
 
         public void UDPSetFrequency(int device, int freq, int sr)
         {
-            int base_port = _settings.WinterHillUdpBasePort + (device == 0 ? 21 : 22);
+            int base_port = _settings.WinterHillUdpBasePort + 21 + device;
             int receiver_num = (_settings.WinterHillUdpBasePort % 100) + 1 + device;
             string controlHost = GetRuntimeUdpHost();
             IPAddress hostAddress;
