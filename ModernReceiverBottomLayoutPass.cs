@@ -59,11 +59,13 @@ namespace opentuner
 
                 bool compact4 = form.ModernReceiverCount >= 4;
                 tunerBox.Size = compact4
-                    ? new Size(144, Math.Max(96, controls.ClientSize.Height - 8))
+                    ? new Size(Math.Max(185, controls.ClientSize.Width - 8), 105)
                     : new Size(188, Math.Max(150, controls.ClientSize.Height - 8));
-                tunerBox.Location = new Point(
-                    Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
-                tunerBox.Anchor = AnchorStyles.Right | AnchorStyles.Bottom;
+                tunerBox.Location = compact4
+                    ? new Point(4, Math.Max(4, controls.ClientSize.Height - tunerBox.Height - 4))
+                    : new Point(Math.Max(260, controls.ClientSize.Width - tunerBox.Width - 4), 4);
+                tunerBox.Anchor = compact4 ? (AnchorStyles.Left | AnchorStyles.Bottom) :
+                    (AnchorStyles.Right | AnchorStyles.Bottom);
 
                 LayoutTunerBox(tunerBox, tuner, compact4);
                 LayoutReceiverStatusAndButtons(controls, tunerBox, tuner, compact4);
@@ -92,36 +94,29 @@ namespace opentuner
 
             int left = compact4 ? 5 : 9;
             int full = box.ClientSize.Width - left * 2;
-            if (freq != null)
+            if (compact4)
             {
-                freq.Bounds = new Rectangle(left, compact4 ? 3 : 8, full, compact4 ? 19 : 27);
-                StyleEntry(freq, compact4 ? 8f : 10f);
+                // Two rows, two columns and one full-width TUNE button.
+                // All five original controls retain their event handlers.
+                int gap = 5;
+                int half = (full - gap) / 2;
+                if (freq != null) { freq.Bounds = new Rectangle(left, 3, half, 24); StyleEntry(freq, 8.5f); }
+                if (rf != null) { rf.Bounds = new Rectangle(left + half + gap, 3, half, 24); rf.Font = new Font("Segoe UI Semibold", 8f); }
+                if (sr != null) { sr.Bounds = new Rectangle(left, 31, half, 24); sr.Font = new Font("Segoe UI Semibold", 8f); }
+                if (lo != null) { lo.Bounds = new Rectangle(left + half + gap, 31, Math.Max(40, half - 34), 24); StyleEntry(lo, 8f); }
+                if (loEnabled != null) { loEnabled.Text = "LO"; loEnabled.Bounds = new Rectangle(left + full - 33, 32, 33, 22); }
+                if (tune != null) { tune.Bounds = new Rectangle(left, 62, full, 30); tune.Font = new Font("Segoe UI Semibold", 8.5f); }
+                return;
             }
-            if (sr != null)
-            {
-                sr.Bounds = new Rectangle(left, compact4 ? 25 : 39, full, compact4 ? 19 : 27);
-                sr.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9.5f);
-            }
-            if (rf != null)
-            {
-                rf.Bounds = new Rectangle(left, compact4 ? 47 : 70, full, compact4 ? 19 : 27);
-                rf.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9.5f);
-            }
-            if (lo != null)
-            {
-                lo.Bounds = new Rectangle(left, compact4 ? 69 : 101, full - (compact4 ? 35 : 50), compact4 ? 19 : 27);
-                StyleEntry(lo, compact4 ? 8f : 9.5f);
-            }
-            if (loEnabled != null)
-            {
-                loEnabled.Text = "LO";
-                loEnabled.Bounds = compact4 ? new Rectangle(box.ClientSize.Width - 33, 69, 32, 19) : new Rectangle(box.ClientSize.Width - 47, 103, 43, 22);
-            }
+            if (freq != null) { freq.Bounds = new Rectangle(left, 8, full, 27); StyleEntry(freq, 10f); }
+            if (sr != null) { sr.Bounds = new Rectangle(left, 39, full, 27); sr.Font = new Font("Segoe UI Semibold", 9.5f); }
+            if (rf != null) { rf.Bounds = new Rectangle(left, 70, full, 27); rf.Font = new Font("Segoe UI Semibold", 9.5f); }
+            if (lo != null) { lo.Bounds = new Rectangle(left, 101, full - 50, 27); StyleEntry(lo, 9.5f); }
+            if (loEnabled != null) { loEnabled.Text = "LO"; loEnabled.Bounds = new Rectangle(box.ClientSize.Width - 47, 103, 43, 22); }
             if (tune != null)
             {
-                tune.Bounds = compact4 ? new Rectangle(left, Math.Max(76, box.ClientSize.Height - 22), full, 18) :
-                    new Rectangle(left, Math.Max(119, box.ClientSize.Height - 35), full, 30);
-                tune.Font = new Font("Segoe UI Semibold", compact4 ? 8f : 9f);
+                tune.Bounds = new Rectangle(left, Math.Max(119, box.ClientSize.Height - 35), full, 30);
+                tune.Font = new Font("Segoe UI Semibold", 9f);
             }
         }
 
