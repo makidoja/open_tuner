@@ -658,37 +658,32 @@ namespace opentuner.MediaSources.Minitiouner
 
             byte err = 0;
 
-            if (manual) 
-            { 
-                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2, ref deviceName, i2c_serial, ts_serial, ts2_serial);
-            }
+            Log.Information("[MINITIOUNER-USB] Starting {Mode} detection on {Interface}",
+                manual ? "manual" : "automatic", hardware_interface.GetName);
+            if (manual)
+                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2,
+                    ref deviceName, i2c_serial, ts_serial, ts2_serial);
             else
+                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2,
+                    ref deviceName);
+
+            Log.Information("[MINITIOUNER-USB] Detection result={Result}, name={Device}, I2C={I2C}, TS1={TS1}, TS2={TS2}",
+                err, deviceName, i2c_port, ts_port, ts_port2);
+
+            // Never open arbitrary FTDI port indices 0/1 when detection fails:
+            // another USB device may occupy those positions. Fail cleanly.
+            if (err != 0 || i2c_port == 99 || ts_port == 99)
             {
-                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2, ref deviceName);
-            }
-
-
-            if (ts_port2 == 99)
+                Log.Error("[MINITIOUNER-USB] No complete FTDI interface pair detected; aborting initialization without opening guessed ports");
+                hardware_connected = false;
                 ts_devices = 1;
-            else
-                ts_devices = 2;
-
-            //ts_devices = 1;
-
-            if (i2c_port == 99 || ts_port == 99)    // not detected properly, revert to 0 and 1 and hope for the best
-            {
-                ts_devices = 1;
-                Log.Information("Hardware not detected properly, reverting to 0,1");
-                err = hardware_interface.hw_init(0, 1, 99);
+                return;
             }
-            else
-            {
-                Log.Information("Trying detected ports:");
-                Log.Information("i2c port: " + i2c_port.ToString());
-                Log.Information("ts port: " + ts_port.ToString());
-                Log.Information("ts2 port: " + ts_port2.ToString());
-                err = hardware_interface.hw_init(i2c_port, ts_port, ts_port2);
-            }
+
+            ts_devices = ts_port2 == 99 ? 1 : 2;
+            Log.Information("[MINITIOUNER-USB] Initializing detected ports");
+            err = hardware_interface.hw_init(i2c_port, ts_port, ts_port2);
+            Log.Information("[MINITIOUNER-USB] Hardware initialization result={Result}", err);
 
             if (err != 0)
             {
