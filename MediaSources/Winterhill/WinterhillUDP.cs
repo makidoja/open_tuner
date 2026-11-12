@@ -209,7 +209,7 @@ namespace opentuner.MediaSources.WinterHill
 
             mm.rx[receiver].rx = receiver;
             UpdateInfo(mm);
-            if (ModernIsPicoTunerEthernet)
+            if (ModernIsPicoTunerEthernet || ModernIsStandardWinterHillUdp)
                 System.Threading.Interlocked.Exchange(ref lastPicoStatusTicks, DateTime.UtcNow.Ticks);
             }
             catch (Exception ex)
