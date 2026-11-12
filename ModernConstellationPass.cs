@@ -68,6 +68,17 @@ namespace opentuner
                     Position(index);
                 }
 
+                // Hide unsupported constellation controls when WinterHill
+                // (including PicoTuner in WinterHill mode) is selected.
+                Timer sourceTimer = new Timer { Interval = 500 };
+                sourceTimer.Tick += delegate
+                {
+                    if (form.IsDisposed) { sourceTimer.Stop(); sourceTimer.Dispose(); return; }
+                    RefreshSourceAvailability(backend);
+                };
+                RefreshSourceAvailability(backend);
+                sourceTimer.Start();
+
                 backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
                 {
                     if (tuner < 0 || tuner >= 4 || form.IsDisposed) return;
@@ -82,13 +93,42 @@ namespace opentuner
                             if (form.IsDisposed) return;
                             ModernConstellationControl plot = displays[tuner];
                             if (plot == null || plot.IsDisposed) return;
-                            plot.UpdateData(constellation, mode);
-                            plot.Visible = toggles[tuner] != null && toggles[tuner].Checked && plot.HasPoints;
+                            bool supported = !IsWinterHillSelected(backend);
+                            plot.UpdateData(supported ? constellation : null, mode);
+                            if (toggles[tuner] != null) toggles[tuner].Visible = supported;
+                            plot.Visible = supported && toggles[tuner] != null &&
+                                toggles[tuner].Checked && plot.HasPoints;
                         });
                     }
                     catch (InvalidOperationException) { }
                 };
             };
+        }
+
+        private static bool IsWinterHillSelected(MainForm backend)
+        {
+            if (backend == null) return false;
+            string[] names = backend.BackendSourceNames();
+            int selected = backend.BackendSelectedSourceIndex;
+            return names != null && selected >= 0 && selected < names.Length &&
+                names[selected].IndexOf("WinterHill", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static void RefreshSourceAvailability(MainForm backend)
+        {
+            bool supported = !IsWinterHillSelected(backend);
+            for (int i = 0; i < toggles.Length; i++)
+            {
+                CheckBox toggle = toggles[i];
+                ModernConstellationControl plot = displays[i];
+                if (toggle == null || toggle.IsDisposed) continue;
+                toggle.Visible = supported;
+                if (!supported && plot != null && !plot.IsDisposed)
+                {
+                    plot.UpdateData(null, "");
+                    plot.Visible = false;
+                }
+            }
         }
 
         private static void Position(int tuner)
