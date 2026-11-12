@@ -16,17 +16,17 @@ namespace opentuner
         private static bool applyingLayout;
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
         private static readonly Color Muted = Color.FromArgb(142, 165, 190);
-        private static readonly Panel[] infoTabs = new Panel[2];
-        private static readonly Panel[,] infoPages = new Panel[2, 3];
-        private static readonly Button[,] tabButtons = new Button[2, 3];
-        private static readonly TsBitrateGraph[] tsGraphs = new TsBitrateGraph[2];
-        private static readonly DateTime[] lastTsSample = new DateTime[2];
-        private static readonly Label[] currentFreq = new Label[2];
-        private static readonly Label[] currentMer = new Label[2];
-        private static readonly Label[] currentMargin = new Label[2];
-        private static readonly Panel[] currentMerBar = new Panel[2];
-        private static readonly Panel[] currentMarginBar = new Panel[2];
-        private static readonly Label[,] dataLabels = new Label[2, 4];
+        private static readonly Panel[] infoTabs = new Panel[4];
+        private static readonly Panel[,] infoPages = new Panel[4, 3];
+        private static readonly Button[,] tabButtons = new Button[4, 3];
+        private static readonly TsBitrateGraph[] tsGraphs = new TsBitrateGraph[4];
+        private static readonly DateTime[] lastTsSample = new DateTime[4];
+        private static readonly Label[] currentFreq = new Label[4];
+        private static readonly Label[] currentMer = new Label[4];
+        private static readonly Label[] currentMargin = new Label[4];
+        private static readonly Panel[] currentMerBar = new Panel[4];
+        private static readonly Panel[] currentMarginBar = new Panel[4];
+        private static readonly Label[,] dataLabels = new Label[4, 4];
 
         public static void Attach(ModernConceptForm form)
         {
@@ -47,7 +47,7 @@ namespace opentuner
             applyingLayout = true;
             try
             {
-            for (int tuner = 0; tuner < 2; tuner++)
+            for (int tuner = 0; tuner < 4; tuner++)
             {
                 Panel tunerBox = FindByName<Panel>(form, "ModernTunerControlBox" + tuner);
                 if (tunerBox == null || tunerBox.Parent == null) continue;
@@ -396,7 +396,7 @@ namespace opentuner
             if (backend == null) return;
             backend.BackendSourceData += delegate(int tuner, OTSourceData data, string description)
             {
-                if (tuner < 0 || tuner >= 2 || data == null ||
+                if (tuner < 0 || tuner >= 4 || data == null ||
                     form.IsDisposed || !form.IsHandleCreated) return;
                 try
                 {
