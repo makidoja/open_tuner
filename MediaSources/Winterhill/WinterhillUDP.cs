@@ -325,37 +325,43 @@ namespace opentuner.MediaSources.WinterHill
 
         public void UDPSetVoltage(int plug, uint voltage)
         {
-            int base_port = _settings.WinterHillUdpBasePort;
-            string controlHost = GetRuntimeUdpHost();
-            IPEndPoint WinterHill_end_point = null;
+            if (plug < 0 || plug > 3 || (plug >= 2 && !DualPicoEnabled) ||
+                (voltage != 0 && voltage != 13 && voltage != 18))
+                return;
+
+            int device = plug / 2;
+            int localPlug = plug % 2;
+            int physicalBase = device == 1 ?
+                _settings.SecondPicoTunerUdpBasePort : _settings.WinterHillUdpBasePort;
+            string controlHost = GetRuntimeUdpHost(device == 1 ? 2 : 0);
             IPAddress hostAddress;
             if (!IPAddress.TryParse(controlHost, out hostAddress))
             {
-                Log.Warning("PicoTuner UDP voltage command deferred: invalid/unresolved host '{Host}'", controlHost);
+                Log.Warning("PicoTuner {Unit} UDP LNB command skipped: invalid host {Host}",
+                    device + 1, controlHost);
                 return;
             }
-            WinterHill_end_point = new IPEndPoint(hostAddress, base_port + 21);
 
-            string command2 = "";
-            string vg = plug == 0 ? "vgx" : "vgy";
-            switch (voltage)
-            {
-                case 0: command2 = ("[to@wh] " + vg + "=OFF"); break;
-                case 13: command2 = ("[to@wh] " + vg + "=LO"); break;
-                case 18: command2 = ("[to@wh] " + vg + "=HI"); break;
-            }
+            // PicoTuner 2 uses the verified WinterHill control endpoint
+            // base+20, while preserving PicoTuner 1's working base+21 path.
+            int controlPort = physicalBase + (device == 1 ? 20 : 21);
+            string vg = localPlug == 0 ? "vgx" : "vgy";
+            string state = voltage == 0 ? "OFF" : voltage == 13 ? "LO" : "HI";
+            string command = "[to@wh] " + vg + "=" + state;
+            byte[] payload = Encoding.ASCII.GetBytes(command);
 
-            _settings.LNBVoltage[plug] = voltage;
-            Log.Information(command2);
-
-            byte[] outStream = Encoding.ASCII.GetBytes(command2);
             try
             {
-                WH_Client.Client.SendTo(outStream, WinterHill_end_point);
+                WH_Client.Client.SendTo(payload,
+                    new IPEndPoint(hostAddress, controlPort));
+                Log.Information("PicoTuner {Unit} LNB {Output} {State}: {Host}:{Port}",
+                    device + 1, localPlug == 0 ? "A" : "B",
+                    state, controlHost, controlPort);
             }
             catch (Exception ex)
             {
-                Log.Warning(ex, "Error sending PicoTuner UDP voltage command to " + controlHost);
+                Log.Warning(ex, "PicoTuner {Unit} LNB control failed: {Host}:{Port}",
+                    device + 1, controlHost, controlPort);
             }
         }
 
