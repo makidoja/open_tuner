@@ -292,12 +292,15 @@ namespace opentuner
                     Location = new Point(58, 58),
                     Size = new Size(110, 30)
                 };
-                rfInputs[tuner].Items.Add("Tuner A");
-                rfInputs[tuner].Items.Add("Tuner B");
+                rfInputs[tuner].Items.Add("RF A");
+                rfInputs[tuner].Items.Add("RF B");
                 rfInputs[tuner].SelectedIndex = string.Equals(backend.BackendGetRfInput(tuner), "B", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
                 rfInputs[tuner].SelectionChangeCommitted += delegate
                 {
-                    backend.BackendSetRfInput(captured, rfInputs[captured].SelectedIndex == 1 ? 1 : 0);
+                    int physicalPort = rfInputs[captured].SelectedIndex == 1 ? 1 : 0;
+                    Serilog.Log.Information("OpenTuner receiver {Receiver}: select physical RF input {Input}",
+                        captured + 1, physicalPort == 0 ? "A" : "B");
+                    backend.BackendSetRfInput(captured, physicalPort);
                 };
                 tunerBox.Controls.Add(rfInputs[tuner]);
 
