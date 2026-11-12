@@ -191,6 +191,20 @@ namespace opentuner.MediaSources.WinterHill
                 }
             }
 
+            // Restore the second unit's saved power state independently.
+            // Never send these commands to PicoTuner 1.
+            if (_settings.SecondPicoTunerEnabled &&
+                _settings.SecondPicoTunerLNBVoltage != null)
+            {
+                for (int output = 0;
+                    output < System.Math.Min(2, _settings.SecondPicoTunerLNBVoltage.Length);
+                    output++)
+                {
+                    UDPSetVoltage(output + 2,
+                        _settings.SecondPicoTunerLNBVoltage[output]);
+                }
+            }
+
             int count = System.Math.Min(_settings.SecondPicoTunerEnabled ? 4 : 2,
                 _current_frequency.Length);
             for (int tuner = 0; tuner < count; tuner++)
