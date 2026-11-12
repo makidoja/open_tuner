@@ -39,6 +39,7 @@ namespace opentuner.MediaSources.Minitiouner
 
         Thread ts_thread_t = null;
         Thread ts_thread_2_t = null;
+        private bool receiverThreadsStarted;
 
         bool T1P2_prevLocked = false;
         bool T2P1_prevLocked = false;
@@ -555,35 +556,55 @@ namespace opentuner.MediaSources.Minitiouner
                 change_frequency(1, current_frequency_1, current_sr_1, current_rf_input_1, current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
             }
 
-            nim_thread_t.Start();
+            // Prepare worker objects now, but delay their start until
+            // SourceConnect has configured players, TS recorders and streamers.
+            receiverThreadsStarted = false;
+
 
             // TS thread - T1P2
             ts_thread = new TSThread(ts_data_queue, FlushTS2, ReadTS2, "MT TS2");
             ts_thread_t = new Thread(ts_thread.worker_thread);
-            ts_thread_t.Start();
+
 
             if (ts_devices == 2)
             {
                 ts_thread2 = new TSThread(ts_data_queue2, FlushTS1, ReadTS1, "MT TS1");
                 ts_thread_2_t = new Thread(ts_thread2.worker_thread);
-                ts_thread_2_t.Start();
+
             }
 
             // start TS Parser 
             TSParserThread ts_parser_thread = new TSParserThread(parse_ts_data_callback);
             RegisterTSConsumer(0, ts_parser_thread.parser_ts_data_queue);
             ts_parser_t = new Thread(ts_parser_thread.worker_thread);
-            ts_parser_t.Start();
+
 
             if (ts_devices == 2)
             {
                 TSParserThread ts_parser_thread2 = new TSParserThread(parse_ts2_data_callback);
                 RegisterTSConsumer(1, ts_parser_thread2.parser_ts_data_queue);
                 ts_parser_2_t = new Thread(ts_parser_thread2.worker_thread);
-                ts_parser_2_t.Start();
+
             }
 
             return ts_devices;
+        }
+
+        // Called by MainForm only after ConfigureMediaPlayers, ConfigureTSRecorders,
+        // ConfigureTSStreamers and the source-data callback are installed.
+        // Starting NIM earlier allowed its first no-lock status to dereference
+        // the not-yet-configured _ts_recorders/_ts_streamers lists.
+        public void StartReceiverThreadsAfterConfiguration()
+        {
+            if (receiverThreadsStarted || !hardware_connected) return;
+            receiverThreadsStarted = true;
+            Log.Information("[MINITIOUNER-USB] Starting receiver workers after player/recorder/streamer setup");
+            // TS workers and parsers are ready before the first NIM status.
+            ts_thread_t?.Start();
+            ts_thread_2_t?.Start();
+            ts_parser_t?.Start();
+            ts_parser_2_t?.Start();
+            nim_thread_t?.Start();
         }
 
         public void parse_ts_data_callback(TSStatus ts_status)
