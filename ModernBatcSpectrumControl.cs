@@ -344,9 +344,17 @@ namespace opentuner
                     g.DrawLine(p, x - 4, plot.Top + 4, x, plot.Top);
                     g.DrawLine(p, x + 4, plot.Top + 4, x, plot.Top);
                 }
+                // Put receiver marker labels either side of the centre line:
+                // RX1 above (green), RX2 below (yellow), not at the bottom.
                 using (Font f = new Font("Segoe UI Semibold", 7.5f))
                 using (Brush b = new SolidBrush(c))
-                    g.DrawString(rx == 0 ? "RX1" : "RX2", f, b, x + 4, plot.Bottom - 17);
+                {
+                    float mid = plot.Top + plot.Height / 2f;
+                    float labelY = rx == 0 ? mid - f.Height - 3f : mid + 3f;
+                    float labelX = Math.Max(plot.Left + 2f,
+                        Math.Min(plot.Right - g.MeasureString(rx == 0 ? "RX1" : "RX2", f).Width - 2f, x + 4f));
+                    g.DrawString(rx == 0 ? "RX1" : "RX2", f, b, labelX, labelY);
+                }
             }
         }
 
