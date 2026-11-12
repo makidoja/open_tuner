@@ -823,7 +823,13 @@ namespace opentuner
         {
             Panel panel = receiverControls[rx];
             if (panel == null) return;
-            panel.Height = compact ? 126 : 164;
+            // Four receivers: a vertical left-hand info/tuning sidebar.
+            // Never reserve the bottom of a video quadrant for diagnostics.
+            panel.SuspendLayout();
+            panel.Dock = compact ? DockStyle.Left : DockStyle.Bottom;
+            if (compact) panel.Width = 252;
+            else panel.Height = 164;
+            panel.ResumeLayout(true);
             if (!compact)
             {
                 foreach (Control control in panel.Controls)
@@ -840,6 +846,8 @@ namespace opentuner
                 return;
             }
 
+            // Leave tuning and diagnostic layout to ModernReceiverBottomLayoutPass.
+            // It positions the two sections vertically in the new left sidebar.
             panel.SuspendLayout();
             foreach (Control control in panel.Controls)
             {
@@ -848,43 +856,18 @@ namespace opentuner
                     originalReceiverBounds[control] = control.Bounds;
                     originalReceiverFonts[control] = control.Font;
                 }
+                Label hint = control as Label;
+                if (hint != null && hint.Text.StartsWith("Frequency and SR"))
+                    hint.Visible = false;
             }
-            panel.Font = new Font("Segoe UI", 7.5f);
-            liveFreq[rx].Location = new Point(2, 2);
-            liveFreq[rx].Size = new Size(130, 27);
-            liveFreq[rx].Font = new Font("Segoe UI Semibold", 13f);
-            freqInputs[rx].Location = new Point(135, 4);
-            freqInputs[rx].Width = 94;
-            srInputs[rx].Location = new Point(233, 4);
-            srInputs[rx].Width = 63;
-            lockLabels[rx].Location = new Point(2, 33);
-            lockLabels[rx].Size = new Size(75, 22);
-            lockLabels[rx].Font = new Font("Segoe UI Semibold", 7.5f);
-            serviceLabels[rx].Location = new Point(82, 34);
-            serviceLabels[rx].Size = new Size(132, 19);
-            merLabels[rx].Location = new Point(218, 34);
-            merLabels[rx].Size = new Size(90, 19);
-            marginLabels[rx].Location = new Point(218, 55);
-            marginLabels[rx].AutoSize = true;
-            marginLabels[rx].MinimumSize = new Size(100, 18);
-            // Reflow the existing buttons without replacing their Click handlers.
-            Button tune = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text == "TUNE");
-            if (tune != null) { tune.Location = new Point(300, 3); tune.Size = new Size(57, 25); tune.Font = new Font("Segoe UI Semibold", 7f); }
-            Label speaker = panel.Controls.OfType<Label>().FirstOrDefault(x => x.Text == "🔊");
-            if (speaker != null) { speaker.Location = new Point(2, 73); speaker.Size = new Size(20, 22); }
-            volumeBars[rx].Location = new Point(22, 72);
-            volumeBars[rx].Width = 85;
-            muteButtons[rx].Location = new Point(108, 72);
-            muteButtons[rx].Size = new Size(53, 24);
-            muteButtons[rx].Font = new Font("Segoe UI Semibold", 7f);
-            Button record = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text.Contains("RECORD"));
-            if (record != null) { record.Location = new Point(165, 72); record.Size = new Size(66, 24); record.Font = new Font("Segoe UI", 7f); }
-            Button snap = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text.Contains("SNAPSHOT"));
-            if (snap != null) { snap.Location = new Point(235, 72); snap.Size = new Size(75, 24); snap.Font = new Font("Segoe UI", 7f); }
-            Button full = panel.Controls.OfType<Button>().FirstOrDefault(x => x.Text == "⛶");
-            if (full != null) { full.Location = new Point(314, 72); full.Size = new Size(35, 24); }
-            Label hint = panel.Controls.OfType<Label>().FirstOrDefault(x => x.Text.StartsWith("Frequency and SR"));
-            if (hint != null) hint.Visible = false;
+            if (receiverCards[rx] != null)
+            {
+                // Left dock must claim its width before the Fill video control.
+                panel.BringToFront();
+                Panel header = receiverCards[rx].Controls.OfType<Panel>()
+                    .FirstOrDefault(x => x.Name == "ModernReceiverHeader" + rx);
+                if (header != null) header.BringToFront();
+            }
             panel.ResumeLayout(true);
         }
 
