@@ -137,7 +137,8 @@
             this.comboDefaultInterface.Items.AddRange(new object[] {
             "Always Ask",
             "Websocket (ZR6TG)",
-            "PicoTuner Ethernet (G4EWJ)"});
+            "PicoTuner Ethernet (G4EWJ)",
+            "Winter Hill UDP (BATC 4 RX)"});
             this.comboDefaultInterface.Location = new System.Drawing.Point(192, 29);
             this.comboDefaultInterface.Name = "comboDefaultInterface";
             this.comboDefaultInterface.Size = new System.Drawing.Size(206, 24);
