@@ -306,7 +306,7 @@ namespace opentuner
             connect.ContextMenuStrip = recoveryMenu;
             p.Controls.Add(connect);
 
-            Button settings = FlatButton("SETTINGS", false); settings.Width = 82; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
+            Button settings = FlatButton("MEDIA SETTINGS", false); settings.Width = 124; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
             p.Controls.Add(settings);
 
             connectionPill = FlatButton("READY", false);
