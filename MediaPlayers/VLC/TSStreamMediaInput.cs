@@ -15,7 +15,7 @@ namespace opentuner
 
         CircularBuffer ts_data_queue;
         public bool ts_sync = false;
-        public bool end = false;
+        public volatile bool end = false;
 
         public TSStreamMediaInput(CircularBuffer _ts_data_queue )
         {
@@ -42,78 +42,53 @@ namespace opentuner
 
         public override int Read(IntPtr buf, uint len)
         {
-            int timeout = 0;
+            if (end || len == 0) return 0;
 
-            // wait for next data
-            while (ts_data_queue.Count < 1010)
+            // Every dequeue is performed atomically by CircularBuffer. Count
+            // can change between a separate Count check and Dequeue when
+            // another consumer clears the queue (retuning, stop/recovery).
+            // The old loop never advanced if Count became zero, repeatedly
+            // logging "Failing to dequeue" and hanging the VLC input thread.
+            int request = (int)Math.Min(len, 65536U);
+            byte[] data = new byte[request];
+            int waitMs = 0;
+            const int maxWaitMs = 10000;
+            const int pollMs = 5;
+
+            while (!end)
             {
-                if (end == true)
+                int received = ts_data_queue.Dequeue(data, 0, request);
+                if (received > 0)
                 {
-                    return 0;
-                }
-                //Log.Information("Waiting: " + timeout.ToString());
-                // if we haven't received anything within a few seconds then most likely won't get anything
-                if (timeout > 500000)
-                {
-                    Log.Information("TSStreamMediaInput : Read Timeout");
-                    return 0;
-                }
-
-                Thread.Sleep(5);
-                timeout += 50;
-            }
-
-            int queue_count = ts_data_queue.Count; 
-
-            if (queue_count > 0)
-            {
-                //RawTSData raw_ts_data = null;
-                byte raw_ts_data = 0;
-
-                uint buildLen = len;
-                if (queue_count < buildLen)
-                {
-                    buildLen = Convert.ToUInt32(queue_count);
-                }
-
-                byte[] vlc_data = new byte[buildLen];
-
-                int counter = 0;
-
-                while (counter < buildLen)
-                {
-                    //if (ts_data_queue.TryDequeue(out raw_ts_data))
-                    //{
-                    if (ts_data_queue.Count > 0)
+                    int start = 0;
+                    if (!ts_sync)
                     {
-                        raw_ts_data = ts_data_queue.Dequeue();
-
-                        //vlc_data[counter++] = raw_ts_data.rawTSData[0];
-
-                        if (ts_sync == false && raw_ts_data != 0x47)
-                        {
-                            buildLen--;
+                        // Locate a TS sync byte without fabricating any bytes.
+                        // A retune may temporarily start in the middle of a
+                        // packet; VLC can resynchronise from the real stream.
+                        while (start < received && data[start] != 0x47)
+                            start++;
+                        if (start == received)
                             continue;
-                        }
-                        else
-                        {
-                            ts_sync = true;
-                            vlc_data[counter++] = raw_ts_data;
-                        }
+                        ts_sync = true;
                     }
-                    else
-                    {
-                        Log.Information("Warning: Failing to dequeue, nothing to dequeue: TSStream");
-                    }
-                    //}
+
+                    int available = received - start;
+                    Marshal.Copy(data, start, buf, available);
+                    return available;
                 }
 
-                Marshal.Copy(vlc_data.ToArray(), 0, buf, vlc_data.Length);
-                return vlc_data.Length;
-
+                // No bytes currently available: wait, never spin or spam the
+                // log. A read timeout ends this VLC input; new playback on
+                // retune creates a fresh TSStreamMediaInput.
+                if (waitMs >= maxWaitMs)
+                {
+                    Log.Warning("TSStreamMediaInput: no transport data for {WaitMs} ms; ending current media input", waitMs);
+                    return 0;
+                }
+                Thread.Sleep(pollMs);
+                waitMs += pollMs;
             }
-
-            Log.Information("TS StreamInput: Shouldn't be here");
             return 0;
         }
 
