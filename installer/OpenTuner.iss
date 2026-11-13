@@ -47,6 +47,7 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 [Files]
 Source: "..\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\OpenTunerModern.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\OpenTuner-User-Manual.html"; DestDir: "{app}\Help"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\Open Tuner (ZR6TG)"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; IconFilename: "{app}\OpenTunerModern.ico"
