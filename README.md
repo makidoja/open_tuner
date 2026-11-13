@@ -4,7 +4,7 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Development status — v1.3.1:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Development status — v1.3.2:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
@@ -63,6 +63,12 @@ The interface provides independent receiver cards and three information views:
 The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## v1.3.2 service patch
+
+**v1.3.2** fixes a VLC transport-stream empty-queue busy loop that could make OpenTuner stop responding during receiver stop/restart or retuning, particularly with four receivers. The reader now uses atomic bulk dequeues, bounded waiting and one timeout warning instead of flooding the log. This fix was validated against a follow-up dual-PicoTuner log.
+
+See [v1.3.2 Service Patch Notes](RELEASE_NOTES_1.3.2.md). The full user manual is available through the **HELP** button.
 
 ## New in v1.3.1
 
