@@ -159,7 +159,7 @@ namespace opentuner
             left.Controls.Add(ToolButton("RECORDINGS", delegate { backend.BackendOpenRecordingsFolder(); }));
             left.Controls.Add(ToolButton("SNAPSHOTS", delegate { backend.BackendOpenSnapshotsFolder(); }));
             left.Controls.Add(ToolButton("BATC CHAT", delegate { backend.BackendShowBatcChat(); }));
-            left.Controls.Add(ToolButton("SETTINGS", delegate { backend.BackendShowGeneralSettings(); }));
+            left.Controls.Add(ToolButton("MEDIA SETTINGS", delegate { backend.BackendShowGeneralSettings(); }));
 
             sourceSettingsButton = ToolButton("SOURCE SETTINGS ▼", delegate { ShowSourceMenu(backend, sourceCombo); });
             left.Controls.Add(sourceSettingsButton);
@@ -178,7 +178,14 @@ namespace opentuner
             qo100.CheckedChanged += delegate { SetSpectrumVisible(qo100.Checked); };
             left.Controls.Add(qo100);
 
-            Panel right = new Panel { Dock = DockStyle.Right, Width = 118, BackColor = Color.Transparent };
+            // Keep HELP adjacent to CONNECTED, independent of left toolbar content.
+            Panel right = new Panel { Dock = DockStyle.Right, Width = 190, BackColor = Color.Transparent };
+            Button help = ToolButton("HELP", delegate { OpenUserManual(); });
+            help.Name = "ModernCompactHelpButton";
+            help.Dock = DockStyle.Left;
+            help.Width = 64;
+            help.Margin = new Padding(0);
+            right.Controls.Add(help);
 
             if (connectButton == null)
                 connectButton = ToolButton("CONNECT", delegate { });
@@ -188,7 +195,8 @@ namespace opentuner
                 connectButton.AutoSize = false;
             }
 
-            connectButton.Dock = DockStyle.Fill;
+            connectButton.Dock = DockStyle.Right;
+            connectButton.Width = 118;
             connectButton.Margin = new Padding(0);
             connectButton.Font = new Font("Segoe UI Semibold", 9f);
             connectButton.FlatStyle = FlatStyle.Flat;
@@ -201,6 +209,28 @@ namespace opentuner
             bar.Controls.Add(right);
             header.Controls.Add(bar);
             bar.BringToFront();
+        }
+
+        private static void OpenUserManual()
+        {
+            try
+            {
+                string local = System.IO.Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "Help", "OpenTuner-User-Manual.html");
+                string destination = System.IO.File.Exists(local) ? local :
+                    "https://github.com/makidoja/open_tuner/blob/connect-state-test/docs/OpenTuner-User-Manual.html";
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = destination,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Unable to open OpenTuner manual");
+                MessageBox.Show("The manual could not be opened. Visit github.com/makidoja/open_tuner.",
+                    "OpenTuner Help", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private static void ShowSourceMenu(MainForm backend, ComboBox hiddenSourceCombo)
