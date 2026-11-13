@@ -1,0 +1,74 @@
+name: Publish OpenTuner M0CKE v1.3.2
+
+on:
+  push:
+    branches:
+      - connect-state-test
+    paths:
+      - .github/workflows/publish-v1.3.2.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release notes and manual
+        uses: actions/checkout@v4
+
+      - name: Confirm tested installer build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_run=43423720244
+          expected_sha=66c5e120e632886b9cab70ce42455a51aa0295f0
+          actual_sha="$(gh api repos/${{ github.repository }}/actions/runs/$build_run --jq '.head_sha')"
+          test "$actual_sha" = "$expected_sha"
+          for attempt in $(seq 1 120); do
+            state="$(gh api repos/${{ github.repository }}/actions/runs/$build_run --jq '.status')"
+            result="$(gh api repos/${{ github.repository }}/actions/runs/$build_run --jq '.conclusion')"
+            if [ "$state" = "completed" ]; then
+              test "$result" = "success" || { echo "Windows installer build did not pass: $result"; exit 1; }
+              break
+            fi
+            if [ "$attempt" -eq 120 ]; then echo "Build did not complete within validation window"; exit 1; fi
+            sleep 15
+          done
+          if gh release view OpenTuner1.3.2 --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "OpenTuner1.3.2 already exists; refusing duplicate"
+            exit 1
+          fi
+
+      - name: Retrieve verified v1.3.2 installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-out
+          gh run download 43423720244 --repo "${{ github.repository }}" \
+            --name OpenTuner-Windows-Installer-v1.3.2 --dir release-out
+          test -s release-out/OpenTuner-M0CKE-1.3.2-Setup.exe
+          test "$(stat -c%s release-out/OpenTuner-M0CKE-1.3.2-Setup.exe)" -gt 10000000
+          cp docs/OpenTuner-User-Manual.html release-out/OpenTuner-User-Manual.html
+          sha256sum release-out/OpenTuner-M0CKE-1.3.2-Setup.exe > release-out/SHA256SUMS.txt
+
+      - name: Publish maintenance release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create OpenTuner1.3.2 \
+            release-out/OpenTuner-M0CKE-1.3.2-Setup.exe \
+            release-out/OpenTuner-User-Manual.html \
+            release-out/SHA256SUMS.txt \
+            --repo "${{ github.repository }}" \
+            --target 66c5e120e632886b9cab70ce42455a51aa0295f0 \
+            --title "OpenTuner M0CKE v1.3.2 — Service Patch" \
+            --notes-file RELEASE_NOTES_1.3.2.md \
+            --latest
