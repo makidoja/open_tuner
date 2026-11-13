@@ -228,7 +228,7 @@ namespace opentuner.MediaSources.WinterHill
 
         private void btnBroadcastListener_Click(object sender, EventArgs e)
         {
-            PicoWHBroadcastListenerForm picoWHBroadcastListenerForm = new PicoWHBroadcastListenerForm();
+            PicoWHBroadcastListenerForm picoWHBroadcastListenerForm = new PicoWHBroadcastListenerForm(_settings);
             picoWHBroadcastListenerForm.Show();
         }
     }
