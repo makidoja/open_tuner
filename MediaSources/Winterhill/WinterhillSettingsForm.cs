@@ -27,6 +27,7 @@ namespace opentuner.MediaSources.WinterHill
             txtUDPBasePort.Text = _settings.WinterHillUdpBasePort.ToString();
             txtUDPIP.Text = _settings.WinterHillUdpHost.ToString();
             BuildSecondPicoSettings();
+            groupBox2.Height = 78;
             RefreshInterfaceSettingsLayout();
 
             Shown += delegate
