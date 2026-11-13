@@ -26,27 +26,35 @@ namespace opentuner
         {
             InitializeComponent();
 
-            // Both the old plain ListBox and the formatted RichTextBox occupy
-            // the same Dock.Fill area. Always put the styled transcript above
-            // the unused legacy control, even after the form is shown.
+            // The legacy ListBox must not compete with the visible chat
+            // transcript for Dock.Fill. Keep the input permanently docked
+            // beneath the transcript rather than BringToFront on each show.
             lbChat.Visible = false;
+            lbChat.Dock = DockStyle.None;
             richChat.Visible = true;
-            richChat.BringToFront();
+            richChat.Dock = DockStyle.Fill;
             richChat.BorderStyle = BorderStyle.None;
-            Shown += delegate
-            {
-                if (!IsDisposed && !richChat.IsDisposed)
-                {
-                    lbChat.Visible = false;
-                    richChat.Visible = true;
-                    richChat.BringToFront();
-                }
-            };
+            txtMessage.Dock = DockStyle.Bottom;
+            txtMessage.MinimumSize = new Size(0, 28);
+            txtMessage.Height = 30;
+            splitContainer1.Panel2.Controls.SetChildIndex(txtMessage, 0);
+            splitContainer1.Panel2.Controls.SetChildIndex(richChat, 1);
+            Shown += delegate { EnsureChatLayout(); };
+            Resize += delegate { EnsureChatLayout(); };
 
             _settings = Settings;
             _source = Source;
             consoleFont = new Font("Consolas", _settings.chat_font_size);
             consoleFontBold = new Font("Consolas", _settings.chat_font_size + 1, FontStyle.Bold);
+        }
+
+        private void EnsureChatLayout()
+        {
+            if (IsDisposed || splitContainer1.IsDisposed) return;
+            if (txtMessage.Dock != DockStyle.Bottom) txtMessage.Dock = DockStyle.Bottom;
+            if (txtMessage.Height < 28) txtMessage.Height = 30;
+            if (richChat.Dock != DockStyle.Fill) richChat.Dock = DockStyle.Fill;
+            lbChat.Visible = false;
         }
 
         private SocketIO client = null;
@@ -102,23 +110,23 @@ namespace opentuner
                 btnSigReportTuner3.Enabled = true;
                 btnSigReportTuner4.Enabled = true;
             }
-            int count = 200;
-            while (!client.Connected)
-            {
-                Thread.Sleep(100);
-                count--;
-                if (count == 0)
-                    return;
-            }
-            if (_settings.gui_autologin)
-            {
-                setNick();
-            }
+            // Socket.IO connects asynchronously; never block the UI thread
+            // here waiting up to 20 seconds. Auto-login runs in OnConnected.
         }
 
         private void Client_OnDisconnected(object sender, string e)
         {
-            lblConnected.Text = "Connected: False";
+            if (IsDisposed || Disposing || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (IsDisposed) return;
+                    lblConnected.Text = "Connected: False";
+                    txtMessage.Enabled = false;
+                });
+            }
+            catch (InvalidOperationException) { }
         }
 
         private delegate void UpdateLBDelegate(System.Windows.Forms.ListBox LB, Object obj);
@@ -295,7 +303,17 @@ namespace opentuner
         private void Client_OnConnected(object sender, EventArgs e)
         {
             Log.Information("Connected socketio");
-            lblConnected.Text = "Connected: True";
+            if (IsDisposed || Disposing || !IsHandleCreated) return;
+            try
+            {
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    if (IsDisposed) return;
+                    lblConnected.Text = "Connected: True";
+                    if (_settings.gui_autologin) setNick();
+                });
+            }
+            catch (InvalidOperationException) { }
         }
 
         private void setNick()
