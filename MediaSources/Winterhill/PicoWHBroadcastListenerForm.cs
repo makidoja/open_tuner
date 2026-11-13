@@ -58,7 +58,7 @@ namespace opentuner.MediaSources.WinterHill
                 BackColor = Color.FromArgb(18, 38, 60),
                 ForeColor = Color.White
             };
-            deviceSelector.SelectedIndexChanged += delegate { ShowSelectedDevice(); };
+            deviceSelector.SelectedIndexChanged += delegate { ShowSelectedDevice(true); };
             Controls.Add(selectLabel);
             Controls.Add(deviceSelector);
 
@@ -94,7 +94,7 @@ namespace opentuner.MediaSources.WinterHill
             else entry.Name = name;
         }
 
-        private void ShowSelectedDevice()
+        private void ShowSelectedDevice(bool updatePortEditor = false)
         {
             if (lblDetectedIP == null || lblDetectedBasePort == null) return;
             DetectedPico device = deviceSelector == null ? null :
@@ -107,7 +107,7 @@ namespace opentuner.MediaSources.WinterHill
             btnReboot.Enabled = ready;
             btnBootsel.Enabled = ready;
             btnChangeBasePort.Enabled = ready;
-            if (ready) txtNewBasePort.Text = device.BasePort.ToString();
+            if (ready && updatePortEditor) txtNewBasePort.Text = device.BasePort.ToString();
         }
 
 
