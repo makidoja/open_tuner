@@ -4,6 +4,8 @@ using System.Text;
 using System.Windows.Forms;
 using System.Net.Sockets;
 using Serilog;
+using System.Collections.Generic;
+using System.Drawing;
 
 namespace opentuner.MediaSources.WinterHill
 {
@@ -12,9 +14,100 @@ namespace opentuner.MediaSources.WinterHill
         UdpClient WH_Client = new UdpClient();
 
         private PicoWHBroadcastListener broadCastListener;
-        public PicoWHBroadcastListenerForm()
+        private readonly WinterHillSettings settings;
+        private readonly Dictionary<string, DetectedPico> devices =
+            new Dictionary<string, DetectedPico>(StringComparer.OrdinalIgnoreCase);
+        private ComboBox deviceSelector;
+        private Label selectLabel;
+
+        private sealed class DetectedPico
         {
+            public string Address;
+            public int BasePort;
+            public bool Seen;
+            public string Name;
+            public override string ToString()
+            {
+                return Name + " - " + Address +
+                    (Seen ? " (UDP " + BasePort + ")" : " (awaiting broadcast)");
+            }
+        }
+
+        public PicoWHBroadcastListenerForm() : this(null) { }
+
+        public PicoWHBroadcastListenerForm(WinterHillSettings currentSettings)
+        {
+            settings = currentSettings;
             InitializeComponent();
+            BuildDeviceSelector();
+        }
+
+        private void BuildDeviceSelector()
+        {
+            selectLabel = new Label
+            {
+                Text = "Select PicoTuner:",
+                AutoSize = true, Location = new Point(514, 81)
+            };
+            deviceSelector = new ComboBox
+            {
+                Name = "PicoTunerDeviceSelector",
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Location = new Point(628, 77), Size = new Size(267, 24),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(18, 38, 60),
+                ForeColor = Color.White
+            };
+            deviceSelector.SelectedIndexChanged += delegate { ShowSelectedDevice(); };
+            Controls.Add(selectLabel);
+            Controls.Add(deviceSelector);
+
+            if (settings != null)
+            {
+                AddConfiguredDevice(settings.WinterHillUdpHost,
+                    settings.WinterHillUdpBasePort, "PicoTuner 1");
+                if (settings.SecondPicoTunerEnabled)
+                    AddConfiguredDevice(settings.SecondPicoTunerUdpHost,
+                        settings.SecondPicoTunerUdpBasePort, "PicoTuner 2");
+            }
+            groupBox1.Top = 116;
+            groupBox1.Height = 260;
+            btnClose.Top = 390;
+            lbBroadcast.Height = 365;
+            ClientSize = new Size(918, 428);
+            ShowSelectedDevice();
+        }
+
+        private void AddConfiguredDevice(string address, int basePort, string name)
+        {
+            IPAddress parsed;
+            if (!IPAddress.TryParse(address, out parsed) ||
+                parsed.AddressFamily != AddressFamily.InterNetwork) return;
+            DetectedPico entry;
+            if (!devices.TryGetValue(address, out entry))
+            {
+                entry = new DetectedPico { Address = address, Name = name, BasePort = basePort };
+                devices[address] = entry;
+                deviceSelector.Items.Add(entry);
+                if (deviceSelector.SelectedIndex < 0) deviceSelector.SelectedIndex = 0;
+            }
+            else entry.Name = name;
+        }
+
+        private void ShowSelectedDevice()
+        {
+            if (lblDetectedIP == null || lblDetectedBasePort == null) return;
+            DetectedPico device = deviceSelector == null ? null :
+                deviceSelector.SelectedItem as DetectedPico;
+            lblDetectedIP.Text = device == null ? "Unknown" : device.Address;
+            lblDetectedBasePort.Text = device == null || !device.Seen ?
+                "Unknown" : device.BasePort.ToString();
+            bool ready = device != null && device.Seen;
+            btnReset.Enabled = ready;
+            btnReboot.Enabled = ready;
+            btnBootsel.Enabled = ready;
+            btnChangeBasePort.Enabled = ready;
+            if (ready) txtNewBasePort.Text = device.BasePort.ToString();
         }
 
 
@@ -74,7 +167,7 @@ namespace opentuner.MediaSources.WinterHill
             try
             {
                 broadCastListener = new PicoWHBroadcastListener();
-                broadCastListener.OnBroadcast += BroadCastListener_OnBroadcast;
+                broadCastListener.OnBroadcastFromDevice += BroadCastListener_OnBroadcastFromDevice;
             }
             catch (Exception ex)
             {
@@ -83,30 +176,62 @@ namespace opentuner.MediaSources.WinterHill
             }
         }
 
-        private void BroadCastListener_OnBroadcast(string data)
+        private void BroadCastListener_OnBroadcastFromDevice(string senderIp, string data)
         {
-            string[] message_data = data.Split('\n');
-
-            for (int c = 0; c < message_data.Length; c++)
+            if (IsDisposed || Disposing) return;
+            if (InvokeRequired)
             {
-                UpdateLB(lbBroadcast, message_data[c].Trim());
-
-                if (message_data[c].Contains( "IP address"))
+                try
                 {
-                    UpdateLabel(lblDetectedIP, message_data[c].Substring(17).Trim());
+                    BeginInvoke((MethodInvoker)delegate
+                    {
+                        BroadCastListener_OnBroadcastFromDevice(senderIp, data);
+                    });
                 }
+                catch (InvalidOperationException) { }
+                return;
+            }
 
-                if (message_data[c].Contains( "Base IP port"))
+            string[] lines = data.Split('\n');
+            int receivedPort = 0;
+            foreach (string raw in lines)
+            {
+                string line = raw.Trim();
+                UpdateLB(lbBroadcast, "[" + senderIp + "] " + line);
+                int pos = line.IndexOf("Base IP port", StringComparison.OrdinalIgnoreCase);
+                if (pos >= 0)
                 {
-                    UpdateLabel(lblDetectedBasePort, message_data[c].Substring(17).Trim());
+                    string tail = line.Substring(pos + "Base IP port".Length).Trim();
+                    int.TryParse(tail, out receivedPort);
                 }
             }
-            
+
+            DetectedPico entry;
+            if (!devices.TryGetValue(senderIp, out entry))
+            {
+                entry = new DetectedPico
+                {
+                    Address = senderIp, Name = "Detected PicoTuner",
+                    BasePort = receivedPort, Seen = true
+                };
+                devices[senderIp] = entry;
+                deviceSelector.Items.Add(entry);
+                if (deviceSelector.SelectedIndex < 0)
+                    deviceSelector.SelectedItem = entry;
+            }
+            else
+            {
+                entry.Seen = true;
+                if (receivedPort > 0) entry.BasePort = receivedPort;
+            }
+            deviceSelector.Refresh();
+            ShowSelectedDevice();
         }
 
         public void CloseForm()
         {
             broadCastListener?.Close();
+            broadCastListener = null;
             Close();
         }
 
@@ -141,28 +266,27 @@ namespace opentuner.MediaSources.WinterHill
 
         public void SendRemoteCommand(string command)
         {
-            int baseport = 9900;
-
-            if (!int.TryParse(lblDetectedBasePort.Text, out baseport))
-                baseport = 9900;
-
-            baseport = (baseport / 100);
-            baseport = baseport * 100;
-            baseport += 20;
-
-            IPEndPoint remote_end_point = new IPEndPoint(IPAddress.Parse(lblDetectedIP.Text), baseport);
-
-            byte[] outStream = Encoding.ASCII.GetBytes(command);
-
+            DetectedPico device = deviceSelector.SelectedItem as DetectedPico;
+            if (device == null || !device.Seen || device.BasePort <= 0)
+            {
+                MessageBox.Show("Select a detected PicoTuner before sending commands.");
+                return;
+            }
+            IPAddress address;
+            if (!IPAddress.TryParse(device.Address, out address)) return;
+            int controlPort = (device.BasePort / 100) * 100 + 20;
+            IPEndPoint endpoint = new IPEndPoint(address, controlPort);
+            byte[] payload = Encoding.ASCII.GetBytes(command);
             try
             {
-                Log.Information("Sending command : " + command + " to " + lblDetectedIP.Text + " : " + baseport.ToString());
-
-                WH_Client.Client.SendTo(outStream, remote_end_point);
+                WH_Client.Client.SendTo(payload, endpoint);
+                Log.Information("Broadcast listener command {Command} to {Ip}:{Port}",
+                    command, device.Address, controlPort);
             }
-            catch
+            catch (Exception ex)
             {
-                Console.WriteLine("Error sending UDP Command");
+                Log.Warning(ex, "Unable to send PicoTuner command");
+                MessageBox.Show("Failed to send command: " + ex.Message);
             }
         }
 
@@ -185,10 +309,33 @@ namespace opentuner.MediaSources.WinterHill
         {
             int new_baseport = 0;
 
-            if (int.TryParse(txtNewBasePort.Text, out new_baseport))
+            // PicoTuner firmware accepts even base-port values ending
+            // in 00..14; require separate ranges for configured devices.
+            if (!int.TryParse(txtNewBasePort.Text.Trim(), out new_baseport) ||
+                new_baseport < 1024 || new_baseport > 65400 ||
+                new_baseport % 2 != 0 || new_baseport % 100 > 14)
             {
-                SendRemoteCommand("[to@wh] bip=" + new_baseport.ToString());    
+                MessageBox.Show("Enter an even UDP base port ending in 00..14 (for example 9800 or 9900).");
+                return;
             }
+            DetectedPico selected = deviceSelector.SelectedItem as DetectedPico;
+            if (selected == null || !selected.Seen) return;
+            foreach (DetectedPico other in devices.Values)
+            {
+                if (other == selected) continue;
+                if (Math.Abs(other.BasePort - new_baseport) < 100)
+                {
+                    MessageBox.Show("This UDP port range overlaps another PicoTuner.");
+                    return;
+                }
+            }
+            if (MessageBox.Show("Change base port on " + selected.Name +
+                " (" + selected.Address + ") from " + selected.BasePort +
+                " to " + new_baseport + "?\n\nUpdate Source Settings to match afterwards.",
+                "Confirm PicoTuner port change", MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) != DialogResult.Yes)
+                return;
+            SendRemoteCommand("[to@wh] bip=" + new_baseport.ToString());
         }
 
         private void llblCopyToClickboardIP_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
@@ -203,8 +350,12 @@ namespace opentuner.MediaSources.WinterHill
 
         private void PicoWHBroadcastListenerForm_FormClosing(object sender, FormClosingEventArgs e)
         {
-            //CloseForm();
-            //e.Cancel = false;
+            if (broadCastListener != null)
+            {
+                broadCastListener.Close();
+                broadCastListener = null;
+            }
+            WH_Client.Close();
         }
     }
 }
