@@ -309,6 +309,13 @@ namespace opentuner
             Button settings = FlatButton("MEDIA SETTINGS", false); settings.Width = 124; settings.Height = 32; settings.Click += delegate { backend.BackendShowGeneralSettings(); };
             p.Controls.Add(settings);
 
+            Button help = FlatButton("HELP", false);
+            help.Name = "ModernHelpButton";
+            help.Width = 62;
+            help.Height = 32;
+            help.Click += delegate { OpenUserManual(); };
+            p.Controls.Add(help);
+
             connectionPill = FlatButton("READY", false);
             connectionPill.Size = new Size(112, 30);
             connectionPill.Click += delegate { ToggleConnection(); };
@@ -321,6 +328,7 @@ namespace opentuner
             {
                 int x = p.ClientSize.Width - 12;
                 connectionPill.Location = new Point(x - connectionPill.Width, 13); x -= connectionPill.Width + 7;
+                help.Location = new Point(x - help.Width, 12); x -= help.Width + 7;
                 settings.Location = new Point(x - settings.Width, 12); x -= settings.Width + 7;
                 connect.Location = new Point(x - connect.Width, 12); x -= connect.Width + 7;
                 source.Location = new Point(x - source.Width, 12); x -= source.Width + 7;
@@ -328,6 +336,38 @@ namespace opentuner
                 layoutCombo.Location = new Point(x - layoutCombo.Width, 14);
             };
             return p;
+        }
+
+        private void OpenUserManual()
+        {
+            try
+            {
+                string localManual = System.IO.Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory, "Help",
+                    "OpenTuner-User-Manual.html");
+                if (System.IO.File.Exists(localManual))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = localManual,
+                        UseShellExecute = true
+                    });
+                    return;
+                }
+
+                // Developer builds may not include the installed manual.
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://github.com/makidoja/open_tuner/blob/connect-state-test/docs/OpenTuner-User-Manual.html",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Serilog.Log.Warning(ex, "Unable to open OpenTuner user manual");
+                MessageBox.Show("Unable to open the user manual. Visit github.com/makidoja/open_tuner.",
+                    "OpenTuner Help", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
 
         private Panel BuildSpectrumCard()
