@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenTuner M0CKE v1.3.1 — User Manual</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1828;--panel:#10253b;--text:#edf5ff;--muted:#a9bfd4;--line:#284864;--accent:#48a9ff}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{font:16px/1.65 "Segoe UI",Arial,sans-serif;color:var(--text);background:var(--bg);margin:0}
+header{background:linear-gradient(135deg,#10304c,#0c2034);border-bottom:1px solid var(--line);padding:42px max(24px,calc((100vw - 1080px)/2))}
+h1{margin:0;font-size:2.2rem;line-height:1.2}h2{margin-top:2.4em;border-bottom:1px solid var(--line);padding-bottom:.3em}h3{margin-top:1.4em}header p,.muted{color:var(--muted)}
+.layout{max-width:1120px;margin:auto;display:grid;grid-template-columns:240px minmax(0,1fr);gap:35px;padding:24px}
+nav{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 25px);overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:16px}
+nav a{display:block;color:var(--muted);text-decoration:none;padding:4px 0;font-size:.91rem}nav a:hover,a{color:var(--accent)}main{min-width:0}main p{margin:.7em 0 1.1em}
+table{border-collapse:collapse;width:100%;font-size:.94rem}th,td{padding:9px 11px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--panel)}
+code{background:#17334c;padding:2px 5px;border-radius:3px}pre{overflow:auto;background:#071320;padding:13px;border:1px solid var(--line)}
+.note{border-left:4px solid var(--accent);background:var(--panel);padding:12px 15px;margin:16px 0}
+footer{border-top:1px solid var(--line);padding:20px;text-align:center;color:var(--muted)}
+@media(max-width:780px){.layout{display:block;padding:15px}nav{position:static;max-height:none}header{padding:28px 20px}}
+@media print{body{background:white;color:black}nav{display:none}.layout{display:block}header{background:white;color:black}a{color:#135e9b}}
+</style>
+</head>
+<body>
+<header><h1>OpenTuner M0CKE — User Manual</h1><p>Version 1.3.1 · Windows DATV receiving and monitoring · November 2026</p><p>OpenTuner builds on the original Open Tuner project by ZR6TG. Capabilities vary with the connected hardware and its firmware.</p></header>
+<div class="layout"><nav aria-label="Manual contents">
+<strong>Contents</strong>
+<a href="#start">1. Getting started</a><a href="#sources">2. Hardware and modes</a><a href="#connect">3. Connection states</a><a href="#receive">4. Tuning and layout</a><a href="#dual">5. Two PicoTuners</a><a href="#lnb">6. LNB / RF / LO</a><a href="#status">7. Diagnostics</a><a href="#spectrum">8. QO-100 spectrum</a><a href="#media">9. Media controls</a><a href="#presets">10. Presets and chat</a><a href="#settings">11. Settings</a><a href="#broadcast">12. Broadcast Listener</a><a href="#updates">13. Updates</a><a href="#troubleshoot">14. Troubleshooting</a><a href="#reference">15. Ports and references</a>
+</nav><main>
+<section id="start"><h2>1. Getting started</h2>
+<ol><li>Install a Windows test build or published release from the <a href="https://github.com/makidoja/open_tuner">OpenTuner M0CKE GitHub repository</a>.</li>
+<li>Connect a supported receiver to the PC by USB or Ethernet. For Ethernet devices, confirm the PC and receiver can communicate across the network.</li>
+<li>Open <strong>Source Settings</strong>; select the correct receiver interface and its network addresses and ports as applicable.</li>
+<li>Choose the media source, then use <strong>CONNECT</strong> once the hardware is available.</li>
+<li>Enter the receiving frequency, LO offset if required, symbol rate and RF input; press <strong>TUNE</strong>.</li></ol>
+<p>Where an installer includes this manual, the top-bar <strong>HELP</strong> button opens the local HTML copy in your default browser without requiring an internet connection.</p></section>
+<section id="sources"><h2>2. Supported hardware and receiver modes</h2>
+<table><tr><th>Source</th><th>Channels</th><th>Notes</th></tr>
+<tr><td>PicoTuner Ethernet (WinterHill-compatible firmware)</td><td>2 per unit, up to 4 with two units</td><td>Independent IP and UDP base port for each device.</td></tr>
+<tr><td>BATC WinterHill UDP</td><td>4</td><td>Native four-channel WinterHill receiving mode.</td></tr>
+<tr><td>WinterHill WebSocket</td><td>Up to 4</td><td>Legacy-compatible WS endpoint, configured separately.</td></tr>
+<tr><td>MiniTiouner USB / other USB tuner sources</td><td>Hardware-dependent</td><td>USB tuner and driver requirements vary.</td></tr>
+<tr><td>Other original Open Tuner sources</td><td>Varies</td><td>Features depend on source implementation.</td></tr></table>
+<p>The application supports single-, dual- and four-receiver views when the source supplies those channels. Four-receiver mode uses a 2×2 grid.</p></section>
+<section id="connect"><h2>3. Connection management</h2>
+<p><strong>WAITING</strong> means no usable hardware has been detected; <strong>CONNECT</strong> means a receiver is available; <strong>CONNECTED</strong> means the source has been started. A failed or interrupted link may display an offline or recovery state. A device can be connected while a particular receiver still shows <strong>NO LOCK</strong>.</p>
+<p>For recovery, verify power, IP address, UDP base port and firewall first. The Connect control has a contextual <em>Force connect (skip availability check)</em> action for cases where ICMP/probing does not represent actual receiver availability. Use it only when the device is known to be reachable.</p></section>
+<section id="receive"><h2>4. Receive tuning and layout</h2>
+<p>Each receiver has its own <strong>FREQ</strong>, <strong>LO</strong>, <strong>SR</strong>, <strong>RF Input</strong> and <strong>TUNE</strong> controls. Frequency is displayed in MHz and symbol rate in kS/s. For example, a 10,491.500 MHz input with a 9,750 MHz LO corresponds to a 741.500 MHz intermediate frequency when the LO offset is enabled.</p>
+<p>In four-receiver mode the cards are labelled <strong>RX A</strong> (top-left), <strong>RX B</strong> (top-right), <strong>RX C</strong> (bottom-left) and <strong>RX D</strong> (bottom-right). A green <strong>LOCKED</strong> label indicates a demodulator lock; the service name appears in the receiver header.</p></section>
+<section id="dual"><h2>5. Two PicoTuner Ethernet devices — four receivers</h2>
+<p>In <strong>Source Settings → PicoTuner Ethernet</strong>, set PicoTuner 1's IP and base port. Tick <strong>Enable second PicoTuner (four receivers)</strong> and enter PicoTuner 2's own IP and base port. Both IPs must be different and the port ranges must not overlap. Save settings and reconnect.</p>
+<table><tr><th>OpenTuner receiver</th><th>Hardware</th></tr><tr><td>RX A / RX B</td><td>PicoTuner 1, hardware RX1 / RX2</td></tr><tr><td>RX C / RX D</td><td>PicoTuner 2, hardware RX1 / RX2</td></tr></table>
+<p>Example installation: unit 1 at <code>192.168.1.91</code> using base port <code>9900</code>, unit 2 at <code>192.168.1.152</code> using base port <code>9800</code>. These are examples, not factory defaults. Confirm both device broadcasts report the expected addresses and base ports. The status and video streams must reach the PC.</p>
+<div class="note">Four video feeds have been demonstrated with this arrangement. Verify independent tuning and all physical LNB outputs on your own hardware; boards may provide different LNB supply arrangements.</div></section>
+<section id="lnb"><h2>6. LNB power, RF input and LO</h2>
+<p>Where supported, the top toolbar provides <strong>LNB A / LNB B</strong> dropdowns with <strong>OFF</strong>, <strong>13V V</strong> and <strong>18V H</strong>. In dual-PicoTuner mode, there are separate selectors for device 1 and device 2. They are saved independently and reapplied on reconnection.</p>
+<p><strong>RF A/B</strong> in each receiver card chooses the tuner RF input; it is separate from selecting an LNB voltage. Not every PicoTuner board has two physical powered outputs: a broadcast may report LNB Y as <em>absent</em>. Do not assume that a menu option implies the hardware output exists.</p>
+<p>Enable the LO offset only when necessary for your receive system. Check the LO figure before tuning.</p></section>
+<section id="status"><h2>7. Current, TS Info and Tuner Data</h2>
+<h3>Current</h3><p>Shows receive frequency, modulation error ratio (MER) and decode margin, with visual bars. A <strong>Constellation</strong> option is shown where the chosen source provides real constellation samples. WinterHill Ethernet status does not supply these constellation coordinates.</p>
+<h3>TS Info</h3><p>Shows transport-stream bitrate history and, as available, null packet percentage, received stream status, video/audio codecs, resolution and audio details.</p>
+<h3>Tuner Data</h3><p>Can include DVB-S/DVB-S2 state, modulation/MODCOD, RF input, frequency, NIM frequency, LO, symbol rate, service/provider and available error metrics. RF level, BER, carrier offset and LDPC errors are source-dependent. In particular, USB MiniTiouner and Ethernet WinterHill do not necessarily expose identical diagnostics. A dash means the value is not available, not that it is zero.</p></section>
+<section id="spectrum"><h2>8. QO-100 BATC Wideband Quick Tune</h2>
+<p>Enable the <strong>QO-100 spectrum</strong> checkbox for the BATC wideband display. Click a visible signal to tune a receiver. The spectrum can display RX markers.</p>
+<p><strong>RX1 Auto Scan</strong> and <strong>RX2 Auto Scan</strong> use automatic candidate selection. <strong>Rotate 30s</strong> enables optional receiver rotation between signals. Verify the resulting frequency and symbol rate, particularly for narrow signals or when operating in a four-receiver system. Spectrum-derived information is not equivalent to a local RF spectrum measurement.</p></section>
+<section id="media"><h2>9. Receiver video and audio controls</h2>
+<p>Each receiver provides a volume slider and speaker symbol, <strong>MUTE</strong>, <strong>RECORD</strong>, <strong>SNAPSHOT</strong> and fullscreen controls. Recording and snapshot availability can depend on the media player and active transport stream. Use <strong>RECORDINGS</strong> and <strong>SNAPSHOTS</strong> in the top toolbar to access saved content and the relevant media features.</p>
+<p>Each receiver's controls operate independently where supported; muting one stream should not intentionally mute all receivers.</p></section>
+<section id="presets"><h2>10. Presets and BATC Chat</h2>
+<p>Use <strong>PRESETS</strong> to manage saved tuning entries, and select a preset to retune. The receiver interface includes <strong>BATC CHAT</strong> integration for DATV community communication; chat capabilities and access depend on the service configuration and availability.</p></section>
+<section id="settings"><h2>11. Source Settings and Media Settings</h2>
+<p><strong>SOURCE SETTINGS</strong> opens settings for the selected receiver source. The WinterHill settings dialog adapts to the chosen interface:</p>
+<ul><li><strong>PicoTuner Ethernet:</strong> device 1 IP/base port and optional device 2 IP/base port, plus the PicoTuner Broadcast Listener.</li>
+<li><strong>WinterHill UDP:</strong> UDP network settings for the four-receiver WinterHill system.</li>
+<li><strong>WinterHill WebSocket:</strong> WebSocket IP, WS port and corresponding UDP base port.</li>
+<li><strong>Always Ask:</strong> keeps the interface choice available on connection.</li></ul>
+<p><strong>MEDIA SETTINGS</strong> opens the application's broader media-related settings and is distinct from receiver network settings.</p></section>
+<section id="broadcast"><h2>12. PicoTuner Broadcast Listener</h2>
+<p>Open <strong>PicoTuner (WH) Broadcast Listener</strong> from PicoTuner Ethernet Source Settings. The broadcast stream uses UDP <code>9997</code> and reports IP address, serial, firmware, UDP base port, receiver state and TS destinations when provided by firmware.</p>
+<p>Use the <strong>device selector</strong> to pick a PicoTuner by IP address. The displayed address and base port relate to the <em>selected</em> unit, not merely whichever unit broadcast most recently. Commands <strong>Reset</strong>, <strong>Reboot</strong>, <strong>Bootsel</strong> and <strong>Change Base Port</strong> target that unit.</p>
+<p>Base-port changes require confirmation. The app checks port format and overlap with other discovered/configured units. Check your PicoTuner firmware documentation for persistence: some base-port changes are forgotten after power is removed. If you change a hardware base port, update the matching Source Settings value before reconnecting.</p></section>
+<section id="updates"><h2>13. Automatic update checking</h2>
+<p>OpenTuner checks GitHub for newer published releases at startup. When a newer semantic version is found, the user can open the GitHub releases page. A test build may be newer than the latest published release without triggering an update notification. Update checks require internet access.</p>
+<p>Official releases: <a href="https://github.com/makidoja/open_tuner/releases">github.com/makidoja/open_tuner/releases</a>. Experimental Windows builds: <a href="https://github.com/makidoja/open_tuner/actions">GitHub Actions</a>.</p></section>
+<section id="troubleshoot"><h2>14. Troubleshooting</h2>
+<table><tr><th>Symptom</th><th>Check</th></tr>
+<tr><td>WAITING / unable to connect</td><td>Power, receiver mode, IP address, local network and firewall; use Broadcast Listener to check PicoTuner discovery.</td></tr>
+<tr><td>RX C/D have no lock or video</td><td>Second PicoTuner checkbox, distinct IP and UDP base port, status/video packet destinations, receiver tuning commands.</td></tr>
+<tr><td>UDP commands sent, no stream</td><td>Review PicoTuner broadcast's <code>TS target RX1/RX2</code>. <code>0.0.0.0</code> suggests the device has no usable video destination yet.</td></tr>
+<tr><td>Receiver shows NO LOCK</td><td>Frequency, symbol rate, LO, RF A/B selection, LNB voltage, RF input and signal quality.</td></tr>
+<tr><td>Missing diagnostics / constellation</td><td>Check the hardware protocol; the application intentionally does not invent measurements.</td></tr>
+<tr><td>No audio</td><td>Speaker/mute/volume slider, codec support and whether the service actually carries audio.</td></tr></table>
+<p>When reporting a bug, include OpenTuner version, Windows version/display scaling, receiver firmware, network settings excluding secrets, screenshot and relevant logs. Issues: <a href="https://github.com/makidoja/open_tuner/issues">GitHub Issues</a>.</p></section>
+<section id="reference"><h2>15. Network reference and credits</h2>
+<p>For two PicoTuners using base ports <code>9900</code> and <code>9800</code>:</p>
+<table><tr><th>Purpose</th><th>PicoTuner 1</th><th>PicoTuner 2</th></tr><tr><td>Discovery broadcast</td><td>9997</td><td>9997</td></tr><tr><td>Status</td><td>9901</td><td>9801</td></tr><tr><td>WinterHill-format control</td><td>See firmware/control path</td><td>9820 (base + 20)</td></tr><tr><td>RX1 video</td><td>9941</td><td>9841</td></tr><tr><td>RX2 video</td><td>9942</td><td>9842</td></tr></table>
+<p>OpenTuner M0CKE is developed from the original <a href="https://www.zr6tg.co.za/open-tuner/">Open Tuner</a> by ZR6TG. BATC and community contributions remain central to the supported amateur television hardware ecosystem. See the <a href="https://wiki.batc.org.uk/">BATC Wiki</a> for hardware information.</p></section>
+</main></div><footer>OpenTuner M0CKE v1.3.1 · 73 de M0CKE · <a href="https://github.com/makidoja/open_tuner">Project repository</a></footer>
+</body></html>
