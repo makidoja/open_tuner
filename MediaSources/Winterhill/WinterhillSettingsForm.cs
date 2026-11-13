@@ -11,6 +11,7 @@ namespace opentuner.MediaSources.WinterHill
         private CheckBox chkSecondPico;
         private TextBox txtSecondPicoIp;
         private TextBox txtSecondPicoBasePort;
+        private GroupBox secondPicoGroup;
 
         public WinterHillSettingsForm(WinterHillSettings Settings)
         {
@@ -26,6 +27,7 @@ namespace opentuner.MediaSources.WinterHill
             txtUDPBasePort.Text = _settings.WinterHillUdpBasePort.ToString();
             txtUDPIP.Text = _settings.WinterHillUdpHost.ToString();
             BuildSecondPicoSettings();
+            RefreshInterfaceSettingsLayout();
 
             Shown += delegate
             {
@@ -87,6 +89,7 @@ namespace opentuner.MediaSources.WinterHill
             btnBroadcastListener.Top = btnCancel.Top;
             ClientSize = new Size(501, btnSave.Bottom + 14);
             Controls.Add(second);
+            secondPicoGroup = second;
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
@@ -99,32 +102,38 @@ namespace opentuner.MediaSources.WinterHill
         {
             int wsport = 0;
             int baseport = 0;
-
             int udpbaseport = 0;
 
-            if (!int.TryParse(txtWHWSPort.Text, out wsport))
+            if (comboDefaultInterface.SelectedIndex == 1 &&
+                !int.TryParse(txtWHWSPort.Text, out wsport))
             {
                 MessageBox.Show("WinterHill WS Port is not valid.");
                 return;
             }
 
-            if (!int.TryParse(txtWHWSBaseUdp.Text, out baseport))
+            if (comboDefaultInterface.SelectedIndex == 1 &&
+                !int.TryParse(txtWHWSBaseUdp.Text, out baseport))
             {
                 MessageBox.Show("WinterHill WS Base Port is not valid");
                 return;
             }
 
-            if (!int.TryParse(txtUDPBasePort.Text, out udpbaseport))
+            if ((comboDefaultInterface.SelectedIndex == 2 ||
+                 comboDefaultInterface.SelectedIndex == 3) &&
+                !int.TryParse(txtUDPBasePort.Text, out udpbaseport))
             {
                 MessageBox.Show("WinterHill UDP Base Port is not valid");
                 return;
             }
 
-            _settings.WinterHillWSHost = txtWHWSIp.Text;
-            _settings.WinterHillWSPort = wsport;
-            _settings.WinterHillWSUdpBasePort = baseport;
+            if (comboDefaultInterface.SelectedIndex == 1)
+            {
+                _settings.WinterHillWSHost = txtWHWSIp.Text;
+                _settings.WinterHillWSPort = wsport;
+                _settings.WinterHillWSUdpBasePort = baseport;
+            }
 
-            if (chkSecondPico.Checked)
+            if (comboDefaultInterface.SelectedIndex == 2 && chkSecondPico.Checked)
             {
                 IPAddress firstAddress, secondAddress;
                 if (!IPAddress.TryParse(txtSecondPicoIp.Text.Trim(), out secondAddress) ||
@@ -151,18 +160,70 @@ namespace opentuner.MediaSources.WinterHill
                 _settings.SecondPicoTunerUdpHost = secondAddress.ToString();
                 _settings.SecondPicoTunerUdpBasePort = secondPort;
             }
-            _settings.SecondPicoTunerEnabled = chkSecondPico.Checked;
-            _settings.WinterHillUdpBasePort = udpbaseport;
-            _settings.WinterHillUdpHost = txtUDPIP.Text;
+            if (comboDefaultInterface.SelectedIndex == 2)
+                _settings.SecondPicoTunerEnabled = chkSecondPico.Checked;
+            if (comboDefaultInterface.SelectedIndex == 2 ||
+                comboDefaultInterface.SelectedIndex == 3)
+            {
+                _settings.WinterHillUdpBasePort = udpbaseport;
+                _settings.WinterHillUdpHost = txtUDPIP.Text;
+            }
             _settings.DefaultInterface = (byte)comboDefaultInterface.SelectedIndex;
             
             DialogResult = DialogResult.OK;
             Close();
         }
 
+        // Show only the settings that belong to the selected receiver type.
+        // Preserve every field's value while switching; Save still persists
+        // the appropriate backend configuration for later use.
+        private void RefreshInterfaceSettingsLayout()
+        {
+            if (groupBox1 == null || groupBox3 == null ||
+                secondPicoGroup == null || comboDefaultInterface == null) return;
+
+            int mode = comboDefaultInterface.SelectedIndex;
+            bool pico = mode == 2;
+            bool ws = mode == 1;
+            bool udp = mode == 3;
+            bool showNetwork = pico || udp;
+
+            groupBox3.Visible = showNetwork;
+            groupBox3.Text = pico ? "PicoTuner 1 (Ethernet / WinterHill)" :
+                "WinterHill UDP (BATC 4 RX)";
+            secondPicoGroup.Visible = pico;
+            groupBox1.Visible = ws;
+            btnBroadcastListener.Visible = pico;
+            btnBroadcastListener.Enabled = pico;
+
+            int top = groupBox2.Bottom + 8;
+            if (showNetwork)
+            {
+                groupBox3.Top = top;
+                top = groupBox3.Bottom + 8;
+            }
+            if (pico)
+            {
+                secondPicoGroup.Top = top;
+                top = secondPicoGroup.Bottom + 8;
+            }
+            if (ws)
+            {
+                groupBox1.Top = top;
+                top = groupBox1.Bottom + 8;
+            }
+
+            // Keep a compact dialog in single-interface modes.
+            int footerTop = Math.Max(groupBox2.Bottom + 14, top + 8);
+            btnSave.Top = footerTop;
+            btnCancel.Top = footerTop;
+            btnBroadcastListener.Top = footerTop;
+            ClientSize = new Size(501, btnSave.Bottom + 14);
+        }
+
         private void comboDefaultInterface_SelectedIndexChanged(object sender, EventArgs e)
         {
-           
+            RefreshInterfaceSettingsLayout();
         }
 
         private void btnBroadcastListener_Click(object sender, EventArgs e)
