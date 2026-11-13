@@ -18,6 +18,7 @@ namespace opentuner.MediaSources.WinterHill
         public delegate void OnBroadcastDelegate(string data);
 
         public event OnBroadcastDelegate OnBroadcast;
+        public event Action<string, string> OnBroadcastFromDevice;
 
         public PicoWHBroadcastListener() 
         {
@@ -57,6 +58,7 @@ namespace opentuner.MediaSources.WinterHill
                         lastBroadcastLogUtc = DateTime.UtcNow;
                         Log.Information("[PICO-DISCOVERY-DIAG] UDP 9997 from {SenderIp}, bytes={Bytes}", senderIp, data.Length);
                     }
+                    OnBroadcastFromDevice?.Invoke(senderIp, receivedMessage);
                     OnBroadcast?.Invoke(receivedMessage);
 
                     //Log.Information(remoteEndPoint.ToString());
