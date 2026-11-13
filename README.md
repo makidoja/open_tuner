@@ -4,13 +4,13 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Development status — v1.3.0:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Development status — v1.3.1:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
-- **One, two, or four receiver views**, including an experimental 2×2 four-receiver display.
+- **One, two, or four receiver views**, including a working 2×2 four-receiver display.
 - **Native BATC Winter Hill UDP mode** for the original Raspberry Pi-based four-channel Winter Hill receiver.
-- **PicoTuner Ethernet** (dual receiver), **PicoTuner USB**, **MiniTiouner USB**, and other supported OpenTuner source options.
+- **PicoTuner Ethernet** (two receivers per device, up to four with two devices), **PicoTuner USB**, **MiniTiouner USB**, and other supported OpenTuner source options.
 - Independent tuning and live receiver controls, including RF input, symbol rate and optional LO offset.
 - Live **frequency, MER, decode margin, DVB mode, MODCOD, service and provider** information when exposed by the receiver.
 - **Current**, **TS Info**, and **Tuner Data** pages for each receiver.
@@ -25,13 +25,13 @@ OpenTuner M0CKE is an actively developed interface based on the original **[Open
 | Source | Receiver channels | Notes |
 | --- | ---: | --- |
 | BATC Winter Hill UDP | 4 | Original Raspberry Pi-based Winter Hill running BATC UDP software, such as `winterhill-3v20`. Experimental native four-channel support. |
-| PicoTuner Ethernet / Winter Hill firmware | 2 | A single dual-channel Ethernet PicoTuner with standard UDP control and status. |
+| PicoTuner Ethernet / Winter Hill firmware | 2 or 4 | One dual-channel Ethernet PicoTuner or two independent devices for four receivers (RX A/B and RX C/D), each with separate IP/UDP base-port settings. |
 | PicoTuner USB | 2 | Dual receiver support, subject to connected hardware and drivers. |
 | MiniTiouner USB | Up to 2 | Based on the installed hardware configuration. |
 | Winter Hill WebSocket | 4 | Separate legacy/ZR6TG-compatible interface; requires an appropriate WebSocket service. |
 | Other original OpenTuner sources | Varies | Availability and capabilities depend on the source implementation. |
 
-**Two independent Ethernet PicoTuners are not yet combined into one four-channel source.** The new native four-channel mode is for a four-receiver BATC Winter Hill unit.
+**Two independent Ethernet PicoTuners can now be combined into one four-channel source.** This is separate from the native mode for a single four-receiver BATC WinterHill unit. Four live streams from two PicoTuners have been demonstrated in v1.3.1.
 
 ### Native BATC Winter Hill UDP setup
 
@@ -60,9 +60,20 @@ The interface provides independent receiver cards and three information views:
 | **TS Info** | Actual received TS bitrate graph, null packets, stream status, recording status and media information where available. |
 | **Tuner Data** | Demodulation state, DVB system, MODCOD, RF input, frequency, NIM frequency, LO configuration, symbol rate, service/provider and other supported readings. |
 
-The **4 RX** view is currently being refined for a 2×2 video layout with compact **left-side receiver information and tuning controls**. The 1–2 RX modes retain the larger information layout.
+The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## New in v1.3.1
+
+- Four simultaneous receivers using **two PicoTuner Ethernet devices**, each with a separate IP and UDP base port.
+- Independent LNB power controls for each configured PicoTuner (subject to physical hardware).
+- Improved receiver control layout and signal displays.
+- Source Settings now show the relevant options for PicoTuner Ethernet, WinterHill UDP or WebSocket.
+- PicoTuner Broadcast Listener can select each discovered unit by IP before changing its base port or sending reset/reboot commands.
+- Main toolbar includes **MEDIA SETTINGS** and a **HELP** button opening an installed offline user manual.
+
+**Documentation:** [OpenTuner User Manual](docs/OpenTuner-User-Manual.html) · [v1.3.1 Release Notes](RELEASE_NOTES_1.3.1.md)
 
 ## Download and install
 
@@ -73,7 +84,7 @@ The **4 RX** view is currently being refined for a 2×2 video layout with compac
 
 GitHub may require you to sign in to download workflow artifacts. A successful build verifies that the installer was produced; it **does not** confirm every receiver mode has been hardware-tested.
 
-[Latest successfully compiled test build #507](https://github.com/makidoja/open_tuner/actions/runs/43257943595) (12 November 2026).
+For the latest v1.3.1 installer build, select the newest **successful** workflow run on the development branch. Older artifacts may have outdated version numbers.
 
 ## QO-100 support
 
@@ -81,7 +92,7 @@ OpenTuner M0CKE includes BATC wideband spectrum integration and quick-tune featu
 
 ## Development and testing notes
 
-The **v1.3.0** development branch includes work on:
+The **v1.3.1** development branch includes work on:
 
 - Native standard-BATC Winter Hill UDP support for four channels.
 - Separate PicoTuner Ethernet and USB receiver connectivity.
@@ -90,7 +101,7 @@ The **v1.3.0** development branch includes work on:
 - Compact four-channel controls, header buttons and receiver information sidebars.
 - Independent RX1–RX4 status handling.
 
-**Still being validated:** the four-channel sidebar on different Windows display sizes and DPI settings, full independent hardware operation for RX1–RX4, and availability of advanced diagnostic fields across firmware versions.
+**Still being validated:** layouts on different Windows DPI settings, hardware-specific LNB outputs, and advanced diagnostic availability across firmware versions.
 
 Please include the **receiver model, firmware/software version, connection mode, Windows display scaling, screenshots and relevant logs** when reporting a problem.
 
