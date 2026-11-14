@@ -403,7 +403,9 @@ namespace opentuner
         {
             if (spectrumCard == null) return;
             spectrumCard.Visible = visible;
-            spectrumCard.Height = visible ? 168 : 0;
+            ModernConceptForm owner = spectrumCard.FindForm() as ModernConceptForm;
+            int receivers = owner == null ? 2 : owner.ModernReceiverCount;
+            spectrumCard.Height = visible ? (receivers >= 4 ? 209 : 145) : 0;
             if (visible) LayoutSpectrumCompact();
         }
 
