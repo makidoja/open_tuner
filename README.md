@@ -17,7 +17,7 @@ OpenTuner M0CKE is an actively developed interface based on the original **[Open
 - Actual received transport-stream bitrate history; null-packet percentage and media information where provided.
 - Video/audio codec details and video resolution when the selected media player reports them.
 - Constellation displays **where real hardware constellation data is available**; missing data is not fabricated.
-- QO-100 BATC wideband spectrum integration, quick tuning, RX markers, automatic scanning and optional 30-second receiver rotation.
+- QO-100 BATC wideband spectrum integration, quick tuning, RX markers, automatic scanning and optional 30-second receiver rotation. In **4 RX mode**, the development build shows separate RX1–RX4 Quick Tune lanes and controls.
 - Recording, snapshots, fullscreen playback, volume and mute controls.
 
 ## Receiver hardware and interfaces
