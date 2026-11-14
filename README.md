@@ -4,7 +4,7 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Development status — v1.3.2:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Latest release — v1.3.4:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
@@ -17,7 +17,7 @@ OpenTuner M0CKE is an actively developed interface based on the original **[Open
 - Actual received transport-stream bitrate history; null-packet percentage and media information where provided.
 - Video/audio codec details and video resolution when the selected media player reports them.
 - Constellation displays **where real hardware constellation data is available**; missing data is not fabricated.
-- QO-100 BATC wideband spectrum integration, quick tuning, RX markers, automatic scanning and optional 30-second receiver rotation. In **4 RX mode**, the development build shows separate RX1–RX4 Quick Tune lanes and controls.
+- QO-100 BATC wideband spectrum integration, quick tuning, RX markers, automatic scanning and optional 30-second receiver rotation. In **4 RX mode**, the application shows separate RX1–RX4 Quick Tune lanes and controls.
 - Recording, snapshots, fullscreen playback, volume and mute controls.
 
 ## Receiver hardware and interfaces
@@ -63,6 +63,12 @@ The interface provides independent receiver cards and three information views:
 The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## v1.3.4 release — four-receiver QO-100 Quick Tune
+
+**v1.3.4** extends the QO-100 BATC Wideband Quick Tune view to all four physical receivers when a supported four-receiver source is connected and **4 RX** layout is selected. RX3 and RX4 now have their own click-to-tune spectrum lanes, markers, Auto Scan and optional Rotate 30s controls. All auto-scanning receivers avoid the beacon and reserve frequencies assigned to other active receivers. In 1 RX / 2 RX mode, only the corresponding controls appear.
+
+See [v1.3.4 release notes](RELEASE_NOTES_1.3.4.md).
 
 ## v1.3.2 service patch
 
