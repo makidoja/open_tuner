@@ -415,7 +415,7 @@ namespace opentuner
 
             // Both receivers can independently rotate between eligible stations.
             // Place the second checkbox in the same row as each Auto Scan option.
-            for (int rx = 0; rx < 2; rx++)
+            for (int rx = 0; rx < 4; rx++)
             {
                 int index = rx;
                 CheckBox rotate = new CheckBox
@@ -452,7 +452,7 @@ namespace opentuner
             {
                 const int gap = 8;
                 const int rightMargin = 18;
-                for (int rx = 0; rx < 2; rx++)
+                for (int rx = 0; rx < 4; rx++)
                 {
                     CheckBox scan = autoScanEnabled[rx];
                     CheckBox rotate = rotate30Seconds[rx];
@@ -1050,7 +1050,7 @@ namespace opentuner
         private void AutoScanTick()
         {
             if (IsDisposed || Disposing) return;
-            for (int rx = 0; rx < 2; rx++)
+            for (int rx = 0; rx < 4; rx++)
             {
                 if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked &&
                     autoScanState[rx] == "ARMED")
@@ -1060,7 +1060,7 @@ namespace opentuner
             catch (Exception ex)
             {
                 Serilog.Log.Warning(ex, "QO100 Auto Scan tick failed");
-                for (int rx = 0; rx < 2; rx++)
+                for (int rx = 0; rx < 4; rx++)
                     if (autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked)
                         SetAutoScanState(rx, "SCAN ERROR");
             }
@@ -1076,7 +1076,7 @@ namespace opentuner
 
             if (!backend.BackendSourceInitialised || !backend.BackendTransportConnected || activeQuickTuneSpectrum == null)
             {
-                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "WAITING FOR RX");
+                for (int rx = 0; rx < 4; rx++) SetAutoScanState(rx, "WAITING FOR RX");
                 return;
             }
 
@@ -1084,14 +1084,14 @@ namespace opentuner
                 autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked);
             if (!any)
             {
-                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "OFF");
+                for (int rx = 0; rx < 4; rx++) SetAutoScanState(rx, "OFF");
                 return;
             }
 
             List<signal.Sig> detected;
             if (!activeQuickTuneSpectrum.TryDetectedSignalsSnapshot(out detected))
             {
-                for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "NO BATC DATA");
+                for (int rx = 0; rx < 4; rx++) SetAutoScanState(rx, "NO BATC DATA");
                 return;
             }
             var candidates = detected
