@@ -56,17 +56,17 @@ namespace opentuner
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
         private ModernBatcSpectrumControl activeQuickTuneSpectrum;
-        private readonly CheckBox[] autoScanEnabled = new CheckBox[2];
-        private readonly CheckBox[] rotate30Seconds = new CheckBox[2];
-        private readonly DateTime[] rotationStartedUtc = new DateTime[2];
-        private readonly double[] rotationFrequencyMHz = new double[2];
-        private readonly DateTime[] noLockSince = new DateTime[2];
-        private readonly DateTime[] lastAutoTune = new DateTime[2];
+        private readonly CheckBox[] autoScanEnabled = new CheckBox[4];
+        private readonly CheckBox[] rotate30Seconds = new CheckBox[4];
+        private readonly DateTime[] rotationStartedUtc = new DateTime[4];
+        private readonly double[] rotationFrequencyMHz = new double[4];
+        private readonly DateTime[] noLockSince = new DateTime[4];
+        private readonly DateTime[] lastAutoTune = new DateTime[4];
         private readonly DateTime[] lastSignalStatus = new DateTime[4];
-        private readonly double[] lastAutoFrequency = new double[2];
-        private readonly string[] autoScanState = new string[] { "OFF", "OFF" };
-        private readonly Label[] autoScanStatusLabels = new Label[2];
-        private readonly DateTime[] spectrumMissingSince = new DateTime[2];
+        private readonly double[] lastAutoFrequency = new double[4];
+        private readonly string[] autoScanState = new string[] { "OFF", "OFF", "OFF", "OFF" };
+        private readonly Label[] autoScanStatusLabels = new Label[4];
+        private readonly DateTime[] spectrumMissingSince = new DateTime[4];
         private DateTime lastAutoScanCheck = DateTime.MinValue;
         private Timer uiTimer;
         private Timer autoScanTimer;
@@ -386,7 +386,7 @@ namespace opentuner
             p.Controls.Add(batcSpectrumBox);
             // Each receiver gets an independent opt-in auto scan checkbox in
             // its own half of the BATC spectrum (above/below the RX divider).
-            for (int rx = 0; rx < 2; rx++)
+            for (int rx = 0; rx < 4; rx++)
             {
                 int index = rx;
                 CheckBox check = new CheckBox
@@ -465,7 +465,7 @@ namespace opentuner
                     scan.Height = rotate.Height = 22;
 
                     // Both controls share a single baseline and top edge.
-                    int top = rx == 0 ? 36 : 79;
+                    int top = 36 + rx * 37;
                     int right = p.ClientSize.Width - rightMargin;
                     int scanLeft = right - scan.Width - gap - rotate.Width;
                     scan.Location = new Point(Math.Max(4, scanLeft), top);
@@ -854,10 +854,16 @@ namespace opentuner
             for (int i = 0; i < receiverControls.Length; i++)
                 if (receiverControls[i] != null) ApplyCompactReceiverLayout(i, four);
             if (activeQuickTuneSpectrum != null)
-                activeQuickTuneSpectrum.SetReceiverCount(Math.Min(2, displayed));
-            if (autoScanEnabled[1] != null) autoScanEnabled[1].Visible = displayed > 1;
-            if (rotate30Seconds[1] != null) rotate30Seconds[1].Visible = displayed > 1;
-            if (autoScanStatusLabels[1] != null) autoScanStatusLabels[1].Visible = displayed > 1;
+                activeQuickTuneSpectrum.SetReceiverCount(displayed);
+            for (int rx = 0; rx < 4; rx++)
+            {
+                bool show = rx < displayed;
+                if (autoScanEnabled[rx] != null) autoScanEnabled[rx].Visible = show;
+                if (rotate30Seconds[rx] != null) rotate30Seconds[rx].Visible = show;
+                if (autoScanStatusLabels[rx] != null) autoScanStatusLabels[rx].Visible = show;
+                if (!show && autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked)
+                    autoScanEnabled[rx].Checked = false;
+            }
             // The modern spectrum pass owns additional RX-colour indicators.
             ModernBatcSpectrumPass.SetReceiverIndicatorVisibility(displayed);
         }
@@ -1074,8 +1080,8 @@ namespace opentuner
                 return;
             }
 
-            bool any = (autoScanEnabled[0] != null && autoScanEnabled[0].Checked) ||
-                       (autoScanEnabled[1] != null && autoScanEnabled[1].Checked);
+            bool any = Enumerable.Range(0, ModernReceiverCount).Any(rx =>
+                autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked);
             if (!any)
             {
                 for (int rx = 0; rx < 2; rx++) SetAutoScanState(rx, "OFF");
@@ -1095,7 +1101,7 @@ namespace opentuner
                 .OrderBy(sig => sig.frequency).ToList();
             if (candidates.Count == 0)
             {
-                for (int rx = 0; rx < Math.Min(2, visibleTuners); rx++)
+                for (int rx = 0; rx < ModernReceiverCount; rx++)
                 {
                     bool enabled = autoScanEnabled[rx] != null && autoScanEnabled[rx].Checked;
                     bool beacon = lastData[rx] != null && lastData[rx].frequency > 0 &&
@@ -1105,7 +1111,7 @@ namespace opentuner
                 return;
             }
 
-            for (int rx = 0; rx < Math.Min(2, visibleTuners); rx++)
+            for (int rx = 0; rx < ModernReceiverCount; rx++)
             {
                 if (autoScanEnabled[rx] == null || !autoScanEnabled[rx].Checked)
                 {
@@ -1168,7 +1174,6 @@ namespace opentuner
 
                 // Avoid retuning onto the same frequency as an already locked
                 // receiver, and cycle onward after an unsuccessful trial.
-                int other = 1 - rx;
                 var available = candidates.Where(sig =>
                     // Never take the beacon, including wide detected blocks that
                     // overlap its centre even when their measured centre differs.
@@ -1237,15 +1242,10 @@ namespace opentuner
                 Serilog.Log.Information("QO100 RX{Receiver}: current signal {Freq:F3} disappeared; scanning before dwell expiry",
                     rx + 1, currentMHz);
 
-            int other = 1 - rx;
-            double otherConfiguredMHz = (double)freqInputs[other].Value;
             var available = candidates.Where(sig =>
-                // Include signal bandwidth in the beacon exclusion.
+                // Include signal bandwidth in the beacon exclusion, and
+                // avoid all other active receivers (not just RX1/RX2).
                 Math.Abs(sig.frequency - 10491.5) > 0.10 + sig.sr / 2.0 &&
-                // Never take a transmission RX1 is currently tuned to, even
-                // when RX1 has not yet achieved a lock.
-                Math.Abs(sig.frequency - otherConfiguredMHz) >
-                    Math.Max(0.10, (sig.sr + (double)srInputs[other].Value / 1000.0) / 2.0 + 0.05) &&
                 !AutoScanCandidateOccupiedByOther(rx, sig) &&
                 // A station must be different from the one we are watching.
                 Math.Abs(sig.frequency - currentMHz) >
@@ -1285,40 +1285,34 @@ namespace opentuner
 
         private bool AutoScanCandidateOccupiedByOther(int receiver, signal.Sig candidate)
         {
-            int other = 1 - receiver;
-            if (other >= visibleTuners) return false;
-
-            // Prefer the confirmed hardware lock, since the backend can report
-            // a slightly different centre frequency from the BATC detector.
-            if (lastData[other] != null && lastData[other].demod_locked &&
-                lastData[other].frequency > 0)
+            // Four independent tuners may be listening to different signals.
+            // Reserve every other receiver's confirmed lock, and any frequency
+            // assigned by Auto Scan or 30-second rotation, while it is active.
+            for (int other = 0; other < ModernReceiverCount; other++)
             {
-                double lockedMHz = lastData[other].frequency / 1000.0;
-                double lockedSrMHz = lastData[other].symbol_rate / 1000.0;
-                double guardMHz = Math.Max(0.10, (candidate.sr + lockedSrMHz) / 2.0 + 0.05);
-                if (Math.Abs(candidate.frequency - lockedMHz) < guardMHz)
-                    return true;
+                if (other == receiver) continue;
+                if (lastData[other] != null && lastData[other].demod_locked &&
+                    lastData[other].frequency > 0)
+                {
+                    double lockedMHz = lastData[other].frequency / 1000.0;
+                    double lockedSrMHz = lastData[other].symbol_rate / 1000.0;
+                    double guardMHz = Math.Max(0.10, (candidate.sr + lockedSrMHz) / 2.0 + 0.05);
+                    if (Math.Abs(candidate.frequency - lockedMHz) < guardMHz) return true;
+                }
+                if (autoScanEnabled[other] != null && autoScanEnabled[other].Checked &&
+                    lastAutoTune[other] != DateTime.MinValue && lastAutoFrequency[other] > 0)
+                {
+                    double otherSrMHz = (double)srInputs[other].Value / 1000.0;
+                    double guardMHz = Math.Max(0.10, (candidate.sr + otherSrMHz) / 2.0 + 0.05);
+                    if (Math.Abs(candidate.frequency - lastAutoFrequency[other]) < guardMHz) return true;
+                }
             }
-
-            // Once Auto Scan has assigned a signal to the other receiver, keep
-            // it reserved for as long as it remains tuned there, including
-            // while waiting to acquire lock. Do not expire this reservation
-            // after an arbitrary number of seconds.
-            if (autoScanEnabled[other] != null && autoScanEnabled[other].Checked &&
-                lastAutoTune[other] != DateTime.MinValue && lastAutoFrequency[other] > 0)
-            {
-                double otherSrMHz = (double)srInputs[other].Value / 1000.0;
-                double guardMHz = Math.Max(0.10, (candidate.sr + otherSrMHz) / 2.0 + 0.05);
-                if (Math.Abs(candidate.frequency - lastAutoFrequency[other]) < guardMHz)
-                    return true;
-            }
-
             return false;
         }
 
         internal void ModernAutoScanChanged(int receiver, bool enabled)
         {
-            if (receiver < 0 || receiver >= 2) return;
+            if (receiver < 0 || receiver >= 4) return;
             noLockSince[receiver] = DateTime.MinValue;
             spectrumMissingSince[receiver] = DateTime.MinValue;
             rotationStartedUtc[receiver] = DateTime.MinValue;
@@ -1338,7 +1332,7 @@ namespace opentuner
 
         private void SetAutoScanState(int receiver, string state)
         {
-            if (receiver < 0 || receiver > 1) return;
+            if (receiver < 0 || receiver >= 4) return;
             if (autoScanState[receiver] == state) return;
             autoScanState[receiver] = state;
             CheckBox cb = autoScanEnabled[receiver];
