@@ -19,10 +19,10 @@ namespace opentuner
         private readonly signal detector;
         private ushort[] fft;
         private List<signal.Sig> signals = new List<signal.Sig>();
-        private readonly signal.Sig?[] tuned = new signal.Sig?[2];
-        private readonly double[] lockedFrequencyMHz = new double[2];
-        private readonly string[] lockedServiceName = new string[2];
-        private readonly DateTime[] lockedAtUtc = new DateTime[2];
+        private readonly signal.Sig?[] tuned = new signal.Sig?[4];
+        private readonly double[] lockedFrequencyMHz = new double[4];
+        private readonly string[] lockedServiceName = new string[4];
+        private readonly DateTime[] lockedAtUtc = new DateTime[4];
         private bool connected;
         private int receiverCount = 2;
         private DateTime lastFrame = DateTime.MinValue;
@@ -178,35 +178,30 @@ namespace opentuner
 
         internal void SetReceiverCount(int count)
         {
-            receiverCount = Math.Max(1, Math.Min(2, count));
+            receiverCount = Math.Max(1, Math.Min(4, count));
+            lock (signalLock)
+            {
+                detector.set_num_rx(receiverCount);
+                detector.set_num_rx_scan(receiverCount);
+            }
             Invalidate();
         }
 
         private void DrawReceiverSplit(Graphics g, Rectangle plot)
         {
-            int mid = plot.Top + plot.Height / 2;
-            if (receiverCount == 1)
-            {
-                using (Font f = new Font("Segoe UI Semibold", 7.5f))
-                using (Brush b = new SolidBrush(Color.FromArgb(215, 220, 230, 240)))
-                    g.DrawString("RX1", f, b, plot.Left + 5, plot.Bottom - f.Height - 2);
-                return;
-            }
             using (Pen p = new Pen(Color.FromArgb(150, 190, 205, 220), 1f))
-            {
-                p.DashStyle = DashStyle.Dash;
-                g.DrawLine(p, plot.Left, mid, plot.Right, mid);
-            }
-
             using (Font f = new Font("Segoe UI Semibold", 7.5f))
             using (Brush b = new SolidBrush(Color.FromArgb(215, 220, 230, 240)))
             {
-                const float xPad = 5f;
-                float x = plot.Left + xPad;
-                float rx1Y = Math.Max(plot.Top + 1, mid - f.Height - 2);
-                float rx2Y = Math.Min(plot.Bottom - f.Height - 1, mid + 2);
-                g.DrawString("RX1", f, b, x, rx1Y);
-                g.DrawString("RX2", f, b, x, rx2Y);
+                p.DashStyle = DashStyle.Dash;
+                for (int rx = 0; rx < receiverCount; rx++)
+                {
+                    float laneTop = plot.Top + (plot.Height * rx / (float)receiverCount);
+                    if (rx > 0)
+                        g.DrawLine(p, plot.Left, laneTop, plot.Right, laneTop);
+                    g.DrawString("RX" + (rx + 1), f, b, plot.Left + 5,
+                        laneTop + 2);
+                }
             }
         }
 
@@ -327,29 +322,29 @@ namespace opentuner
 
         private void DrawTunedMarkers(Graphics g, Rectangle plot)
         {
+            Color[] colours = { Green, Color.Gold, Color.FromArgb(255, 142, 72),
+                Color.FromArgb(194, 128, 255) };
             for (int rx = 0; rx < receiverCount; rx++)
             {
                 signal.Sig? item = tuned[rx];
                 if (!item.HasValue) continue;
-                signal.Sig s = item.Value;
-                float x = plot.Left + (float)(((s.frequency - StartMHz) / SpanMHz) * plot.Width);
-                Color c = rx == 0 ? Green : Color.Gold;
-                using (Pen p = new Pen(c, 2f))
-                {
-                    g.DrawLine(p, x, plot.Top, x, plot.Bottom);
-                    g.DrawLine(p, x - 4, plot.Top + 4, x, plot.Top);
-                    g.DrawLine(p, x + 4, plot.Top + 4, x, plot.Top);
-                }
-                // Put receiver marker labels either side of the centre line:
-                // RX1 above (green), RX2 below (yellow), not at the bottom.
+                signal.Sig sig = item.Value;
+                float x = plot.Left + (float)(((sig.frequency - StartMHz) / SpanMHz) * plot.Width);
+                if (x < plot.Left || x > plot.Right) continue;
+                float top = plot.Top + (plot.Height * rx / (float)receiverCount);
+                float bottom = plot.Top + (plot.Height * (rx + 1) / (float)receiverCount);
+                Color colour = colours[rx];
+                using (Pen p = new Pen(colour, 2f))
+                using (Brush b = new SolidBrush(colour))
                 using (Font f = new Font("Segoe UI Semibold", 7.5f))
-                using (Brush b = new SolidBrush(c))
                 {
-                    float mid = plot.Top + plot.Height / 2f;
-                    float labelY = rx == 0 ? mid - f.Height - 3f : mid + 3f;
-                    float labelX = Math.Max(plot.Left + 2f,
-                        Math.Min(plot.Right - g.MeasureString(rx == 0 ? "RX1" : "RX2", f).Width - 2f, x + 4f));
-                    g.DrawString(rx == 0 ? "RX1" : "RX2", f, b, labelX, labelY);
+                    g.DrawLine(p, x, top, x, bottom);
+                    g.DrawLine(p, x - 4, top + 3, x, top);
+                    g.DrawLine(p, x + 4, top + 3, x, top);
+                    string label = "RX" + (rx + 1);
+                    float labelX = Math.Max(plot.Left + 2,
+                        Math.Min(plot.Right - g.MeasureString(label, f).Width - 2, x + 5));
+                    g.DrawString(label, f, b, labelX, bottom - f.Height - 2);
                 }
             }
         }
@@ -398,7 +393,8 @@ namespace opentuner
             }
             if (!best.HasValue) return;
 
-            int receiver = receiverCount == 1 || e.Y < plot.Top + plot.Height / 2 ? 0 : 1;
+            int receiver = Math.Max(0, Math.Min(receiverCount - 1,
+                (int)((e.Y - plot.Top) * receiverCount / (double)Math.Max(1, plot.Height))));
             signal.Sig selected = best.Value;
             tuned[receiver] = selected;
             detector.set_tuned(selected, receiver);
