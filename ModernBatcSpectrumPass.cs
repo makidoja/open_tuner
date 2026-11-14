@@ -12,7 +12,7 @@ namespace opentuner
         private static bool attached;
         private static ModernBatcSpectrumControl display;
         private static Label spectrumTitle;
-        private static readonly Label[] receiverSquares = new Label[2];
+        private static readonly Label[] receiverSquares = new Label[4];
 
         internal static void SetReceiverIndicatorVisibility(int receiverCount)
         {
@@ -110,7 +110,9 @@ namespace opentuner
                 if (form.IsDisposed) return;
                 form.BeginInvoke((MethodInvoker)delegate
                 {
-                    int tuner = Math.Max(0, Math.Min(1, receiver));
+                    int tuner = receiver;
+                    if (tuner < 0 || tuner >= form.ModernReceiverCount ||
+                        tuner >= freqInputs.Length || tuner >= srInputs.Length) return;
                     decimal mhz = freqKHz / 1000M;
                     if (mhz >= freqInputs[tuner].Minimum && mhz <= freqInputs[tuner].Maximum)
                         freqInputs[tuner].Value = mhz;
@@ -130,7 +132,7 @@ namespace opentuner
             CheckBox[] scanChecks = GetField<CheckBox[]>(form, "autoScanEnabled");
             if (scanChecks != null)
             {
-                for (int rx = 0; rx < Math.Min(2, scanChecks.Length); rx++)
+                for (int rx = 0; rx < Math.Min(4, scanChecks.Length); rx++)
                 {
                     int index = rx;
                     CheckBox check = scanChecks[rx];
@@ -170,7 +172,9 @@ namespace opentuner
                         Text = "",
                         AutoSize = false,
                         Size = new Size(11, 11),
-                        BackColor = rx == 0 ? Color.FromArgb(40, 222, 126) : Color.Gold
+                        BackColor = rx == 0 ? Color.FromArgb(40, 222, 126) :
+                            rx == 1 ? Color.Gold :
+                            rx == 2 ? Color.FromArgb(255, 142, 72) : Color.FromArgb(194, 128, 255)
                     };
                     receiverSquares[rx] = square;
                     card.Controls.Add(square);
@@ -210,13 +214,16 @@ namespace opentuner
             LayoutDisplay(card);
             SetReceiverIndicatorVisibility(form.ModernReceiverCount);
             display.BringToFront();
-            if (form.ModernReceiverCount == 1)
+            CheckBox[] rotatesForVisibility = GetField<CheckBox[]>(form, "rotate30Seconds");
+            Label[] labelsForVisibility = GetField<Label[]>(form, "autoScanStatusLabels");
+            for (int rx = 0; rx < 4; rx++)
             {
-                if (scanChecks != null && scanChecks.Length > 1 && scanChecks[1] != null)
-                    scanChecks[1].Visible = false;
-                Label[] singleStatuses = GetField<Label[]>(form, "autoScanStatusLabels");
-                if (singleStatuses != null && singleStatuses.Length > 1 && singleStatuses[1] != null)
-                    singleStatuses[1].Visible = false;
+                bool visible = rx < form.ModernReceiverCount;
+                if (scanChecks != null && scanChecks[rx] != null) scanChecks[rx].Visible = visible;
+                if (rotatesForVisibility != null && rotatesForVisibility[rx] != null)
+                    rotatesForVisibility[rx].Visible = visible;
+                if (labelsForVisibility != null && labelsForVisibility[rx] != null)
+                    labelsForVisibility[rx].Visible = visible;
             }
 
             card.Resize += delegate { LayoutDisplay(card); };
@@ -235,8 +242,11 @@ namespace opentuner
         {
             if (display == null || display.IsDisposed || card == null) return;
 
-            if (card.Visible && card.Height != 145)
-                card.Height = 145;
+            ModernConceptForm form = FindOwnerForm(card);
+            int receivers = form == null ? 2 : form.ModernReceiverCount;
+            int targetHeight = receivers >= 4 ? 209 : 145;
+            if (card.Visible && card.Height != targetHeight)
+                card.Height = targetHeight;
 
             if (spectrumTitle != null && !spectrumTitle.IsDisposed)
             {
@@ -244,27 +254,26 @@ namespace opentuner
                 spectrumTitle.Width = Math.Max(100, card.ClientSize.Width - 24);
             }
 
-            // One layout authority for the RX1/RX2 control strip; both
-            // selectors and their coloured square share the exact row.
+            // One layout authority for one to four receiver control rows.
+            // RX3/RX4 are only visible in the actual 4 RX configuration.
             const int stripWidth = 265;
             int usableWidth = Math.Max(300, card.ClientSize.Width - 36 - stripWidth);
             int width = Math.Min(1140, usableWidth);
-            int height = 108;
+            int height = receivers >= 4 ? 172 : 108;
             int totalWidth = width + stripWidth;
             int left = Math.Max(12, (card.ClientSize.Width - totalWidth) / 2);
 
             display.Size = new Size(width, height);
             display.Location = new Point(left, 31);
-            ModernConceptForm form = FindOwnerForm(card);
             CheckBox[] checkboxes = GetField<CheckBox[]>(form, "autoScanEnabled");
             CheckBox[] rotates = GetField<CheckBox[]>(form, "rotate30Seconds");
             Label[] statuses = GetField<Label[]>(form, "autoScanStatusLabels");
-            for (int rx = 0; rx < 2; rx++)
+            for (int rx = 0; rx < 4; rx++)
             {
                 CheckBox scan = checkboxes != null ? checkboxes[rx] : null;
                 CheckBox rotate = rotates != null ? rotates[rx] : null;
                 Label square = receiverSquares[rx];
-                int rowTop = display.Top + (rx == 0 ? 5 : 54);
+                int rowTop = display.Top + 4 + (rx * (receivers >= 4 ? 40 : 49));
                 int x = display.Right + 9;
                 if (square != null && !square.IsDisposed)
                 {
@@ -285,7 +294,7 @@ namespace opentuner
                     rotate.Location = new Point(x, rowTop);
                 }
                 if (statuses != null && statuses[rx] != null && !statuses[rx].IsDisposed)
-                    statuses[rx].Location = new Point(display.Right + 12, rowTop + 23);
+                    statuses[rx].Location = new Point(display.Right + 12, rowTop + 22);
             }
         }
     }
