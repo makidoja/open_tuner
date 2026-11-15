@@ -13,7 +13,6 @@ namespace opentuner
         private static PictureBox spectrumProxy;
         private static Button connectButton;
         private static Button sourceSettingsButton;
-        private static Timer connectionTimer;
 
         public static void Attach(ModernConceptForm form)
         {
@@ -47,7 +46,6 @@ namespace opentuner
             if (videoHosts != null) TightenTunerCards(videoHosts);
 
             ConfigureSpectrum(nativeSpectrum);
-            StartConnectionStateTimer(backend);
         }
 
         private static T GetField<T>(ModernConceptForm form, string name) where T : class
@@ -242,31 +240,6 @@ namespace opentuner
 
         private static void StartConnectionStateTimer(MainForm backend)
         {
-            if (connectionTimer != null) return;
-
-            connectionTimer = new Timer { Interval = 250 };
-            connectionTimer.Tick += delegate
-            {
-                if (connectButton == null || connectButton.IsDisposed) return;
-
-                if (backend.BackendConnected)
-                {
-                    connectButton.Text = "CONNECTED";
-                    connectButton.BackColor = Color.FromArgb(22, 140, 85);
-                    connectButton.FlatAppearance.BorderColor = Color.FromArgb(40, 222, 126);
-                    connectButton.ForeColor = Color.White;
-                }
-                else
-                {
-                    connectButton.Text = "CONNECT";
-                    connectButton.BackColor = Color.FromArgb(28, 139, 253);
-                    connectButton.FlatAppearance.BorderColor = Color.FromArgb(28, 139, 253);
-                    connectButton.ForeColor = Color.White;
-                }
-            };
-            connectionTimer.Start();
-        }
-
         private static Button ToolButton(string text, Action click)
         {
             Button b = new Button
