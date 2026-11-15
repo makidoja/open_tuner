@@ -238,8 +238,6 @@ namespace opentuner
                 menu.Show(sourceSettingsButton, new Point(0, sourceSettingsButton.Height));
         }
 
-        private static void StartConnectionStateTimer(MainForm backend)
-        {
         private static Button ToolButton(string text, Action click)
         {
             Button b = new Button
