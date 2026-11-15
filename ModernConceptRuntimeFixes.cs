@@ -14,7 +14,6 @@ namespace opentuner
         private static bool quickTuneHooked;
         private static bool navigationHooked;
         private static bool videoOwnershipHooked;
-        private static Timer connectionStatusTimer;
 
         public static void Attach(ModernConceptForm form)
         {
@@ -29,7 +28,6 @@ namespace opentuner
                 HookQuickTune(form);
                 HookNavigation(form);
                 StabiliseVideoOwnership(form);
-                StartConnectionStatusCorrection(form);
             };
 
             form.Resize += delegate { ApplyCompactSpectrumLayout(form); };
@@ -122,18 +120,13 @@ namespace opentuner
             MainForm backend = GetBackend(form);
             Panel[] hosts = GetVideoHosts(form);
             MethodInfo adoptMethod = typeof(ModernConceptForm).GetMethod("AdoptVideoControls", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo timerField = typeof(ModernConceptForm).GetField("uiTimer", BindingFlags.Instance | BindingFlags.NonPublic);
-            Timer legacyTimer = timerField == null ? null : timerField.GetValue(form) as Timer;
-
             if (backend == null || hosts == null || adoptMethod == null) return;
 
             // The legacy modern form polled every 300 ms and repeatedly attempted to
             // re-parent player controls. That could cross thread ownership boundaries.
             // Stop that poller and attach video controls only from the UI thread when
             // the backend actually starts producing receiver data.
-            if (legacyTimer != null)
-                legacyTimer.Stop();
-
+            
             Action attachIfNeeded = delegate
             {
                 if (form.IsDisposed) return;
@@ -163,16 +156,7 @@ namespace opentuner
                 catch { }
             };
 
-            form.FormClosed += delegate
-            {
-                if (connectionStatusTimer != null)
-                {
-                    connectionStatusTimer.Stop();
-                    connectionStatusTimer.Dispose();
-                    connectionStatusTimer = null;
-                }
-            };
-
+            
             videoOwnershipHooked = true;
         }
 
@@ -271,42 +255,5 @@ namespace opentuner
             {
             }
         }
-
-        private static void StartConnectionStatusCorrection(ModernConceptForm form)
-        {
-            if (connectionStatusTimer != null) return;
-
-            MainForm backend = GetBackend(form);
-            FieldInfo pillField = typeof(ModernConceptForm).GetField("connectionPill", BindingFlags.Instance | BindingFlags.NonPublic);
-            Label pill = pillField == null ? null : pillField.GetValue(form) as Label;
-            if (backend == null || pill == null) return;
-
-            connectionStatusTimer = new Timer { Interval = 350 };
-            connectionStatusTimer.Tick += delegate
-            {
-                try
-                {
-                    if (!backend.BackendSourceInitialised) return;
-
-                    if (backend.BackendTransportConnected)
-                    {
-                        pill.Text = "● CONNECTED";
-                        pill.ForeColor = Color.FromArgb(40, 222, 126);
-                        pill.BackColor = Color.FromArgb(17, 56, 44);
-                    }
-                    else
-                    {
-                        string mode = backend.BackendInterfaceDescription ?? "";
-                        pill.Text = mode.IndexOf("WebSocket", StringComparison.OrdinalIgnoreCase) >= 0 ? "WS ERROR" : "CONNECTING";
-                        pill.ForeColor = Color.OrangeRed;
-                        pill.BackColor = Color.FromArgb(70, 30, 24);
-                    }
-                }
-                catch
-                {
-                }
-            };
-            connectionStatusTimer.Start();
-        }
-    }
+  }
 }
