@@ -115,9 +115,7 @@ namespace opentuner
             {
                 // Scan must run independently of video adoption and status UI.
                 // An exception in those paths previously left Auto Scan ARMED.
-                try { AdoptVideoControls(); }
-                catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
-                try { RefreshConnectionState(); }
+                  try { RefreshConnectionState(); }
                 catch (Exception ex) { Serilog.Log.Warning(ex, "Connection status refresh failed"); }
             };
             uiTimer.Start();
