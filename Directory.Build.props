@@ -3,10 +3,6 @@
     <OutputType>WinExe</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="ModernDashboard.cs" Condition="Exists('ModernDashboard.cs')" />
-    <Compile Include="ModernTunerLayout.cs" Condition="Exists('ModernTunerLayout.cs')" />
-    <Compile Include="ModernSourceSettings.cs" Condition="Exists('ModernSourceSettings.cs')" />
-    <Compile Include="ModernChromeCleanup.cs" Condition="Exists('ModernChromeCleanup.cs')" />
     <Compile Include="ModernBackendBridge.cs" Condition="Exists('ModernBackendBridge.cs')" />
     <Compile Include="ModernBackendAudioBridge.cs" Condition="Exists('ModernBackendAudioBridge.cs')" />
     <Compile Include="ModernBackendConnectionBridge.cs" Condition="Exists('ModernBackendConnectionBridge.cs')" />
@@ -31,7 +27,6 @@
     <Compile Include="ModernTunerDiagnostics.cs" Condition="Exists('ModernTunerDiagnostics.cs')" />
     <Compile Include="ModernConstellationControl.cs" Condition="Exists('ModernConstellationControl.cs')" />
     <Compile Include="ModernConstellationPass.cs" Condition="Exists('ModernConstellationPass.cs')" />
-    <Compile Include="ModernMainForm.cs" Condition="Exists('ModernMainForm.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
     <Compile Include="MediaSources\Winterhill\WinterHillModernSupport.cs" Condition="Exists('MediaSources\Winterhill\WinterHillModernSupport.cs')" />
