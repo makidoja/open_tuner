@@ -1,0 +1,949 @@
+﻿using opentuner.MediaSources.Minitiouner.HardwareInterfaces;
+using opentuner.Utilities;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+using opentuner.MediaPlayers;
+using Serilog;
+
+namespace opentuner.MediaSources.Minitiouner
+{
+    public partial class MinitiounerSource : OTSource
+    {
+        public MTHardwareInterface hardware_interface;
+        public bool hardware_connected = false;
+
+        public int ts_devices = 1;
+
+        ConcurrentQueue<TunerConfig> config_queue = new ConcurrentQueue<TunerConfig>();
+
+        public CircularBuffer ts_data_queue = new CircularBuffer(GlobalDefines.CircularBufferStartingCapacity);
+        public CircularBuffer ts_data_queue2 = new CircularBuffer(GlobalDefines.CircularBufferStartingCapacity);
+
+        public TSThread ts_thread;
+        public TSThread ts_thread2;
+
+        Thread ts_parser_t = null;
+        Thread ts_parser_2_t = null;
+
+        // threads
+        Thread nim_thread_t = null;
+
+        Thread ts_thread_t = null;
+        Thread ts_thread_2_t = null;
+        private bool receiverThreadsStarted;
+
+        bool T1P2_prevLocked = false;
+        bool T2P1_prevLocked = false;
+
+
+        List<OTMediaPlayer> _media_player = new List<OTMediaPlayer> ();
+        private List<TSRecorder> _ts_recorders;
+        private List<TSUdpStreamer> _ts_streamers;
+        private List<TunerControlForm> _tuner_forms;
+
+        string _mediapath = "";
+
+        public override bool DeviceConnected
+        {
+            get { return hardware_connected; }
+        }
+
+
+        // tuner specific
+
+        // OTSource Properties
+        private uint current_rf_input_0 = nim.NIM_INPUT_TOP;
+        private uint current_rf_input_1 = nim.NIM_INPUT_TOP;
+        private uint current_frequency_0 = 0;
+        private uint current_frequency_1 = 0;
+        private uint current_sr_0 = 0;
+        private uint current_sr_1 = 0;
+
+        private bool current_tone_22kHz_P1 = false;
+        private uint current_offset_0 = 0;
+        private uint current_offset_1 = 0;
+
+        private byte current_lnba_psu = 0;
+        private byte current_lnbb_psu = 0;
+
+        private string last_service_name_0 = "";
+        private string last_service_provider_0 = "";
+        private string last_dbm_0 = "";
+        private string last_mer_0 = "";
+
+        private string last_service_name_1 = "";
+        private string last_service_provider_1 = "";
+        private string last_dbm_1 = "";
+        private string last_mer_1 = "";
+
+
+        private VideoChangeCallback VideoChangeCB;
+
+        // todo: this is the callback we want to remove and keep internal
+        private SourceStatusCallback SourceStatusCB;
+
+        public string HardwareDevice { get; set; }
+
+        private int _hardwareInterface = 0;
+
+        // 0 = ftdi
+        // 1 = picotuner
+        // 2 = picotuner ethernet
+
+        private SettingsManager<MinitiounerSettings> _settingsManager;
+        private MinitiounerSettings _settings;
+
+        public MinitiounerSource() 
+        {
+            // settings
+            _settings = new MinitiounerSettings();
+            _settingsManager = new SettingsManager<MinitiounerSettings>("minitiouner_settings");
+            _settings = (_settingsManager.LoadSettings(_settings));
+        }
+
+        public override int GetVideoSourceCount()
+        {
+            return ts_devices;
+        }
+
+        public override string GetDeviceName()
+        {
+            return HardwareDevice;
+        }
+
+        public override void RegisterTSConsumer(int device, CircularBuffer ts_buffer_queue)
+        {
+            switch (device)
+            {
+                case 0: ts_thread.RegisterTSConsumer(ts_buffer_queue); break;
+                case 1: ts_thread2.RegisterTSConsumer(ts_buffer_queue); break;
+            }
+        }
+
+
+        public override void StartStreaming(int device)
+        {
+            switch(device)
+            {
+                case 0:
+                    if (ts_thread != null)
+                        ts_thread.start_ts();
+                    break;
+                case 1:
+                    if (ts_thread2 != null)
+                        ts_thread2.start_ts();
+                    break;
+            }
+        }
+
+        public override void StopStreaming(int device)
+        {
+            switch (device)
+            {
+                case 0:
+                    if (ts_thread != null)
+                        ts_thread.stop_ts();
+                    break;
+                case 1:
+                    if (ts_thread2 != null)
+                        ts_thread2.stop_ts();
+                    break;
+            }
+        }
+
+
+        public override long GetFrequency(int device, bool offset_included)
+        {
+            long frequency = 0;
+
+            switch (device)
+            {
+                case 0:  
+                    int offset0 = offset_included ? (int)current_offset_0 : 0;
+                    frequency = current_frequency_0 + offset0; 
+                    break;
+                case 1:  
+                    int offset1 = offset_included ? (int)current_offset_1 : 0;
+                    frequency = current_frequency_1 + offset1; 
+                    break;
+            }
+
+            return frequency;
+        }
+
+        // device : 0 = Tuner 1, 1 = Tuner 2
+        public override void SetFrequency(int device, uint frequency, uint symbol_rate, bool offset_included)
+        {
+            uint freq = 0;
+            
+            if (device == 0 )
+                freq = frequency - (offset_included ? current_offset_0 : 0);
+            else
+                freq = frequency - (offset_included ? current_offset_1 : 0);
+
+            change_frequency((byte)(device), freq, symbol_rate,  (device == 0 ? current_rf_input_0 : current_rf_input_1 ), current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+        }
+
+
+        public void change_frequency(byte device, UInt32 freq, UInt32 sr,  uint rf_input, bool tone_22kHz_P1, byte lnbA_supply, byte lnbB_supply)
+        {
+            if (!hardware_connected)
+                return;
+
+            if (device >= GetVideoSourceCount())
+            {
+                return;
+            }
+
+            Log.Information("Change Frequency: " + device.ToString());
+
+            switch (rf_input)
+            {
+                case nim.NIM_INPUT_TOP: Log.Information("RF Input: Nim Input Top Specified"); break;
+                case nim.NIM_INPUT_BOTTOM: Log.Information("RF Input: Nim Input Bottom Specified"); break;
+                default: Log.Information("Error: Invalid RF Input: " + rf_input.ToString()); break;
+            }
+
+            TunerConfig newConfig = new TunerConfig();
+
+            newConfig.tuner = (byte)(device+1);
+            newConfig.frequency = freq;
+            newConfig.symbol_rate = sr;
+            newConfig.rf_input = rf_input;
+            newConfig.tone_22kHz_P1 = tone_22kHz_P1;
+            newConfig.lnba_psu = lnbA_supply;
+            newConfig.lnbb_psu = lnbB_supply;
+
+            if (newConfig.frequency < 144000 || newConfig.frequency > 2450000)
+            {
+                Log.Information("Error: Invalid Frequency: " + newConfig.frequency);
+                return;
+            }
+
+            Log.Information("Main: New Config: " + newConfig.ToString());
+
+            if (device == 0)
+            {
+                current_frequency_0 = newConfig.frequency;
+                current_sr_0 = sr;
+                current_rf_input_0 = rf_input;
+
+                if (VideoChangeCB != null)
+                {
+                    VideoChangeCB(1, false);
+                }
+               
+            }
+            else
+            {
+                current_frequency_1 = newConfig.frequency;
+                current_sr_1 = sr;
+                current_rf_input_1 = rf_input;
+
+                if (VideoChangeCB != null)
+                {
+                    VideoChangeCB(2, false);
+                }
+
+            }
+
+            current_tone_22kHz_P1 = tone_22kHz_P1;
+
+            config_queue.Enqueue(newConfig);
+
+            
+
+            if (_tuner_forms[device] != null)
+            {
+                _tuner_forms[device].UpdateTuner( (device == 0) ? current_frequency_0 : current_frequency_1, (device == 0) ? current_sr_0 : current_sr_0, (device == 0 ) ? current_offset_0 : current_offset_1);
+            }
+
+        }
+
+        //public byte set_polarization_supply(byte lnb_num, bool supply_enable, bool supply_horizontal)
+        //{
+        //    return hardware_interface.hw_set_polarization_supply(lnb_num, supply_enable, supply_horizontal);
+        //}
+
+        public override int Initialize(VideoChangeCallback VideoChangeCB, Control Parent)
+        {            
+            switch (_settings.DefaultInterface)
+            {
+                case 0:
+                    var hw_ask = new ChooseMinitiounerHardwareInterfaceForm();
+
+                    if (hw_ask.ShowDialog() == DialogResult.OK)
+                    {
+                        switch(hw_ask.comboHardwareSelect.SelectedIndex)
+                        {
+                            case 0: hardware_interface = new FTDIInterface(); break;
+                            case 1: hardware_interface = new PicoTunerInterface(); break;
+                        }
+                    }
+                    else return -1;
+
+                    break;
+                case 1: hardware_interface = new FTDIInterface(); break;
+                case 2: hardware_interface = new PicoTunerInterface(); break;
+            }
+
+
+            return Initialize(VideoChangeCB, SourceStatusCB, false, "", "", "", Parent);
+        }
+
+        public void nim_status_feedback(TunerStatus nim_status)
+        {
+            bool T1P2locked = false;
+            bool T2P1Locked = false;
+
+            if (nim_status.T1P2_demod_status >= 2) T1P2locked = true;
+            if (nim_status.T2P1_demod_status >= 2) T2P1Locked = true;
+
+
+            if (T1P2_prevLocked != T1P2locked)
+            {
+                Log.Information("T1P2 - Lock State Change: " + T1P2_prevLocked.ToString() + "->" + T1P2locked.ToString());
+
+                if (nim_status.T1P2_demod_status >= 2)
+                {
+                    if (VideoChangeCB != null)
+                    {
+                        VideoChangeCB(1, true);
+                    }
+                    hardware_interface.hw_ts_led(0, true);
+                }
+                else
+                {
+                    if (VideoChangeCB != null)
+                    {
+                        VideoChangeCB(1, false);
+                    }
+
+                    hardware_interface.hw_ts_led(0, false);
+                }
+
+                T1P2_prevLocked = T1P2locked;
+            }
+
+            if (GetVideoSourceCount() == 2)
+            {
+                if (T2P1_prevLocked != T2P1Locked)
+                {
+                    Log.Information("T2P1 - Lock State Change: " + T2P1_prevLocked.ToString() + "->" + T2P1Locked.ToString());
+
+                    if (nim_status.T2P1_demod_status >= 2)
+                    {
+                        if (VideoChangeCB != null)
+                        {
+                            VideoChangeCB(2, true);
+                        }
+
+                        hardware_interface.hw_ts_led(1, true);
+                    }
+                    else
+                    {
+                        if (VideoChangeCB != null)
+                        {
+                            VideoChangeCB(2, false);
+                        }
+
+                        hardware_interface.hw_ts_led(1, false);
+                    }
+
+                    T2P1_prevLocked = T2P1Locked;
+                }
+            }
+
+            nim_status.T2P1_requested_frequency = current_frequency_0;
+            nim_status.T1P2_requested_frequency = current_frequency_1;
+
+            // update properties
+            UpdateTunerProperties(nim_status);
+        }
+
+        // Modern UI RF input bridge. The USB MiniTiouner uses NIM_INPUT_TOP
+        // and NIM_INPUT_BOTTOM rather than WinterHill's input numbering.
+        public string ModernGetRfInput(int tuner)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return "—";
+            uint value = tuner == 0 ? current_rf_input_0 : current_rf_input_1;
+            return value == nim.NIM_INPUT_BOTTOM ? "B" : "A";
+        }
+
+        public void ModernSetRfInput(int tuner, int input)
+        {
+            if (!hardware_connected || tuner < 0 || tuner >= GetVideoSourceCount()) return;
+            if (input != 0 && input != 1) return;
+
+            uint requested = input == 1 ? nim.NIM_INPUT_BOTTOM : nim.NIM_INPUT_TOP;
+            uint current = tuner == 0 ? current_rf_input_0 : current_rf_input_1;
+            if (requested != current)
+                ChangeRFInput((byte)tuner, requested);
+        }
+
+        // Modern UI LNB supply bridge. psu: 0 = off, 1 = 13 V (vertical),
+        // 2 = 18 V (horizontal), as used by the legacy LNBA_/LNBB_ commands.
+        // Like those commands, this changes the running state only; the
+        // start-up default stays in the MiniTiouner settings.
+        public bool ModernSupportsLnbPower
+        {
+            get { return hardware_connected; }
+        }
+
+        public int ModernGetLnbVoltage(int output)
+        {
+            if (output < 0 || output > 1) return 0;
+            byte psu = output == 0 ? current_lnba_psu : current_lnbb_psu;
+            return psu == 1 ? 13 : psu == 2 ? 18 : 0;
+        }
+
+        public void ModernSetLnbVoltage(int output, int volts)
+        {
+            if (!hardware_connected || output < 0 || output > 1) return;
+            if (volts != 0 && volts != 13 && volts != 18) return;
+
+            byte psu = volts == 13 ? (byte)1 : volts == 18 ? (byte)2 : (byte)0;
+            if (output == 0) current_lnba_psu = psu; else current_lnbb_psu = psu;
+            Log.Information("Modern UI: MiniTiouner LNB {Output} supply -> {Volts} V", output == 0 ? "A" : "B", volts);
+            change_frequency(0, current_frequency_0, current_sr_0, current_rf_input_0,
+                current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+        }
+
+        // Modern UI LO offset bridge (kHz, e.g. 9750000 for a 9750 MHz LO).
+        // SetFrequency(..., offset_included: true) subtracts this offset, which is
+        // how BackendTune drives the USB source.
+        public long ModernGetOffset(int tuner)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return 0;
+            return tuner == 0 ? current_offset_0 : current_offset_1;
+        }
+
+        public void ModernSetOffset(int tuner, long offsetKHz)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return;
+            if (offsetKHz < 0 || offsetKHz > 15000000) return;
+            if (tuner == 0) current_offset_0 = (uint)offsetKHz;
+            else current_offset_1 = (uint)offsetKHz;
+            Log.Information("Modern UI: MiniTiouner tuner {Tuner} LO offset -> {Offset} kHz", tuner + 1, offsetKHz);
+
+            // Keep the legacy tuner panel in step when it exists (it is created
+            // only once the source's properties UI has been built).
+            if (_tuner_forms != null && tuner < _tuner_forms.Count && _tuner_forms[tuner] != null)
+                _tuner_forms[tuner].UpdateTuner(tuner == 0 ? current_frequency_0 : current_frequency_1,
+                    tuner == 0 ? current_sr_0 : current_sr_1, tuner == 0 ? current_offset_0 : current_offset_1);
+        }
+
+        private void ChangeRFInput(byte Tuner, uint RFInput)
+        {
+            switch(Tuner)
+            {
+                case 0: 
+                    change_frequency(Tuner, current_frequency_0, current_sr_0, RFInput, current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+                    break;
+                case 1:
+                    change_frequency(Tuner, current_frequency_1, current_sr_1, RFInput, false, current_lnba_psu, current_lnbb_psu);
+                    break;
+            }
+
+        }
+
+        private void ChangeSymbolRate(byte Tuner, uint SymbolRate)
+        {
+            switch (Tuner)
+            {
+                case 0:
+                    change_frequency(Tuner, current_frequency_0, SymbolRate, current_rf_input_0, current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+                    break;
+                case 1:
+                    change_frequency(Tuner, current_frequency_1, SymbolRate, current_rf_input_1, false, current_lnba_psu, current_lnbb_psu);
+                    break;
+            }
+        }
+
+        private void ChangeOffset(byte Tuner, int offset)
+        {
+            switch(Tuner)
+            {
+                case 0:
+                    current_offset_0 = (uint)offset;
+                    break;
+                case 1:
+                    current_offset_1 = (uint)offset;
+                    break;
+            }
+
+            if (_tuner_forms[Tuner] != null)
+            {
+                _tuner_forms[Tuner].UpdateTuner((Tuner == 0) ? current_frequency_0 : current_frequency_1, (Tuner == 0) ? current_sr_0 : current_sr_0, (Tuner == 0) ? current_offset_0 : current_offset_1);
+            }
+
+        }
+
+        private int Initialize(VideoChangeCallback VideoChangeCB, SourceStatusCallback SourceStatusCB, bool manual, string i2c_serial, string ts_serial, string ts2_serial, Control Parent)
+        {
+
+            this.VideoChangeCB = VideoChangeCB;
+            this.SourceStatusCB = SourceStatusCB;
+
+            hardware_init(manual, i2c_serial, ts_serial, ts2_serial);
+
+            if (!hardware_connected)
+            {
+                MessageBox.Show("Error: No Working Hardware Detected");
+                return -1;
+            }
+
+            // build properties
+            _parent = Parent;
+            BuildSourceProperties();
+
+            _source_properties.UpdateValue("source_hw_interface", hardware_interface.GetName);
+
+            Log.Information("Main: Starting Nim Thread");
+
+            Log.Information("Switch LED's");
+            
+            
+            // switch off ts leds
+            hardware_interface.hw_ts_led(0, false);
+            hardware_interface.hw_ts_led(1, false);
+
+            // configure nim thread
+            NimThread nim_thread = new NimThread(config_queue, hardware_interface, nim_status_feedback, false);
+            nim_thread_t = new Thread(nim_thread.worker_thread);
+
+
+
+            /*
+             
+            TODO: default lnb voltage supply settings
+
+            // set default lnb supply
+            Log.Information(current_enable_lnb_supply.ToString());
+            Log.Information(current_enable_horiz_supply.ToString());
+
+            */
+
+            /*
+            current_lnba_psu = _settings.DefaultLnbASupply;
+            switch (current_lnba_psu)
+            {
+                case 0: hardware_interface.hw_set_polarization_supply(0, false, false);
+                    break;
+                case 1:
+                    hardware_interface.hw_set_polarization_supply(0, true, false);
+                    break;
+                case 2:
+                    hardware_interface.hw_set_polarization_supply(0, true, true);
+                    break;
+            }
+
+            current_lnbb_psu = _settings.DefaultLnbBSupply;
+            switch (current_lnbb_psu)
+            {
+                case 0:
+                    hardware_interface.hw_set_polarization_supply(1, false, false);
+                    break;
+                case 1:
+                    hardware_interface.hw_set_polarization_supply(1, true, false);
+                    break;
+                case 2:
+                    hardware_interface.hw_set_polarization_supply(1, true, true);
+                    break;
+            }
+            */
+
+            current_lnba_psu = _settings.DefaultLnbASupply;
+            current_lnbb_psu = _settings.DefaultLnbBSupply;
+
+            current_tone_22kHz_P1 = false;
+
+            
+            hardware_interface.hw_set_polarization_supply(1, false, false);
+
+            // set startup rf inputs according to settings
+            current_rf_input_0 = nim.NIM_INPUT_TOP;
+            current_rf_input_1 = nim.NIM_INPUT_TOP;
+
+            switch (_settings.DefaultRFInput )
+            {
+                case 1:
+                    current_rf_input_0 = nim.NIM_INPUT_TOP;
+                    current_rf_input_1 = nim.NIM_INPUT_BOTTOM;
+                    break;
+                case 2:
+                    current_rf_input_0 = nim.NIM_INPUT_BOTTOM;
+                    current_rf_input_1 = nim.NIM_INPUT_TOP;
+                    break;
+                case 3:
+                    current_rf_input_0 = nim.NIM_INPUT_BOTTOM;
+                    current_rf_input_1 = nim.NIM_INPUT_BOTTOM;
+                    break;
+            }
+
+            current_frequency_0 = 741525;
+            current_frequency_1 = 741525;
+
+            current_offset_0 = _settings.Offset1;
+            current_offset_1 = _settings.Offset2;
+
+            current_sr_0 = 1500;
+            current_sr_1 = 1500;
+
+            // setup tuner 0
+            change_frequency(0, current_frequency_0, current_sr_0, current_rf_input_0, current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+
+            if (ts_devices == 2)
+            {
+                // setup tuner 1
+                change_frequency(1, current_frequency_1, current_sr_1, current_rf_input_1, current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+            }
+
+            // Prepare worker objects now, but delay their start until
+            // SourceConnect has configured players, TS recorders and streamers.
+            receiverThreadsStarted = false;
+
+
+            // TS thread - T1P2
+            ts_thread = new TSThread(ts_data_queue, FlushTS2, ReadTS2, "MT TS2");
+            ts_thread_t = new Thread(ts_thread.worker_thread);
+
+
+            if (ts_devices == 2)
+            {
+                ts_thread2 = new TSThread(ts_data_queue2, FlushTS1, ReadTS1, "MT TS1");
+                ts_thread_2_t = new Thread(ts_thread2.worker_thread);
+
+            }
+
+            // start TS Parser 
+            TSParserThread ts_parser_thread = new TSParserThread(parse_ts_data_callback);
+            RegisterTSConsumer(0, ts_parser_thread.parser_ts_data_queue);
+            ts_parser_t = new Thread(ts_parser_thread.worker_thread);
+
+
+            if (ts_devices == 2)
+            {
+                TSParserThread ts_parser_thread2 = new TSParserThread(parse_ts2_data_callback);
+                RegisterTSConsumer(1, ts_parser_thread2.parser_ts_data_queue);
+                ts_parser_2_t = new Thread(ts_parser_thread2.worker_thread);
+
+            }
+
+            return ts_devices;
+        }
+
+        // Called by MainForm only after ConfigureMediaPlayers, ConfigureTSRecorders,
+        // ConfigureTSStreamers and the source-data callback are installed.
+        // Starting NIM earlier allowed its first no-lock status to dereference
+        // the not-yet-configured _ts_recorders/_ts_streamers lists.
+        public void StartReceiverThreadsAfterConfiguration()
+        {
+            if (receiverThreadsStarted || !hardware_connected) return;
+            receiverThreadsStarted = true;
+            Log.Information("[MINITIOUNER-USB] Starting receiver workers after player/recorder/streamer setup");
+            // TS workers and parsers are ready before the first NIM status.
+            ts_thread_t?.Start();
+            ts_thread_2_t?.Start();
+            ts_parser_t?.Start();
+            ts_parser_2_t?.Start();
+            nim_thread_t?.Start();
+        }
+
+        public void parse_ts_data_callback(TSStatus ts_status)
+        {
+            UpdateTSProperties(1, ts_status);
+        }
+
+        public void parse_ts2_data_callback(TSStatus ts_status)
+        {
+            UpdateTSProperties(2, ts_status);
+        }
+
+
+        public override CircularBuffer GetVideoDataQueue(int device)
+        {
+            switch (device)
+            {
+                case 0: return ts_data_queue;
+                case 1: return ts_data_queue2;
+            }
+
+            return ts_data_queue;
+        }
+
+        void FlushTS2()
+        {
+            hardware_interface.transport_flush(PicoTunerInterface.TS2);
+        }
+
+        byte ReadTS2(ref byte[] data, ref uint dataRead)
+        {
+            byte err = hardware_interface.transport_read(PicoTunerInterface.TS2, ref data, ref dataRead);
+            DataReceived(PicoTunerInterface.TS2);
+            return err;
+        }
+
+        byte ReadTS1(ref byte[] data, ref uint dataRead)
+        {
+            byte err = hardware_interface.transport_read(PicoTunerInterface.TS1, ref data, ref dataRead);
+            DataReceived(PicoTunerInterface.TS1);
+            return err;
+        }
+
+
+        void FlushTS1()
+        {
+            hardware_interface.transport_flush(PicoTunerInterface.TS1);
+        }
+
+
+        private void DataReceived(byte TS)
+        {
+            if (TS == 1)
+            {
+                ts_thread.NewDataPresent();
+            }
+            else
+            {
+                ts_thread2.NewDataPresent();
+            }
+        }
+
+        private void hardware_init(bool manual, string i2c_serial, string ts_serial, string ts2_serial)
+        {
+
+            // detect ftdi devices
+            uint i2c_port = 99;
+            uint ts_port = 99;
+            uint ts_port2 = 99;
+
+            string deviceName = "Unknown";
+
+            byte err = 0;
+
+            Log.Information("[MINITIOUNER-USB] Starting {Mode} detection on {Interface}",
+                manual ? "manual" : "automatic", hardware_interface.GetName);
+            if (manual)
+                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2,
+                    ref deviceName, i2c_serial, ts_serial, ts2_serial);
+            else
+                err = hardware_interface.hw_detect(ref i2c_port, ref ts_port, ref ts_port2,
+                    ref deviceName);
+
+            Log.Information("[MINITIOUNER-USB] Detection result={Result}, name={Device}, I2C={I2C}, TS1={TS1}, TS2={TS2}",
+                err, deviceName, i2c_port, ts_port, ts_port2);
+
+            // Never open arbitrary FTDI port indices 0/1 when detection fails:
+            // another USB device may occupy those positions. Fail cleanly.
+            if (err != 0 || i2c_port == 99 || ts_port == 99)
+            {
+                Log.Error("[MINITIOUNER-USB] No complete FTDI interface pair detected; aborting initialization without opening guessed ports");
+                hardware_connected = false;
+                ts_devices = 1;
+                return;
+            }
+
+            ts_devices = ts_port2 == 99 ? 1 : 2;
+            Log.Information("[MINITIOUNER-USB] Initializing detected ports");
+            err = hardware_interface.hw_init(i2c_port, ts_port, ts_port2);
+            Log.Information("[MINITIOUNER-USB] Hardware initialization result={Result}", err);
+
+            if (err != 0)
+            {
+                Log.Information("Main: Error: FTDI Failed " + err.ToString());
+                hardware_connected = false;
+                return;
+            }
+
+            hardware_connected = true;
+
+            HardwareDevice = deviceName;
+        }
+
+
+
+        public override void ConfigureVideoPlayers(List<OTMediaPlayer> MediaPlayers)
+        {
+            if (MediaPlayers.Count != ts_devices)
+            {
+                Log.Information("Error: MinitiounerSource Expected " +  ts_devices.ToString() + " video players, but only received " + MediaPlayers.Count);
+            }
+
+            for (int c = 0; c < MediaPlayers.Count; c++)
+            {
+                _media_player.Add(MediaPlayers[c]);
+                _media_player[c].onVideoOut += MinitiounerSource_onVideoOut;
+                if (_settings.DefaultMuted[c])
+                {
+                    _media_player[c].SetVolume(0);
+                }
+                else
+                {
+                    _media_player[c].SetVolume((int)_settings.DefaultVolume[c]);
+                }
+            }
+
+        }
+
+        private void MinitiounerSource_onVideoOut(object sender, MediaStatus e)
+        {
+            for (int c = 0; c < _media_player.Count; c++)
+            {
+                if ((OTMediaPlayer)sender == _media_player[c])
+                {
+                    preMute[c] = (int)_settings.DefaultVolume[c];
+                    muted[c] = _settings.DefaultMuted[c];
+                    if (muted[c] == true)
+                    {
+                        _media_player[c].SetVolume(0);
+                    }
+                    else
+                    {
+                        _media_player[c].SetVolume(preMute[c]);
+                    }
+
+                    UpdateMediaProperties(c, e);
+                    break;
+                }
+            }
+        }
+
+        public override string GetName()
+        {
+            return "Minitiouner Variant";
+        }
+
+        public override void OverrideDefaultMuted(bool Override)
+        {
+            if (Override)
+            {
+                preMute[0] = (int)_settings.DefaultVolume[0];               // save DefaultVolume in preMute
+                _tuner1_properties.UpdateValue("volume_slider_1", "0");     // side effect: will set DefaultVolume to 0
+                _tuner1_properties.UpdateMuteButtonColor("media_controls_1", Color.PaleVioletRed);
+                muted[0] = _settings.DefaultMuted[0] = true;
+                _settings.DefaultVolume[0] = (uint)preMute[0];              // restore DefaultVolume
+
+                if (ts_devices == 2)
+                {
+                    preMute[1] = (int)_settings.DefaultVolume[1];           // save DefaultVolume in preMute
+                    _tuner2_properties.UpdateValue("volume_slider_2", "0"); // side effect: will set DefaultVolume to 0
+                    _tuner2_properties.UpdateMuteButtonColor("media_controls_2", Color.PaleVioletRed);
+                    muted[1] = _settings.DefaultMuted[1] = true;
+                    _settings.DefaultVolume[1] = (uint)preMute[1];          // restore DefaultVolume
+                }
+            }
+        }
+
+        public override string GetDescription()
+        {
+            return "Minitiouner Variant" +
+            Environment.NewLine + Environment.NewLine +
+            "Should work with most Minitiouner Variants" +
+            Environment.NewLine + Environment.NewLine +
+            "Select FTDI or PicoTuner interface in Settings";
+        }
+
+        public override void Close()
+        {
+            // Shut down worker threads before releasing the USB handles.
+            // Aborted .NET Framework workers must finish before the next
+            // MiniTiouner/PicoTuner USB connection begins.
+            _settingsManager.SaveSettings(_settings);
+            foreach (Thread worker in new[] {
+                nim_thread_t, ts_parser_t, ts_parser_2_t, ts_thread_t, ts_thread_2_t })
+            {
+                if (worker == null || !worker.IsAlive) continue;
+                try { worker.Abort(); }
+                catch (System.Threading.ThreadStateException) { }
+            }
+            foreach (Thread worker in new[] {
+                nim_thread_t, ts_parser_t, ts_parser_2_t, ts_thread_t, ts_thread_2_t })
+            {
+                if (worker == null || !worker.IsAlive) continue;
+                try
+                {
+                    if (!worker.Join(2000))
+                        Log.Warning("[MINITIOUNER-USB] Worker {Thread} has not stopped yet", worker.Name ?? "(unnamed)");
+                }
+                catch (System.Threading.ThreadStateException) { }
+            }
+            try
+            {
+                if (hardware_connected && hardware_interface != null)
+                {
+                    hardware_interface.hw_ts_led(0, false);
+                    hardware_interface.hw_ts_led(1, false);
+                }
+            }
+            catch (Exception ex) { Log.Warning(ex, "[MINITIOUNER-USB] Turning off TS LEDs"); }
+            try { hardware_interface?.hw_close(); }
+            catch (Exception ex) { Log.Warning(ex, "[MINITIOUNER-USB] Closing hardware"); }
+            finally
+            {
+                hardware_connected = false;
+                receiverThreadsStarted = false;
+            }
+            Log.Information("[MINITIOUNER-USB] Receiver closed and USB interfaces released");
+        }
+
+        public override void ShowSettings()
+        {
+            MinitiounerSettingsForm settings_form = new MinitiounerSettingsForm(ref _settings);
+            if (settings_form.ShowDialog() == DialogResult.OK) 
+            {
+                _settingsManager.SaveSettings(_settings); 
+            }
+            
+        }
+
+        public override void ConfigureTSRecorders(List<TSRecorder> TSRecorders)
+        {
+            _ts_recorders = TSRecorders;
+            
+            for (int c = 0; c < _ts_recorders.Count; c++)
+            {
+                _ts_recorders[c].onRecordStatusChange += MinitiounerSource_onRecordStatusChange;
+            }
+        }
+
+        private void MinitiounerSource_onRecordStatusChange(object sender, bool e)
+        {
+            Log.Information(((TSRecorder)(sender)).ID.ToString() + " recording status : " + e.ToString());
+        }
+
+        public override void ConfigureTSStreamers(List<TSUdpStreamer> TSStreamers)
+        {
+            _ts_streamers = TSStreamers;
+            
+            for (int c = 0; c < _ts_streamers.Count; c++)
+            {
+                _ts_streamers[c].onStreamStatusChange += MinitiounerSource_onStreamStatusChange;
+            }
+        }
+
+        private void MinitiounerSource_onStreamStatusChange(object sender, bool e)
+        {
+            Log.Information(((TSUdpStreamer)(sender)).ID.ToString() + " streaming status : " + e.ToString());
+        }
+
+        public override void ConfigureMediaPath(string MediaPath)
+        {
+            _mediapath = MediaPath;
+        }
+
+        public override string GetMoreInfoLink()
+        {
+            return "https://www.zr6tg.co.za/opentuner-minitiouner-source/";
+        }
+    }
+}

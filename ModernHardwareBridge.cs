@@ -15,7 +15,9 @@ namespace opentuner
             get
             {
                 WinterHillSource wh = BackendWinterHill();
-                return wh != null && wh.ModernSupportsLnbPower;
+                if (wh != null) return wh.ModernSupportsLnbPower;
+                MinitiounerSource usb = videoSource as MinitiounerSource;
+                return usb != null && usb.ModernSupportsLnbPower;
             }
         }
 
@@ -31,13 +33,17 @@ namespace opentuner
         public int BackendGetLnbVoltage(int output)
         {
             WinterHillSource wh = BackendWinterHill();
-            return wh == null ? 0 : wh.ModernGetLnbVoltage(output);
+            if (wh != null) return wh.ModernGetLnbVoltage(output);
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            return usb == null ? 0 : usb.ModernGetLnbVoltage(output);
         }
 
         public void BackendSetLnbVoltage(int output, int volts)
         {
             WinterHillSource wh = BackendWinterHill();
-            if (wh != null) wh.ModernSetLnbVoltage(output, volts);
+            if (wh != null) { wh.ModernSetLnbVoltage(output, volts); return; }
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            if (usb != null) usb.ModernSetLnbVoltage(output, volts);
         }
 
         public string BackendGetRfInput(int tuner)
@@ -59,13 +65,17 @@ namespace opentuner
         public long BackendGetOffset(int tuner)
         {
             WinterHillSource wh = BackendWinterHill();
-            return wh == null ? 0 : wh.ModernGetOffset(tuner);
+            if (wh != null) return wh.ModernGetOffset(tuner);
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            return usb == null ? 0 : usb.ModernGetOffset(tuner);
         }
 
         public void BackendSetOffset(int tuner, long offsetKHz)
         {
             WinterHillSource wh = BackendWinterHill();
-            if (wh != null) wh.ModernSetOffset(tuner, offsetKHz);
+            if (wh != null) { wh.ModernSetOffset(tuner, offsetKHz); return; }
+            MinitiounerSource usb = videoSource as MinitiounerSource;
+            if (usb != null) usb.ModernSetOffset(tuner, offsetKHz);
         }
 
         public string BackendGetDeliverySystem(int tuner)
