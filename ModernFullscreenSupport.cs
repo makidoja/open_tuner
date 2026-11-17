@@ -9,6 +9,31 @@ namespace opentuner
     {
         private static readonly Dictionary<int, Form> activeWindows = new Dictionary<int, Form>();
 
+        // Full-screen window that sees ESC and the arrow keys before any child
+        // control (or WinForms focus navigation) can consume them.
+        private sealed class FullscreenForm : Form
+        {
+            public event Action ExitRequested;
+            public event Action<int> MoveRequested;
+
+            protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+            {
+                switch (keyData)
+                {
+                    case Keys.Escape:
+                        if (ExitRequested != null) ExitRequested();
+                        return true;
+                    case Keys.Left:
+                        if (MoveRequested != null) MoveRequested(-1);
+                        return true;
+                    case Keys.Right:
+                        if (MoveRequested != null) MoveRequested(1);
+                        return true;
+                }
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+        }
+
         // Screen last used for full screen this session (by device name), so the
         // next full-screen window opens where the user moved the previous one.
         private static string lastScreenName;
@@ -115,7 +140,7 @@ namespace opentuner
             AnchorStyles originalAnchor = host.Anchor;
             Rectangle originalBounds = host.Bounds;
 
-            Form fullscreen = new Form
+            FullscreenForm fullscreen = new FullscreenForm
             {
                 Text = "OpenTuner - Tuner " + (tuner + 1) + " Full Screen",
                 BackColor = Color.Black,
@@ -147,19 +172,10 @@ namespace opentuner
                 hint.BringToFront();
             };
 
-            fullscreen.KeyDown += delegate(object sender, KeyEventArgs e)
-            {
-                if (e.KeyCode == Keys.Escape)
-                {
-                    e.Handled = true;
-                    fullscreen.Close();
-                }
-                else if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
-                {
-                    e.Handled = true;
-                    MoveToAdjacentScreen(fullscreen, e.KeyCode == Keys.Right ? 1 : -1);
-                }
-            };
+            // Keys are caught in ProcessCmdKey (see FullscreenForm): arrow keys never
+            // reach KeyDown because WinForms uses them for control navigation first.
+            fullscreen.ExitRequested += delegate { fullscreen.Close(); };
+            fullscreen.MoveRequested += delegate(int direction) { MoveToAdjacentScreen(fullscreen, direction); };
             // ESC only: double-click is used by the player to toggle its info bar.
             // (The host handler was also added again on every open and never removed.)
 
