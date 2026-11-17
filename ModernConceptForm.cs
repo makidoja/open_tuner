@@ -1037,8 +1037,9 @@ namespace opentuner
             if (tuner >= visibleTuners || tuner < 0) return;
             serviceLabels[tuner].Text = string.IsNullOrWhiteSpace(data.service_name) ? "Waiting" : data.service_name;
             lastSignalStatus[tuner] = DateTime.UtcNow;
-            // Quick-tune markers are currently available for RX1/RX2 only.
-            if (tuner < 2 && activeQuickTuneSpectrum != null)
+            // Quick-tune markers for every receiver lane (RX1-RX4). The spectrum
+            // control bounds-checks the receiver index against its lane count.
+            if (activeQuickTuneSpectrum != null)
             {
                 if (data.demod_locked && data.frequency > 0)
                     activeQuickTuneSpectrum.UpdateLockedReceiverMarker(

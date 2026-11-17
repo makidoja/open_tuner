@@ -411,7 +411,7 @@ namespace opentuner
                 if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
                 // Lock state follows the controls directly and the service
                 // callsign takes all remaining width, so long names fit.
-                int lockWidth = compact4 ? 60 : 86;
+                int lockWidth = compact4 ? 74 : 86;
                 int statusGap = 5;
                 int rightPadding = 6;
                 int statusLeft = x + 6;
@@ -420,6 +420,10 @@ namespace opentuner
                 {
                     locked.Bounds = new Rectangle(statusLeft, 5, lockWidth, 27);
                     locked.TextAlign = ContentAlignment.MiddleCenter;
+                    // "● LOCKED" must fit on one line; if it wraps only the dot shows.
+                    float lockSize = compact4 ? 8f : 9f;
+                    if (Math.Abs(locked.Font.Size - lockSize) > 0.1f)
+                        locked.Font = CachedFont("Segoe UI Semibold", lockSize);
                 }
                 if (service != null)
                 {
