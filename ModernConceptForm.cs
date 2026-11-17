@@ -55,6 +55,17 @@ namespace opentuner
         private FlowLayoutPanel presetList;
         private PictureBox batcSpectrumBox;
         private BATCSpectrum batcSpectrum;
+
+        // Typed access for the Modern*Pass helpers. These replace reflection lookups
+        // by field name, so a rename is now a compile error instead of a silent no-op.
+        internal MainForm Backend { get { return backend; } }
+        internal ComboBox SourceCombo { get { return sourceCombo; } }
+        internal FlowLayoutPanel PresetList { get { return presetList; } }
+        internal PictureBox BatcSpectrumBox { get { return batcSpectrumBox; } }
+        internal BATCSpectrum BatcSpectrum { get { return batcSpectrum; } }
+        internal NumericUpDown[] FreqInputs { get { return freqInputs; } }
+        internal NumericUpDown[] SrInputs { get { return srInputs; } }
+        internal Panel[] VideoHosts { get { return videoHosts; } }
         private ModernBatcSpectrumControl activeQuickTuneSpectrum;
         private readonly CheckBox[] autoScanEnabled = new CheckBox[4];
         private readonly CheckBox[] rotate30Seconds = new CheckBox[4];
@@ -1347,7 +1358,7 @@ namespace opentuner
                    control is PictureBox;
         }
 
-        private void AdoptVideoControls()
+        internal void AdoptVideoControls()
         {
             for (int i = 0; i < Math.Min(4, visibleTuners); i++)
             {

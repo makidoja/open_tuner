@@ -35,20 +35,17 @@ namespace opentuner
 
         private static MainForm GetBackend(ModernConceptForm form)
         {
-            FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            return backendField == null ? null : backendField.GetValue(form) as MainForm;
+            return form.Backend;
         }
 
         private static PictureBox GetSpectrumBox(ModernConceptForm form)
         {
-            FieldInfo boxField = typeof(ModernConceptForm).GetField("batcSpectrumBox", BindingFlags.Instance | BindingFlags.NonPublic);
-            return boxField == null ? null : boxField.GetValue(form) as PictureBox;
+            return form.BatcSpectrumBox;
         }
 
         private static Panel[] GetVideoHosts(ModernConceptForm form)
         {
-            FieldInfo hostField = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-            return hostField == null ? null : hostField.GetValue(form) as Panel[];
+            return form.VideoHosts;
         }
 
         private static IEnumerable<Button> FindButtons(Control root)
@@ -119,9 +116,7 @@ namespace opentuner
 
             MainForm backend = GetBackend(form);
             Panel[] hosts = GetVideoHosts(form);
-            MethodInfo adoptMethod = typeof(ModernConceptForm).GetMethod("AdoptVideoControls", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            if (backend == null || hosts == null || adoptMethod == null) return;
+            if (backend == null || hosts == null) return;
 
             // Video controls are attached only from the UI thread when the backend
             // actually starts producing receiver data. ModernConceptForm.uiTimer no
@@ -141,7 +136,8 @@ namespace opentuner
                 }
 
                 if (!needsAttach) return;
-                try { adoptMethod.Invoke(form, null); } catch { }
+                try { form.AdoptVideoControls(); }
+                catch (Exception ex) { Serilog.Log.Warning(ex, "Video control adoption failed"); }
             };
 
             attachIfNeeded();
@@ -208,17 +204,13 @@ namespace opentuner
 
             try
             {
-                FieldInfo spectrumField = typeof(ModernConceptForm).GetField("batcSpectrum", BindingFlags.Instance | BindingFlags.NonPublic);
-                BATCSpectrum spectrum = spectrumField == null ? null : spectrumField.GetValue(form) as BATCSpectrum;
+                BATCSpectrum spectrum = form.BatcSpectrum;
                 if (spectrum == null) return;
 
                 MainForm backend = GetBackend(form);
 
-                FieldInfo freqField = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-                NumericUpDown[] freqInputs = freqField == null ? null : freqField.GetValue(form) as NumericUpDown[];
-
-                FieldInfo srField = typeof(ModernConceptForm).GetField("srInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-                NumericUpDown[] srInputs = srField == null ? null : srField.GetValue(form) as NumericUpDown[];
+                NumericUpDown[] freqInputs = form.FreqInputs;
+                NumericUpDown[] srInputs = form.SrInputs;
 
                 if (backend == null || freqInputs == null || srInputs == null) return;
 

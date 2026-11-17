@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace opentuner
@@ -23,12 +22,12 @@ namespace opentuner
 
         private static void Apply(ModernConceptForm form)
         {
-            MainForm backend = GetField<MainForm>(form, "backend");
-            ComboBox sourceCombo = GetField<ComboBox>(form, "sourceCombo");
-            FlowLayoutPanel presetList = GetField<FlowLayoutPanel>(form, "presetList");
-            PictureBox nativeSpectrum = GetField<PictureBox>(form, "batcSpectrumBox");
-            NumericUpDown[] srInputs = GetField<NumericUpDown[]>(form, "srInputs");
-            Panel[] videoHosts = GetField<Panel[]>(form, "videoHosts");
+            MainForm backend = form.Backend;
+            ComboBox sourceCombo = form.SourceCombo;
+            FlowLayoutPanel presetList = form.PresetList;
+            PictureBox nativeSpectrum = form.BatcSpectrumBox;
+            NumericUpDown[] srInputs = form.SrInputs;
+            Panel[] videoHosts = form.VideoHosts;
 
             if (backend == null || sourceCombo == null) return;
 
@@ -46,12 +45,6 @@ namespace opentuner
             if (videoHosts != null) TightenTunerCards(videoHosts);
 
             ConfigureSpectrum(nativeSpectrum);
-        }
-
-        private static T GetField<T>(ModernConceptForm form, string name) where T : class
-        {
-            FieldInfo f = typeof(ModernConceptForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as T;
         }
 
         private static void HideLeftNavigation(Form form)
