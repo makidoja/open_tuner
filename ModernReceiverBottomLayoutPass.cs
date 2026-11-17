@@ -16,6 +16,32 @@ namespace opentuner
         // disposed). Fonts are immutable, so one shared instance per family/size is
         // safe to assign to any number of controls. UI thread only.
         private static readonly Dictionary<string, Font> FontCache = new Dictionary<string, Font>();
+        private static readonly bool[] statusLayoutLogged = new bool[4];
+        private static readonly HashSet<Button> fullscreenPainted = new HashSet<Button>();
+
+        // Four corner brackets, centred, drawn over the button face (inside its 1 px border).
+        private static void PaintFullscreenIcon(object sender, PaintEventArgs e)
+        {
+            Button b = sender as Button;
+            if (b == null) return;
+            Rectangle face = new Rectangle(1, 1, b.Width - 2, b.Height - 2);
+            using (SolidBrush back = new SolidBrush(b.BackColor))
+                e.Graphics.FillRectangle(back, face);
+
+            int w = Math.Min(16, b.Width - 10), h = Math.Min(12, b.Height - 10);
+            int left = (b.Width - w) / 2, top = (b.Height - h) / 2;
+            int right = left + w, bottom = top + h, arm = 4;
+            System.Drawing.Drawing2D.SmoothingMode old = e.Graphics.SmoothingMode;
+            e.Graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+            using (Pen pen = new Pen(b.Enabled ? Text : Muted, 2f))
+            {
+                e.Graphics.DrawLines(pen, new[] { new Point(left, top + arm), new Point(left, top), new Point(left + arm, top) });
+                e.Graphics.DrawLines(pen, new[] { new Point(right - arm, top), new Point(right, top), new Point(right, top + arm) });
+                e.Graphics.DrawLines(pen, new[] { new Point(left, bottom - arm), new Point(left, bottom), new Point(left + arm, bottom) });
+                e.Graphics.DrawLines(pen, new[] { new Point(right - arm, bottom), new Point(right, bottom), new Point(right, bottom - arm) });
+            }
+            e.Graphics.SmoothingMode = old;
+        }
 
         private static Font CachedFont(string family, float size)
         {
@@ -333,12 +359,15 @@ namespace opentuner
                         // so it renders properly instead of a substituted dotted glyph.
                         // Its "⛶" text must stay: ModernFullscreenSupport finds it by text.
                         bool isFullscreen = btn == fullscreen;
-                        float size = isFullscreen ? (compact4 ? 13f : 15f) : (compact4 ? 7f : 8.5f);
-                        string family = isFullscreen ? "Segoe UI Symbol" : "Segoe UI Semibold";
-                        if (btn.Font.Name != family || Math.Abs(btn.Font.Size - size) > 0.1f)
-                            btn.Font = CachedFont(family, size);
+                        float size = compact4 ? 7f : 8.5f;
+                        if (btn.Font.Name != "Segoe UI Semibold" || Math.Abs(btn.Font.Size - size) > 0.1f)
+                            btn.Font = CachedFont("Segoe UI Semibold", size);
                         btn.TextAlign = ContentAlignment.MiddleCenter;
                         btn.Padding = Padding.Empty;
+                        // No font renders the "⛶" glyph cleanly here, so draw the icon.
+                        // The text must stay "⛶": ModernFullscreenSupport finds it by text.
+                        if (isFullscreen && fullscreenPainted.Add(btn))
+                            btn.Paint += PaintFullscreenIcon;
                     }
                     Label lbl = item as Label;
                     if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
@@ -350,11 +379,11 @@ namespace opentuner
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
                             lbl.Font = CachedFont("Segoe UI Semibold", size);
                         lbl.AutoSize = false;
-                        lbl.Bounds = compact4 ? new Rectangle(6, 5, 90, 27) : new Rectangle(6, 5, 98, 27);
+                        lbl.Bounds = compact4 ? new Rectangle(6, 5, 62, 27) : new Rectangle(6, 5, 74, 27);
                         lbl.TextAlign = ContentAlignment.MiddleLeft;
                     }
                 }
-                int x = compact4 ? 100 : 108;
+                int x = compact4 ? 70 : 82;
                 // Give the speaker glyph a readable size in both 2-RX and
                 // 4-RX headers. Keep its centre aligned with the volume slider.
                 int speakerWidth = compact4 ? 24 : 28;
@@ -366,7 +395,7 @@ namespace opentuner
                     volIcon.TextAlign = ContentAlignment.MiddleCenter;
                 }
                 x += speakerWidth + 3;
-                int volumeWidth = compact4 ? 90 : Math.Max(100, Math.Min(160, header.ClientSize.Width - 580));
+                int volumeWidth = compact4 ? 55 : Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
                 // The TrackBar draws its channel and thumb near the top of its bounds, so
                 // offset it down to put the thumb on the same centre line as the speaker
                 // glyph and the 27 px buttons (y 5..32).
@@ -380,16 +409,12 @@ namespace opentuner
                 if (snapshot != null && snapshot.Text == "▣ SNAPSHOT") snapshot.Text = "SNAPSHOT";
                 if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
                 if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
-                // Keep lock state and service callsign together, flush to
-                // the far right of the RX header instead of immediately
-                // following Fullscreen. Leave a gap from the left controls.
-                int lockWidth = compact4 ? 65 : 86;
-                int servicePreferred = compact4 ? 110 : 170;
+                // Lock state follows the controls directly and the service
+                // callsign takes all remaining width, so long names fit.
+                int lockWidth = compact4 ? 60 : 86;
                 int statusGap = 5;
                 int rightPadding = 6;
-                int statusLeft = Math.Max(x + 6,
-                    header.ClientSize.Width - rightPadding - lockWidth -
-                    statusGap - servicePreferred);
+                int statusLeft = x + 6;
                 int serviceLeft = statusLeft + lockWidth + statusGap;
                 if (locked != null)
                 {
@@ -402,6 +427,24 @@ namespace opentuner
                         Math.Max(0, header.ClientSize.Width - serviceLeft - rightPadding), 27);
                     service.TextAlign = ContentAlignment.MiddleLeft;
                     service.AutoEllipsis = true;
+                }
+
+                // One-off diagnostic: RX D has been seen with no LOCKED/callsign shown.
+                // Record where each receiver's status labels actually ended up.
+                if (!statusLayoutLogged[tuner] && header.ClientSize.Width > 0)
+                {
+                    statusLayoutLogged[tuner] = true;
+                    Serilog.Log.Information(
+                        "[HEADER-DIAG] RX{Rx} header={HeaderW}x{HeaderH} visible={HeaderVis} x={X} " +
+                        "lock(found={LockFound}, parent={LockParent}, bounds={LockBounds}, visible={LockVis}, text={LockText}) " +
+                        "service(found={SvcFound}, parent={SvcParent}, bounds={SvcBounds}, visible={SvcVis}, text={SvcText})",
+                        (char)('A' + tuner), header.ClientSize.Width, header.ClientSize.Height, header.Visible, x,
+                        locked != null, locked != null && locked.Parent != null ? locked.Parent.Name : "-",
+                        locked != null ? locked.Bounds.ToString() : "-", locked != null && locked.Visible,
+                        locked != null ? locked.Text : "-",
+                        service != null, service != null && service.Parent != null ? service.Parent.Name : "-",
+                        service != null ? service.Bounds.ToString() : "-", service != null && service.Visible,
+                        service != null ? service.Text : "-");
                 }
             }
 

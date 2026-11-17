@@ -93,7 +93,7 @@ namespace opentuner
 
             Label hint = new Label
             {
-                Text = "ESC or double-click to exit full screen",
+                Text = "Press ESC to exit full screen",
                 AutoSize = true,
                 BackColor = Color.FromArgb(150, 0, 0, 0),
                 ForeColor = Color.White,
@@ -117,8 +117,8 @@ namespace opentuner
                     fullscreen.Close();
                 }
             };
-            fullscreen.DoubleClick += delegate { fullscreen.Close(); };
-            host.DoubleClick += delegate { if (!fullscreen.IsDisposed) fullscreen.Close(); };
+            // ESC only: double-click is used by the player to toggle its info bar.
+            // (The host handler was also added again on every open and never removed.)
 
             fullscreen.FormClosed += delegate
             {
