@@ -85,3 +85,4 @@ jobs:
             --title "OpenTuner M0CKE v1.3.6 — Full-Screen Screen-Move Fix" \
             --notes-file RELEASE_NOTES_1.3.6.md \
             --latest
+            # publish
