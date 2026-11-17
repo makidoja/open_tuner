@@ -390,6 +390,58 @@ namespace opentuner.MediaSources.Minitiouner
                 ChangeRFInput((byte)tuner, requested);
         }
 
+        // Modern UI LNB supply bridge. psu: 0 = off, 1 = 13 V (vertical),
+        // 2 = 18 V (horizontal), as used by the legacy LNBA_/LNBB_ commands.
+        // Like those commands, this changes the running state only; the
+        // start-up default stays in the MiniTiouner settings.
+        public bool ModernSupportsLnbPower
+        {
+            get { return hardware_connected; }
+        }
+
+        public int ModernGetLnbVoltage(int output)
+        {
+            if (output < 0 || output > 1) return 0;
+            byte psu = output == 0 ? current_lnba_psu : current_lnbb_psu;
+            return psu == 1 ? 13 : psu == 2 ? 18 : 0;
+        }
+
+        public void ModernSetLnbVoltage(int output, int volts)
+        {
+            if (!hardware_connected || output < 0 || output > 1) return;
+            if (volts != 0 && volts != 13 && volts != 18) return;
+
+            byte psu = volts == 13 ? (byte)1 : volts == 18 ? (byte)2 : (byte)0;
+            if (output == 0) current_lnba_psu = psu; else current_lnbb_psu = psu;
+            Log.Information("Modern UI: MiniTiouner LNB {Output} supply -> {Volts} V", output == 0 ? "A" : "B", volts);
+            change_frequency(0, current_frequency_0, current_sr_0, current_rf_input_0,
+                current_tone_22kHz_P1, current_lnba_psu, current_lnbb_psu);
+        }
+
+        // Modern UI LO offset bridge (kHz, e.g. 9750000 for a 9750 MHz LO).
+        // SetFrequency(..., offset_included: true) subtracts this offset, which is
+        // how BackendTune drives the USB source.
+        public long ModernGetOffset(int tuner)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return 0;
+            return tuner == 0 ? current_offset_0 : current_offset_1;
+        }
+
+        public void ModernSetOffset(int tuner, long offsetKHz)
+        {
+            if (tuner < 0 || tuner >= GetVideoSourceCount()) return;
+            if (offsetKHz < 0 || offsetKHz > 15000000) return;
+            if (tuner == 0) current_offset_0 = (uint)offsetKHz;
+            else current_offset_1 = (uint)offsetKHz;
+            Log.Information("Modern UI: MiniTiouner tuner {Tuner} LO offset -> {Offset} kHz", tuner + 1, offsetKHz);
+
+            // Keep the legacy tuner panel in step when it exists (it is created
+            // only once the source's properties UI has been built).
+            if (_tuner_forms != null && tuner < _tuner_forms.Count && _tuner_forms[tuner] != null)
+                _tuner_forms[tuner].UpdateTuner(tuner == 0 ? current_frequency_0 : current_frequency_1,
+                    tuner == 0 ? current_sr_0 : current_sr_1, tuner == 0 ? current_offset_0 : current_offset_1);
+        }
+
         private void ChangeRFInput(byte Tuner, uint RFInput)
         {
             switch(Tuner)
