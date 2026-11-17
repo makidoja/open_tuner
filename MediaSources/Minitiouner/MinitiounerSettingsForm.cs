@@ -25,28 +25,10 @@ namespace opentuner.MediaSources.Minitiouner
             comboSupplyBDefault.SelectedIndex = _settings.DefaultLnbBSupply;
             ComboDefaultRFInput.SelectedIndex = _settings.DefaultRFInput;
 
-            HideMainWindowSettings();
-        }
-
-        // LO offsets and LNB supply are set in one place: the main window's
-        // LO box / L tick and LNB selectors, which save to these same settings.
-        // Hide the duplicate fields here and close up the gap they leave.
-        private void HideMainWindowSettings()
-        {
-            Control[] hidden =
-            {
-                label3, txtTuner1FreqOffset, label4, txtTuner2FreqOffset,
-                label5, comboSupplyADefault, label6, comboSupplyBDefault
-            };
-            foreach (Control c in hidden) c.Visible = false;
-
-            int shift = ComboDefaultRFInput.Top - txtTuner1FreqOffset.Top;
-            label7.Top -= shift;
-            ComboDefaultRFInput.Top -= shift;
-            groupBox1.Height -= shift;
-            btnSave.Top -= shift;
-            btnCancel.Top -= shift;
-            ClientSize = new System.Drawing.Size(ClientSize.Width, ClientSize.Height - shift);
+            // These are start-up defaults only. While running, LO and LNB supply
+            // are changed live from the main window's LO box / L tick and LNB
+            // selectors, which do not write back here.
+            groupBox1.Text = "Default Tuner Properties";
         }
 
         private void btnCancel_Click(object sender, EventArgs e)
@@ -57,10 +39,27 @@ namespace opentuner.MediaSources.Minitiouner
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            // Offsets and LNB supply defaults are owned by the main window
-            // (see HideMainWindowSettings); leave the saved values untouched.
+            uint offset1 = 0;
+            if (!uint.TryParse(txtTuner1FreqOffset.Text, out offset1))
+            {
+                MessageBox.Show("Invalid Offset 1");
+                return;
+            }
+
+            uint offset2 = 0;
+            if (!uint.TryParse(txtTuner2FreqOffset.Text, out offset2))
+            {
+                MessageBox.Show("Invalid Offset 2");
+                return;
+            }
+
             _settings.DefaultInterface = (byte)comboHardwareInterface.SelectedIndex;
+            _settings.DefaultLnbASupply = (byte)comboSupplyADefault.SelectedIndex;
+            _settings.DefaultLnbBSupply = (byte)comboSupplyBDefault.SelectedIndex;
             _settings.DefaultRFInput = (byte)ComboDefaultRFInput.SelectedIndex;
+
+            _settings.Offset1 = offset1;
+            _settings.Offset2 = offset2;
 
             DialogResult = DialogResult.OK;
             Close();
