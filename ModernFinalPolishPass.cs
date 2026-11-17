@@ -1,0 +1,67 @@
+using System;
+using System.Drawing;
+using System.Windows.Forms;
+
+namespace opentuner
+{
+    internal static class ModernFinalPolishPass
+    {
+        private static bool attached;
+
+        // One shared font and colour. PolishControls runs on every Resize event, and
+        // previously created a new Font per matching label each time without disposing
+        // the old one, leaking GDI handles while the window was being dragged.
+        private static readonly Font DetailFont = new Font("Segoe UI Semibold", 9.25f);
+        private static readonly Color DetailColour = Color.FromArgb(215, 228, 240);
+
+        public static void Attach(ModernConceptForm form)
+        {
+            if (attached || form == null) return;
+            attached = true;
+
+            form.Shown += delegate
+            {
+                // Keep enough horizontal room for CONNECTED, both LNB selectors,
+                // receiver RF selection and LO fields without controls colliding.
+                if (form.MinimumSize.Width < 1380 || form.MinimumSize.Height < 760)
+                    form.MinimumSize = new Size(Math.Max(1380, form.MinimumSize.Width), Math.Max(760, form.MinimumSize.Height));
+
+                PolishControls(form);
+            };
+
+            form.Resize += delegate { PolishControls(form); };
+        }
+
+        private static void PolishControls(Control root)
+        {
+            if (root == null || root.IsDisposed) return;
+
+            foreach (Control c in root.Controls)
+            {
+                ComboBox combo = c as ComboBox;
+                if (combo != null)
+                    ModernWindowTheme.ThemeComboBox(combo);
+
+                Label label = c as Label;
+                if (label != null)
+                {
+                    string text = label.Text ?? "";
+
+                    if (text.IndexOf("MODCOD", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        text.IndexOf("receiver details", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        if (!ReferenceEquals(label.Font, DetailFont))
+                            label.Font = DetailFont;
+                        if (label.ForeColor != DetailColour)
+                            label.ForeColor = DetailColour;
+                        if (label.AutoSize)
+                            label.AutoSize = false;
+                    }
+                }
+
+                if (c.HasChildren)
+                    PolishControls(c);
+            }
+        }
+    }
+}
