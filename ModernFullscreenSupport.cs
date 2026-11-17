@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace opentuner
@@ -22,9 +21,7 @@ namespace opentuner
         {
             try
             {
-                FieldInfo hostsField = typeof(ModernConceptForm).GetField(
-                    "videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-                Panel[] hosts = hostsField == null ? null : hostsField.GetValue(form) as Panel[];
+                Panel[] hosts = form.VideoHosts;
                 if (hosts == null) return;
 
                 for (int tuner = 0; tuner < hosts.Length; tuner++)
@@ -70,9 +67,7 @@ namespace opentuner
                 return;
             }
 
-            FieldInfo hostsField = typeof(ModernConceptForm).GetField(
-                "videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-            Panel[] hosts = hostsField == null ? null : hostsField.GetValue(form) as Panel[];
+            Panel[] hosts = form.VideoHosts;
             if (hosts == null || tuner < 0 || tuner >= hosts.Length) return;
 
             Panel host = hosts[tuner];

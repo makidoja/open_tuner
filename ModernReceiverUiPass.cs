@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Reflection;
 using System.Windows.Forms;
 using opentuner.MediaSources;
 
@@ -34,62 +33,52 @@ namespace opentuner
 
         private static MainForm Backend(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as MainForm;
+            return form.Backend;
         }
 
         private static Panel[] VideoHosts(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Panel[];
+            return form.VideoHosts;
         }
 
         private static NumericUpDown[] FreqInputs(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as NumericUpDown[];
+            return form.FreqInputs;
         }
 
         private static NumericUpDown[] SrInputs(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("srInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as NumericUpDown[];
+            return form.SrInputs;
         }
 
         private static Label[] LiveFreqLabels(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("liveFreq", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Label[];
+            return form.LiveFreq;
         }
 
         private static Label[] ServiceLabels(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("serviceLabels", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Label[];
+            return form.ServiceLabels;
         }
 
         private static Label[] LockLabels(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("lockLabels", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Label[];
+            return form.LockLabels;
         }
 
         private static TrackBar[] VolumeBars(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("volumeBars", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as TrackBar[];
+            return form.VolumeBars;
         }
 
         private static Button[] MuteButtons(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("muteButtons", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Button[];
+            return form.MuteButtons;
         }
 
         private static FlowLayoutPanel PresetList(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("presetList", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as FlowLayoutPanel;
+            return form.PresetList;
         }
 
         private static void HookTunerControls(ModernConceptForm form)

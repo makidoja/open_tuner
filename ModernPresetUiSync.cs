@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.Reflection;
 using System.Windows.Forms;
 
 namespace opentuner
@@ -14,13 +13,9 @@ namespace opentuner
             if (attached || form == null) return;
             attached = true;
 
-            FieldInfo backendField = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo freqField = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo srField = typeof(ModernConceptForm).GetField("srInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-
-            MainForm backend = backendField == null ? null : backendField.GetValue(form) as MainForm;
-            NumericUpDown[] freqInputs = freqField == null ? null : freqField.GetValue(form) as NumericUpDown[];
-            NumericUpDown[] srInputs = srField == null ? null : srField.GetValue(form) as NumericUpDown[];
+            MainForm backend = form.Backend;
+            NumericUpDown[] freqInputs = form.FreqInputs;
+            NumericUpDown[] srInputs = form.SrInputs;
             if (backend == null || freqInputs == null || srInputs == null) return;
 
             backend.BackendPresetLoaded += delegate(int tuner, uint frequencyKHz, uint symbolRateKs)

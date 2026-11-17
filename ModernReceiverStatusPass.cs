@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Reflection;
 using System.Windows.Forms;
 using opentuner.MediaSources;
 
@@ -66,14 +65,12 @@ namespace opentuner
 
         private static MainForm GetBackend(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as MainForm;
+            return form.Backend;
         }
 
         private static Panel[] GetVideoHosts(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Panel[];
+            return form.VideoHosts;
         }
 
         private static Label FindDetailLabel(Control root)

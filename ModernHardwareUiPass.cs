@@ -1,7 +1,6 @@
 using System;
 using System.Drawing;
 using System.Globalization;
-using System.Reflection;
 using System.Windows.Forms;
 using opentuner.MediaSources;
 
@@ -48,26 +47,22 @@ namespace opentuner
 
         private static MainForm GetBackend(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("backend", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as MainForm;
+            return form.Backend;
         }
 
         private static Panel[] GetVideoHosts(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("videoHosts", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as Panel[];
+            return form.VideoHosts;
         }
 
         private static NumericUpDown[] GetFreqInputs(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("freqInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as NumericUpDown[];
+            return form.FreqInputs;
         }
 
         private static NumericUpDown[] GetSrInputs(ModernConceptForm form)
         {
-            FieldInfo f = typeof(ModernConceptForm).GetField("srInputs", BindingFlags.Instance | BindingFlags.NonPublic);
-            return f == null ? null : f.GetValue(form) as NumericUpDown[];
+            return form.SrInputs;
         }
 
         private static void AddHardwareControls(ModernConceptForm form, MainForm backend)

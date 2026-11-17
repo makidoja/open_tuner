@@ -66,6 +66,11 @@ namespace opentuner
         internal NumericUpDown[] FreqInputs { get { return freqInputs; } }
         internal NumericUpDown[] SrInputs { get { return srInputs; } }
         internal Panel[] VideoHosts { get { return videoHosts; } }
+        internal Label[] LiveFreq { get { return liveFreq; } }
+        internal Label[] ServiceLabels { get { return serviceLabels; } }
+        internal Label[] LockLabels { get { return lockLabels; } }
+        internal TrackBar[] VolumeBars { get { return volumeBars; } }
+        internal Button[] MuteButtons { get { return muteButtons; } }
         private ModernBatcSpectrumControl activeQuickTuneSpectrum;
         private readonly CheckBox[] autoScanEnabled = new CheckBox[4];
         private readonly CheckBox[] rotate30Seconds = new CheckBox[4];
