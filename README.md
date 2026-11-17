@@ -4,7 +4,7 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Latest release — v1.3.4:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Latest release — v1.3.5:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
@@ -63,6 +63,12 @@ The interface provides independent receiver cards and three information views:
 The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## v1.3.5 release — receiver UI, MiniTiouner LO/LNB and full screen
+
+**v1.3.5** makes the main-window LO box, **L** tick and **LNB A/B** selectors work on the MiniTiouner source (FTDI module and PicoTuner USB), with start-up defaults entered in MHz under **Default Tuner Properties**. Full-screen video can be moved between monitors with the arrow keys, QO-100 Quick Tune markers for RX3/RX4 follow receiver lock, and the receiver header and entry fields have been tidied.
+
+See [v1.3.5 release notes](RELEASE_NOTES_1.3.5.md).
 
 ## v1.3.4 release — four-receiver QO-100 Quick Tune
 

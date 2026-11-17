@@ -8,9 +8,9 @@ namespace opentuner
     public static class GlobalDefines
     {
         public const int CircularBufferStartingCapacity = 250000;
-        public const string Version = "M0CKE 1.3.4";
+        public const string Version = "M0CKE 1.3.5";
         // Public releases always use major.minor.patch; internal build IDs are independent.
-        public const string PublicReleaseVersion = "1.3.4";
+        public const string PublicReleaseVersion = "1.3.5";
     }
 
     /// <summary>
