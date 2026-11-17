@@ -333,7 +333,7 @@ namespace opentuner
                         // so it renders properly instead of a substituted dotted glyph.
                         // Its "⛶" text must stay: ModernFullscreenSupport finds it by text.
                         bool isFullscreen = btn == fullscreen;
-                        float size = isFullscreen ? (compact4 ? 10f : 12f) : (compact4 ? 7f : 8.5f);
+                        float size = isFullscreen ? (compact4 ? 13f : 15f) : (compact4 ? 7f : 8.5f);
                         string family = isFullscreen ? "Segoe UI Symbol" : "Segoe UI Semibold";
                         if (btn.Font.Name != family || Math.Abs(btn.Font.Size - size) > 0.1f)
                             btn.Font = CachedFont(family, size);
@@ -343,13 +343,15 @@ namespace opentuner
                     Label lbl = item as Label;
                     if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
                     {
-                        // Plain "RX A".."RX D"; the leading ▣ glyph read as a checkbox.
-                        string title = "RX " + (char)('A' + tuner);
+                        // "● RX A".."● RX D", larger, vertically centred on the button row.
+                        string title = "●  RX " + (char)('A' + tuner);
                         if (lbl.Text != title) lbl.Text = title;
-                        float size = compact4 ? 9f : 11f;
+                        float size = compact4 ? 11f : 13f;
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
                             lbl.Font = CachedFont("Segoe UI Semibold", size);
-                        lbl.Size = compact4 ? new Size(92, 23) : new Size(100, 24);
+                        lbl.AutoSize = false;
+                        lbl.Bounds = compact4 ? new Rectangle(6, 5, 90, 27) : new Rectangle(6, 5, 98, 27);
+                        lbl.TextAlign = ContentAlignment.MiddleLeft;
                     }
                 }
                 int x = compact4 ? 100 : 108;
@@ -359,13 +361,16 @@ namespace opentuner
                 if (volIcon != null)
                 {
                     volIcon.AutoSize = false;
-                    volIcon.Bounds = new Rectangle(x, 5, speakerWidth, 29);
+                    volIcon.Bounds = new Rectangle(x, 5, speakerWidth, 27);
                     volIcon.Font = CachedFont("Segoe UI Emoji", compact4 ? 13f : 16f);
                     volIcon.TextAlign = ContentAlignment.MiddleCenter;
                 }
                 x += speakerWidth + 3;
-                int volumeWidth = compact4 ? 55 : Math.Max(65, Math.Min(115, header.ClientSize.Width - 620));
-                if (volume != null) volume.Bounds = new Rectangle(x, 4, volumeWidth, 30);
+                int volumeWidth = compact4 ? 90 : Math.Max(100, Math.Min(160, header.ClientSize.Width - 580));
+                // The TrackBar draws its channel and thumb near the top of its bounds, so
+                // offset it down to put the thumb on the same centre line as the speaker
+                // glyph and the 27 px buttons (y 5..32).
+                if (volume != null) volume.Bounds = new Rectangle(x, 7, volumeWidth, 30);
                 x += volumeWidth + (compact4 ? 2 : 5);
                 if (mute != null) { mute.Bounds = new Rectangle(x, 5, compact4 ? 48 : 64, 27); x += compact4 ? 50 : 68; }
                 if (record != null) { record.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
@@ -373,7 +378,7 @@ namespace opentuner
                 // the glyph visible. Use the word alone (ModernReceiverUiPass finds the
                 // button by "SNAPSHOT" and restores whatever text it had after "✓ SAVED").
                 if (snapshot != null && snapshot.Text == "▣ SNAPSHOT") snapshot.Text = "SNAPSHOT";
-                if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 78 : 99, 27); x += compact4 ? 80 : 103; }
+                if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
                 if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
                 // Keep lock state and service callsign together, flush to
                 // the far right of the RX header instead of immediately
@@ -387,7 +392,10 @@ namespace opentuner
                     statusGap - servicePreferred);
                 int serviceLeft = statusLeft + lockWidth + statusGap;
                 if (locked != null)
+                {
                     locked.Bounds = new Rectangle(statusLeft, 5, lockWidth, 27);
+                    locked.TextAlign = ContentAlignment.MiddleCenter;
+                }
                 if (service != null)
                 {
                     service.Bounds = new Rectangle(serviceLeft, 5,
