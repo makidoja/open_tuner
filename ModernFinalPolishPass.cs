@@ -8,6 +8,12 @@ namespace opentuner
     {
         private static bool attached;
 
+        // One shared font and colour. PolishControls runs on every Resize event, and
+        // previously created a new Font per matching label each time without disposing
+        // the old one, leaking GDI handles while the window was being dragged.
+        private static readonly Font DetailFont = new Font("Segoe UI Semibold", 9.25f);
+        private static readonly Color DetailColour = Color.FromArgb(215, 228, 240);
+
         public static void Attach(ModernConceptForm form)
         {
             if (attached || form == null) return;
@@ -44,9 +50,12 @@ namespace opentuner
                     if (text.IndexOf("MODCOD", StringComparison.OrdinalIgnoreCase) >= 0 ||
                         text.IndexOf("receiver details", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        label.Font = new Font("Segoe UI Semibold", 9.25f);
-                        label.ForeColor = Color.FromArgb(215, 228, 240);
-                        label.AutoSize = false;
+                        if (!ReferenceEquals(label.Font, DetailFont))
+                            label.Font = DetailFont;
+                        if (label.ForeColor != DetailColour)
+                            label.ForeColor = DetailColour;
+                        if (label.AutoSize)
+                            label.AutoSize = false;
                     }
                 }
 

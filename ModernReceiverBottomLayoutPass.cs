@@ -11,6 +11,24 @@ namespace opentuner
 {
     internal static class ModernReceiverBottomLayoutPass
     {
+        // Apply() runs on every form/controls Resize event. Creating a new Font per
+        // control on each pass leaked GDI font handles (the replaced fonts were never
+        // disposed). Fonts are immutable, so one shared instance per family/size is
+        // safe to assign to any number of controls. UI thread only.
+        private static readonly Dictionary<string, Font> FontCache = new Dictionary<string, Font>();
+
+        private static Font CachedFont(string family, float size)
+        {
+            string key = family + "|" + size.ToString(CultureInfo.InvariantCulture);
+            Font font;
+            if (!FontCache.TryGetValue(key, out font))
+            {
+                font = new Font(family, size);
+                FontCache[key] = font;
+            }
+            return font;
+        }
+
         private static bool attached;
         private static readonly HashSet<Panel> observedReceiverPanels = new HashSet<Panel>();
         private static bool applyingLayout;
@@ -136,7 +154,7 @@ namespace opentuner
                     }
                     caption.Text = labelText;
                     caption.Bounds = new Rectangle(x, y, half, 13);
-                    caption.Font = new Font("Segoe UI Semibold", 7f);
+                    caption.Font = CachedFont("Segoe UI Semibold", 7.5f);
                     caption.ForeColor = Muted;
                     caption.Visible = true;
                 }
@@ -144,19 +162,19 @@ namespace opentuner
                 if (freq != null)
                 {
                     freq.Bounds = new Rectangle(left, 19, half, fieldHeight);
-                    StyleEntry(freq, 8f);
+                    StyleEntry(freq, 9.5f);
                 }
                 int loCheckWidth = 25;
                 if (lo != null)
                 {
                     lo.Bounds = new Rectangle(right, 19,
                         Math.Max(45, half - loCheckWidth - 3), fieldHeight);
-                    StyleEntry(lo, 8f);
+                    StyleEntry(lo, 9.5f);
                 }
                 if (loEnabled != null)
                 {
                     loEnabled.Text = "L";
-                    loEnabled.Font = new Font("Segoe UI", 7.5f);
+                    loEnabled.Font = CachedFont("Segoe UI", 7.5f);
                     loEnabled.Bounds = new Rectangle(right + half - loCheckWidth,
                         20, loCheckWidth, 24);
                     loEnabled.BringToFront();
@@ -171,7 +189,7 @@ namespace opentuner
                     sr.BackColor = Color.FromArgb(18, 38, 60);
                     sr.ForeColor = Text;
                     sr.IntegralHeight = false;
-                    sr.Font = new Font("Segoe UI Semibold", 8f);
+                    sr.Font = CachedFont("Segoe UI Semibold", 8f);
                     sr.BringToFront();
                 }
                 // Each fixed receiver (A-D) has its own physical RF input A/B.
@@ -183,7 +201,7 @@ namespace opentuner
                     rf.FlatStyle = FlatStyle.Flat;
                     rf.BackColor = Color.FromArgb(18, 38, 60);
                     rf.ForeColor = Text;
-                    rf.Font = new Font("Segoe UI Semibold", 8f);
+                    rf.Font = CachedFont("Segoe UI Semibold", 8f);
                     // When themed button proxy exists, keep the native white
                     // Windows ComboBox hidden behind the dark themed button.
                     rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
@@ -198,7 +216,7 @@ namespace opentuner
                     ComboBox native = key.StartsWith("ModernSrButton") ? sr : rf;
                     if (proxy == null || native == null) continue;
                     proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 30);
-                    proxy.Font = new Font("Segoe UI Semibold", 8f);
+                    proxy.Font = CachedFont("Segoe UI Semibold", 8f);
                     Button button = proxy as Button;
                     if (button != null)
                     {
@@ -210,7 +228,7 @@ namespace opentuner
                 if (tune != null)
                 {
                     tune.Bounds = new Rectangle(left + full - 70, 109, 70, 26);
-                    tune.Font = new Font("Segoe UI Semibold", 8f);
+                    tune.Font = CachedFont("Segoe UI Semibold", 8f);
                 }
                 return;
             }
@@ -225,30 +243,30 @@ namespace opentuner
             if (freq != null)
             {
                 freq.Bounds = new Rectangle(left, 6, full, 26);
-                StyleEntry(freq, 9f);
+                StyleEntry(freq, 10f);
             }
             if (lo != null)
             {
                 lo.Bounds = new Rectangle(left, 37, full - 38, 26);
-                StyleEntry(lo, 9f);
+                StyleEntry(lo, 10f);
             }
             if (loEnabled != null)
             {
                 loEnabled.Text = "LO";
-                loEnabled.Font = new Font("Segoe UI", 8f);
+                loEnabled.Font = CachedFont("Segoe UI", 8f);
                 loEnabled.Bounds = new Rectangle(left + full - 35, 38, 35, 24);
                 loEnabled.BringToFront();
             }
             if (sr != null)
             {
                 sr.Bounds = new Rectangle(left, 69, half2, 29);
-                sr.Font = new Font("Segoe UI Semibold", 8.5f);
+                sr.Font = CachedFont("Segoe UI Semibold", 8.5f);
                 sr.Visible = box.Controls["ModernSrButton" + tuner] == null;
             }
             if (rf != null)
             {
                 rf.Bounds = new Rectangle(right2, 69, half2, 29);
-                rf.Font = new Font("Segoe UI Semibold", 8.5f);
+                rf.Font = CachedFont("Segoe UI Semibold", 8.5f);
                 rf.Visible = box.Controls["ModernRfButton" + tuner] == null;
             }
             // The dark selector proxies must follow both the size and the
@@ -260,14 +278,14 @@ namespace opentuner
                 ComboBox native = key.StartsWith("ModernSrButton") ? sr : rf;
                 if (proxy == null || native == null) continue;
                 proxy.Bounds = new Rectangle(native.Left, native.Top, native.Width, 29);
-                proxy.Font = new Font("Segoe UI Semibold", 8.5f);
+                proxy.Font = CachedFont("Segoe UI Semibold", 8.5f);
                 proxy.Visible = true;
                 proxy.BringToFront();
             }
             if (tune != null)
             {
                 tune.Bounds = new Rectangle(left + full - 70, 110, 70, 25);
-                tune.Font = new Font("Segoe UI Semibold", 8f);
+                tune.Font = CachedFont("Segoe UI Semibold", 8f);
                 tune.BringToFront();
             }
         }
@@ -310,14 +328,14 @@ namespace opentuner
                     {
                         float size = compact4 ? 7f : 8.5f;
                         if (Math.Abs(btn.Font.Size - size) > 0.1f)
-                            btn.Font = new Font("Segoe UI Semibold", size);
+                            btn.Font = CachedFont("Segoe UI Semibold", size);
                     }
                     Label lbl = item as Label;
                     if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
                     {
                         float size = compact4 ? 9f : 11f;
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
-                            lbl.Font = new Font("Segoe UI Semibold", size);
+                            lbl.Font = CachedFont("Segoe UI Semibold", size);
                         lbl.Size = compact4 ? new Size(92, 23) : new Size(100, 24);
                     }
                 }
@@ -329,7 +347,7 @@ namespace opentuner
                 {
                     volIcon.AutoSize = false;
                     volIcon.Bounds = new Rectangle(x, 5, speakerWidth, 29);
-                    volIcon.Font = new Font("Segoe UI Emoji", compact4 ? 13f : 16f);
+                    volIcon.Font = CachedFont("Segoe UI Emoji", compact4 ? 13f : 16f);
                     volIcon.TextAlign = ContentAlignment.MiddleCenter;
                 }
                 x += speakerWidth + 3;
@@ -408,7 +426,7 @@ namespace opentuner
                         BackColor = page == 0 ? Color.FromArgb(34, 68, 98) :
                             Color.FromArgb(17, 35, 52),
                         ForeColor = Text,
-                        Font = new Font("Segoe UI Semibold", 8f),
+                        Font = CachedFont("Segoe UI Semibold", 8f),
                         UseVisualStyleBackColor = false
                     };
                     button.FlatAppearance.BorderSize = 0;
@@ -448,7 +466,7 @@ namespace opentuner
                         Label label = new Label
                         {
                             AutoSize = false,
-                            Font = new Font("Segoe UI", 8f),
+                            Font = CachedFont("Segoe UI", 8f),
                             ForeColor = Text,
                             BackColor = Color.Transparent,
                             Text = "—",
@@ -466,7 +484,7 @@ namespace opentuner
                 if (detail != null)
                 {
                     infoPages[tuner, 2].Controls.Add(detail);
-                    detail.Font = new Font("Segoe UI", 8f);
+                    detail.Font = CachedFont("Segoe UI", 8f);
                     detail.ForeColor = Muted;
                     detail.Anchor = AnchorStyles.Left | AnchorStyles.Top;
                 }
@@ -520,7 +538,7 @@ namespace opentuner
                 currentFreq[tuner].AutoSize = false;
                 currentFreq[tuner].Bounds = new Rectangle(8, 5,
                     Math.Max(100, panelWidth - 18), freqHeight);
-                currentFreq[tuner].Font = new Font("Segoe UI Semibold",
+                currentFreq[tuner].Font = CachedFont("Segoe UI Semibold",
                     tallInfo ? 20f : 17f);
                 currentFreq[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
@@ -529,7 +547,7 @@ namespace opentuner
                 currentMer[tuner].AutoSize = false;
                 currentMer[tuner].Bounds = new Rectangle(8, merTop,
                     metricTextWidth, metricHeight);
-                currentMer[tuner].Font = new Font("Segoe UI Semibold",
+                currentMer[tuner].Font = CachedFont("Segoe UI Semibold",
                     tallInfo ? 12.5f : 11f);
                 currentMer[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
@@ -541,7 +559,7 @@ namespace opentuner
                 currentMargin[tuner].AutoSize = false;
                 currentMargin[tuner].Bounds = new Rectangle(8, marginTop,
                     metricTextWidth, metricHeight);
-                currentMargin[tuner].Font = new Font("Segoe UI Semibold",
+                currentMargin[tuner].Font = CachedFont("Segoe UI Semibold",
                     tallInfo ? 12.5f : 11f);
                 currentMargin[tuner].TextAlign = ContentAlignment.MiddleLeft;
             }
@@ -566,7 +584,7 @@ namespace opentuner
                             int y = 4 + (col / 2) * 39;
                             label.Bounds = new Rectangle(x, y, width - 5, 36);
                             label.Visible = true;
-                            label.Font = new Font("Segoe UI", 7.3f);
+                            label.Font = CachedFont("Segoe UI", 7.3f);
                         }
                         else
                         {
@@ -581,14 +599,14 @@ namespace opentuner
                             label.AutoEllipsis = true;
                             label.UseMnemonic = false;
                             label.Visible = true;
-                            label.Font = new Font("Segoe UI", 8f);
+                            label.Font = CachedFont("Segoe UI", 8f);
                         }
                     }
                     else
                     {
                         int width = Math.Max(70, (pagePanel.ClientSize.Width - 12) / 4);
                         label.Visible = true;
-                        label.Font = new Font("Segoe UI", 8f);
+                        label.Font = CachedFont("Segoe UI", 8f);
                         label.Bounds = page == 1
                             ? new Rectangle(6 + col * width, 3, width - 5, 43)
                             : new Rectangle(6 + col * width, 4, width - 5,
@@ -744,8 +762,8 @@ namespace opentuner
                 t.AutoSize = false;
                 t.Location = new Point(5, 3);
                 t.Size = new Size(Math.Max(20, border.Width - 10), border.Height - 6);
-                t.Font = new Font("Segoe UI Semibold", fontSize);
-                t.TextAlign = HorizontalAlignment.Center;
+                t.Font = CachedFont("Segoe UI Semibold", fontSize);
+                t.TextAlign = HorizontalAlignment.Left;
                 t.ForeColor = Text;
             }
         }
@@ -756,7 +774,7 @@ namespace opentuner
             if (l == null) return;
             l.Location = new Point(x, y);
             l.Size = new Size(w, h);
-            l.Font = new Font("Segoe UI Semibold", size);
+            l.Font = CachedFont("Segoe UI Semibold", size);
             l.ForeColor = colour;
             l.TextAlign = ContentAlignment.MiddleLeft;
         }
