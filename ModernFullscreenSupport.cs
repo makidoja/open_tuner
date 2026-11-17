@@ -9,6 +9,42 @@ namespace opentuner
     {
         private static readonly Dictionary<int, Form> activeWindows = new Dictionary<int, Form>();
 
+        // Screen last used for full screen this session (by device name), so the
+        // next full-screen window opens where the user moved the previous one.
+        private static string lastScreenName;
+
+        private static Screen InitialScreen(Form owner)
+        {
+            if (!string.IsNullOrEmpty(lastScreenName))
+                foreach (Screen sc in Screen.AllScreens)
+                    if (sc.DeviceName == lastScreenName) return sc;
+            return Screen.FromControl(owner);
+        }
+
+        // A borderless maximised window maximises on the monitor that holds its
+        // normal bounds, so restore, move the bounds, then maximise again.
+        private static void PlaceOnScreen(Form window, Screen screen)
+        {
+            window.WindowState = FormWindowState.Normal;
+            window.Bounds = screen.Bounds;
+            window.WindowState = FormWindowState.Maximized;
+            lastScreenName = screen.DeviceName;
+        }
+
+        private static void MoveToAdjacentScreen(Form window, int direction)
+        {
+            Screen[] screens = Screen.AllScreens;
+            if (screens.Length < 2) return;
+            // Order left-to-right (then top-to-bottom) so arrows match the layout.
+            Array.Sort(screens, (a, b) => a.Bounds.X != b.Bounds.X
+                ? a.Bounds.X.CompareTo(b.Bounds.X) : a.Bounds.Y.CompareTo(b.Bounds.Y));
+            Screen current = Screen.FromControl(window);
+            int index = Array.FindIndex(screens, sc => sc.DeviceName == current.DeviceName);
+            if (index < 0) index = 0;
+            int next = (index + direction + screens.Length) % screens.Length;
+            PlaceOnScreen(window, screens[next]);
+        }
+
         public static void Attach(ModernConceptForm form)
         {
             if (form == null) return;
@@ -93,7 +129,9 @@ namespace opentuner
 
             Label hint = new Label
             {
-                Text = "Press ESC to exit full screen",
+                Text = Screen.AllScreens.Length > 1
+                    ? "Press ESC to exit full screen  •  ← → move to another screen"
+                    : "Press ESC to exit full screen",
                 AutoSize = true,
                 BackColor = Color.FromArgb(150, 0, 0, 0),
                 ForeColor = Color.White,
@@ -115,6 +153,11 @@ namespace opentuner
                 {
                     e.Handled = true;
                     fullscreen.Close();
+                }
+                else if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right)
+                {
+                    e.Handled = true;
+                    MoveToAdjacentScreen(fullscreen, e.KeyCode == Keys.Right ? 1 : -1);
                 }
             };
             // ESC only: double-click is used by the player to toggle its info bar.
@@ -146,6 +189,10 @@ namespace opentuner
             hint.BringToFront();
 
             activeWindows[tuner] = fullscreen;
+            // Open on the main window's screen, or the screen last used for full screen.
+            Screen target = InitialScreen(form);
+            fullscreen.Bounds = target.Bounds;
+            lastScreenName = target.DeviceName;
             fullscreen.Show(form);
             fullscreen.Activate();
         }
