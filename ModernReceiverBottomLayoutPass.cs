@@ -130,7 +130,10 @@ namespace opentuner
             if (compact4)
             {
                 int gap = 8;
-                int half = (full - gap) / 2;
+                // Fixed-width columns sized for values like "10491.500" / "RF A",
+                // instead of stretching each field to half the card width.
+                const int FieldWidth = 104;
+                int half = Math.Min(FieldWidth, (full - gap) / 2);
                 int right = left + half + gap;
                 int fieldHeight = 27;
 
@@ -326,13 +329,23 @@ namespace opentuner
                     Button btn = item as Button;
                     if (btn != null)
                     {
-                        float size = compact4 ? 7f : 8.5f;
-                        if (Math.Abs(btn.Font.Size - size) > 0.1f)
-                            btn.Font = CachedFont("Segoe UI Semibold", size);
+                        // The fullscreen glyph is not in Segoe UI; use Segoe UI Symbol
+                        // so it renders properly instead of a substituted dotted glyph.
+                        // Its "⛶" text must stay: ModernFullscreenSupport finds it by text.
+                        bool isFullscreen = btn == fullscreen;
+                        float size = isFullscreen ? (compact4 ? 10f : 12f) : (compact4 ? 7f : 8.5f);
+                        string family = isFullscreen ? "Segoe UI Symbol" : "Segoe UI Semibold";
+                        if (btn.Font.Name != family || Math.Abs(btn.Font.Size - size) > 0.1f)
+                            btn.Font = CachedFont(family, size);
+                        btn.TextAlign = ContentAlignment.MiddleCenter;
+                        btn.Padding = Padding.Empty;
                     }
                     Label lbl = item as Label;
                     if (lbl != null && lbl.Name == "ModernReceiverHeaderTitle" + tuner)
                     {
+                        // Plain "RX A".."RX D"; the leading ▣ glyph read as a checkbox.
+                        string title = "RX " + (char)('A' + tuner);
+                        if (lbl.Text != title) lbl.Text = title;
                         float size = compact4 ? 9f : 11f;
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
                             lbl.Font = CachedFont("Segoe UI Semibold", size);
@@ -356,6 +369,10 @@ namespace opentuner
                 x += volumeWidth + (compact4 ? 2 : 5);
                 if (mute != null) { mute.Bounds = new Rectangle(x, 5, compact4 ? 48 : 64, 27); x += compact4 ? 50 : 68; }
                 if (record != null) { record.Bounds = new Rectangle(x, 5, compact4 ? 72 : 89, 27); x += compact4 ? 74 : 93; }
+                // "▣ SNAPSHOT" wrapped onto two lines in the 27 px button, leaving only
+                // the glyph visible. Use the word alone (ModernReceiverUiPass finds the
+                // button by "SNAPSHOT" and restores whatever text it had after "✓ SAVED").
+                if (snapshot != null && snapshot.Text == "▣ SNAPSHOT") snapshot.Text = "SNAPSHOT";
                 if (snapshot != null) { snapshot.Bounds = new Rectangle(x, 5, compact4 ? 78 : 99, 27); x += compact4 ? 80 : 103; }
                 if (fullscreen != null) { fullscreen.Bounds = new Rectangle(x, 5, compact4 ? 29 : 34, 27); x += compact4 ? 31 : 39; }
                 // Keep lock state and service callsign together, flush to
