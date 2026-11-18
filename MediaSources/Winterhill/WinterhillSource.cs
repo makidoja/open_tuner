@@ -41,6 +41,12 @@ namespace opentuner.MediaSources.WinterHill
         private string _LocalIp;
 
         private int[] _current_frequency = new int[4] {0, 0, 0, 0};
+        // Frequency (baseband kHz) requested by this app and not yet confirmed by
+        // a status packet. PicoTuner status ($6) can keep reporting the previous
+        // frequency after a retune; until it reports the requested one, the
+        // requested value is shown (0 = nothing pending).
+        private int[] _pending_frequency = new int[4] { 0, 0, 0, 0 };
+        private bool[] _pending_mismatch_logged = new bool[4];
         private int[] _current_offset = new int[4] { 0, 0, 0, 0 };
         private int[] _current_sr = new int[4] { 0, 0, 0, 0 };
 
@@ -493,7 +499,11 @@ namespace opentuner.MediaSources.WinterHill
             int baseFrequency = offset_included
                 ? (int)frequency - _current_offset[device] : (int)frequency;
             if (baseFrequency >= 0)
+            {
                 _current_frequency[device] = baseFrequency;
+                _pending_frequency[device] = baseFrequency;
+                _pending_mismatch_logged[device] = false;
+            }
             _current_sr[device] = (int)symbol_rate;
             Log.Information("WinterHill RX{Receiver} tune: frequency={Frequency} kHz, SR={Rate} kS, offsetIncluded={OffsetIncluded}, RF={Rf}",
                 device + 1, frequency, symbol_rate, offset_included,

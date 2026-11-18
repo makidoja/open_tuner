@@ -572,7 +572,26 @@ namespace opentuner.MediaSources.WinterHill
                         {
                             if (float.TryParse(rx.frequency, NumberStyles.Any, CultureInfo.InvariantCulture, out sent_freq))
                             {
-                                _current_frequency[c] = Convert.ToInt32((sent_freq * 1000) - _current_offset[c]);
+                                int reported = Convert.ToInt32((sent_freq * 1000) - _current_offset[c]);
+                                int pending = _pending_frequency[c];
+                                if (pending != 0 && Math.Abs(reported - pending) > 2)
+                                {
+                                    // Still reporting the old frequency after our retune:
+                                    // keep showing the requested one.
+                                    if (!_pending_mismatch_logged[c])
+                                    {
+                                        _pending_mismatch_logged[c] = true;
+                                        Log.Information("WinterHill RX{Receiver}: status reports {Reported} kHz, awaiting requested {Pending} kHz",
+                                            c + 1, reported, pending);
+                                    }
+                                }
+                                else
+                                {
+                                    if (pending != 0)
+                                        Log.Information("WinterHill RX{Receiver}: status confirmed {Reported} kHz", c + 1, reported);
+                                    _pending_frequency[c] = 0;
+                                    _current_frequency[c] = reported;
+                                }
                             }
                         }
                         catch (Exception ex)
