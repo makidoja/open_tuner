@@ -425,6 +425,95 @@ namespace opentuner
             return false;
         }
 
+        // Splits a detected above-threshold block wherever it dips below the
+        // 75% "top of signal" level used by the BATC measurement (ignoring
+        // single-bin dips), then measures each part as a separate signal.
+        private void SplitAndAddSignals(UInt16[] fft_data, int blockStart, int blockEnd, int noise_level)
+        {
+            int last = Math.Min(blockEnd, fft_data.Length - 1);
+            if (last - blockStart < 2) return;
+
+            // Typical top level (80th percentile), so a single spike cannot
+            // push the split level above a flat-topped signal.
+            double[] levels = new double[last - blockStart + 1];
+            for (int k = blockStart; k <= last; k++)
+                levels[k - blockStart] = Smoothed(fft_data, k);
+            Array.Sort(levels);
+            double top = levels[(int)((levels.Length - 1) * 0.8)];
+            double splitLevel = noise_level + 0.75 * (top - noise_level);
+            int minWidth = Math.Max(3, (int)(fft_data.Length * 0.03 / 9.0));
+
+            bool[] isHigh = new bool[last - blockStart + 1];
+            for (int k = blockStart; k <= last; k++)
+                isHigh[k - blockStart] = Smoothed(fft_data, k) >= splitLevel;
+            // A one-bin dip is noise on a flat top, not a gap between channels.
+            for (int k = 1; k < isHigh.Length - 1; k++)
+                if (!isHigh[k] && isHigh[k - 1] && isHigh[k + 1]) isHigh[k] = true;
+
+            int partStart = -1;
+            for (int k = blockStart; k <= last + 1; k++)
+            {
+                bool high = k <= last && isHigh[k - blockStart];
+                if (high && partStart < 0)
+                    partStart = k;
+                else if (!high && partStart >= 0)
+                {
+                    if (k - partStart >= minWidth)
+                        AddSignal(fft_data, partStart, Math.Min(k, last), noise_level);
+                    partStart = -1;
+                }
+            }
+        }
+
+        private static double Smoothed(UInt16[] fft_data, int k)
+        {
+            int a = Math.Max(0, k - 1), b = Math.Min(fft_data.Length - 1, k + 1);
+            return (fft_data[a] + fft_data[k] + fft_data[b]) / 3.0;
+        }
+
+        // Original BATC measurement of one signal between start and end bins.
+        private void AddSignal(UInt16[] fft_data, int start_signal, int end_signal, int noise_level)
+        {
+            int acc = 0;
+            int acc_i = 0;
+            for (int j = Convert.ToInt16(start_signal + (0.3 * (end_signal - start_signal))) | 0; j < start_signal + (0.8 * (end_signal - start_signal)); j++)
+            {
+                acc = acc + fft_data[j];
+                acc_i = acc_i + 1;
+            }
+            if (acc_i == 0) return;
+
+            int strength_signal = acc / acc_i;
+
+            /* Find real start of top of signal */
+            int lo = start_signal, hi = end_signal;
+            for (int j = lo; j < hi && (fft_data[j] - noise_level) < 0.75 * (strength_signal - noise_level); j++)
+                start_signal = j;
+
+            /* Find real end of the top of signal */
+            for (int j = hi; j > start_signal && (fft_data[j] - noise_level) < 0.75 * (strength_signal - noise_level); j--)
+                end_signal = j;
+
+            float mid_signal = Convert.ToSingle(start_signal + ((end_signal - start_signal) / 2.0));
+            float signal_bw = align_symbolrate(Convert.ToSingle((end_signal - start_signal) * (9.0 / (fft_data.Length))));
+            double signal_freq = Convert.ToDouble(start_freq + (((mid_signal + 1) / (fft_data.Length)) * 9.0));
+
+            // Exclude signals in beacon band
+            if (signal_bw >= 0.033)
+            {
+                if (Math.Abs(signal_freq - 10491.5) < 0.35 && signal_bw > 1.0)
+                {
+                    beacon_strength = strength_signal;
+                    signals.Add(new Sig(start_signal, end_signal, Convert.ToInt32(mid_signal), strength_signal / 255, signal_freq, signal_bw, false, 0));
+                }
+                else
+                {
+                    bool overpower = isOverPower(beacon_strength, strength_signal, signal_bw);
+                    signals.Add(new Sig(start_signal, end_signal, Convert.ToInt32(mid_signal), strength_signal / 255, signal_freq, signal_bw, overpower, 0));
+                }
+            }
+        }
+
         public List<Sig> detect_signals(UInt16[] fft_data)
         {
             lock (list_lock)
@@ -434,20 +523,12 @@ namespace opentuner
                 // Old values must not create a false dBb measurement.
                 beacon_strength = -1;
                 int i;
-                int j;
 
                 int noise_level = 11000;
                 int signal_threshold = 16000;
 
                 Boolean in_signal = false;
                 int start_signal = 0;
-                int end_signal;
-                float mid_signal;
-                int strength_signal;
-                float signal_bw;
-                double signal_freq;
-                int acc;
-                int acc_i;
 
                 for (i = 2; i < fft_data.Length; i++)
                 {
@@ -465,64 +546,10 @@ namespace opentuner
                         if ((fft_data[i] + fft_data[i - 1] + fft_data[i - 2]) / 3.0 < signal_threshold)
                         {
                             in_signal = false;
-
-                            end_signal = i;
-
-                            acc = 0;
-                            acc_i = 0;
-                            // Log.Information(Convert.ToInt16(start_signal + (0.3 * (end_signal - start_signal))));
-                            //  Log.Information( start_signal + (0.7 * (end_signal - start_signal)));
-
-                            for (j = Convert.ToInt16(start_signal + (0.3 * (end_signal - start_signal))) | 0; j < start_signal + (0.8 * (end_signal - start_signal)); j++)
-                            {
-                                acc = acc + fft_data[j];
-                                acc_i = acc_i + 1;
-                            }
-
-
-                            strength_signal = acc / acc_i;
-
-                            /* Find real start of top of signal */
-                            for (j = start_signal; (fft_data[j] - noise_level) < 0.75 * (strength_signal - noise_level); j++)
-                            {
-                                start_signal = j;
-                            }
-
-
-                            /* Find real end of the top of signal */
-                            for (j = end_signal; (fft_data[j] - noise_level) < 0.75 * (strength_signal - noise_level); j--)
-                            {
-                                end_signal = j;
-                            }
-                            //  Log.Information("Start:" + start_signal.ToString());
-                            //  Log.Information("End:" + end_signal.ToString());
-                            // Log.Information("Strength:" + strength_signal.ToString());
-                            mid_signal = Convert.ToSingle(start_signal + ((end_signal - start_signal) / 2.0));
-
-                            signal_bw = align_symbolrate(Convert.ToSingle((end_signal - start_signal) * (9.0 / (fft_data.Length))));
-                            signal_freq = Convert.ToDouble(start_freq + (((mid_signal + 1) / (fft_data.Length)) * 9.0));
-
-
-                            // Exclude signals in beacon band
-                            if (signal_bw >= 0.033)
-                            {
-                                if (Math.Abs(signal_freq - 10491.5) < 0.35 && signal_bw > 1.0)
-                                {
-                                    beacon_strength = strength_signal;
-                                    signals.Add(new Sig(start_signal, end_signal, Convert.ToInt32(mid_signal), strength_signal / 255, signal_freq, signal_bw, false, 0));
-                                }
-                                else
-                                {
-                                    bool overpower = false;
-
-                                    if (isOverPower(beacon_strength, strength_signal, signal_bw))
-                                        overpower = true;
-
-                                    signals.Add(new Sig(start_signal, end_signal, Convert.ToInt32(mid_signal), strength_signal / 255, signal_freq, signal_bw, overpower, 0));
-                                }
-                            }
-
-
+                            // Adjacent channels (e.g. 10498.75 and 10499.25 at 333 kS)
+                            // can stay above the threshold between them and arrive here
+                            // as one block centred in the gap; split them first.
+                            SplitAndAddSignals(fft_data, start_signal, i, noise_level);
                         }
                     }
                 }
