@@ -22,6 +22,9 @@ namespace opentuner.MediaPlayers.VLC
 
         MediaPlayer _mediaplayer;
         private int videoUpdateGeneration;
+        // Guards the swap of _mediaplayer/media/media_input: Stop/Play can be
+        // called from the UI thread and from source status threads.
+        private readonly object playerSwapLock = new object();
 
         int player_volume;
 
@@ -147,17 +150,21 @@ namespace opentuner.MediaPlayers.VLC
 
             MediaStatus media_status = new MediaStatus();
 
-            foreach (var track in media.Tracks)
+            // A retune may have released this media on another thread.
+            Media currentMedia = media;
+            if (currentMedia == null) return;
+
+            foreach (var track in currentMedia.Tracks)
             {
                 switch (track.TrackType)
                 {
                     case TrackType.Audio:
                         media_status.AudioChannels = track.Data.Audio.Channels;
-                        media_status.AudioCodec = media.CodecDescription(TrackType.Audio, track.Codec);
+                        media_status.AudioCodec = currentMedia.CodecDescription(TrackType.Audio, track.Codec);
                         media_status.AudioRate = track.Data.Audio.Rate;
                         break;
                     case TrackType.Video:
-                        media_status.VideoCodec = media.CodecDescription(TrackType.Video, track.Codec);
+                        media_status.VideoCodec = currentMedia.CodecDescription(TrackType.Video, track.Codec);
                         media_status.VideoWidth = track.Data.Video.Width;
                         media_status.VideoHeight = track.Data.Video.Height;
                         Log.Information("VLC video track: " + media_status.VideoCodec + " " + media_status.VideoWidth.ToString() + "x" + media_status.VideoHeight.ToString());
@@ -185,39 +192,82 @@ namespace opentuner.MediaPlayers.VLC
         {
             Log.Information("VLC: Stop Command");
 
-            try
+            MediaPlayer oldPlayer;
+            Media oldMedia;
+            TSStreamMediaInput oldInput;
+            lock (playerSwapLock)
             {
-                if (media_input != null)
-                    media_input.end = true;
+                oldPlayer = _mediaplayer;
+                oldMedia = media;
+                oldInput = media_input;
+                _mediaplayer = null;
+                media = null;
+                media_input = null;
             }
-            catch { }
 
-            try { updateVideoPlayer(null, false); } catch { }
+            // Let VLC's input thread finish its current Read immediately.
+            try { if (oldInput != null) oldInput.end = true; } catch { }
 
-            if (_mediaplayer != null)
+            if (oldPlayer != null)
             {
                 try
                 {
-                    _mediaplayer.Stopped -= MediaPlayer_Stopped;
-                    _mediaplayer.Playing -= MediaPlayer_Playing;
-                    _mediaplayer.EncounteredError -= MediaPlayer_EncounteredError;
-                    _mediaplayer.Vout -= MediaPlayer_Vout;
+                    oldPlayer.Stopped -= MediaPlayer_Stopped;
+                    oldPlayer.Playing -= MediaPlayer_Playing;
+                    oldPlayer.EncounteredError -= MediaPlayer_EncounteredError;
+                    oldPlayer.Vout -= MediaPlayer_Vout;
                 }
                 catch { }
-                try { _mediaplayer.Dispose(); } catch { }
-                _mediaplayer = null;
             }
 
-            if (media != null)
-            {
-                try { media.Dispose(); } catch { }
-                media = null;
-            }
+            // Never stop/dispose a LibVLC MediaPlayer on the UI thread: releasing
+            // it waits for VLC's video-output thread, which in turn needs the UI
+            // thread to service the video window -> deadlock ("Not Responding"),
+            // seen when two receivers retuned at the same moment. Detach it from
+            // the VideoView on the UI thread, then release it on a pool thread.
+            ReleasePlayerLater(oldPlayer, oldMedia, oldInput);
+        }
 
-            if (media_input != null)
+        private void ReleasePlayerLater(MediaPlayer oldPlayer, Media oldMedia, TSStreamMediaInput oldInput)
+        {
+            // Invalidate any queued attach for the player being released.
+            System.Threading.Interlocked.Increment(ref videoUpdateGeneration);
+            if (oldPlayer == null && oldMedia == null && oldInput == null) return;
+
+            WaitCallback release = delegate
             {
-                try { media_input.Dispose(); } catch { }
-                media_input = null;
+                try { if (oldPlayer != null) oldPlayer.Stop(); } catch (Exception ex) { Log.Warning(ex, "VLC: stop on release failed"); }
+                try { if (oldPlayer != null) oldPlayer.Dispose(); } catch (Exception ex) { Log.Warning(ex, "VLC: player dispose failed"); }
+                try { if (oldMedia != null) oldMedia.Dispose(); } catch { }
+                try { if (oldInput != null) oldInput.Dispose(); } catch { }
+            };
+
+            // Detach first, so the VideoView never touches a released player.
+            MethodInvoker detach = delegate
+            {
+                try
+                {
+                    if (videoView != null && !videoView.IsDisposed &&
+                        oldPlayer != null && Object.ReferenceEquals(videoView.MediaPlayer, oldPlayer))
+                        videoView.MediaPlayer = null;
+                }
+                catch (Exception ex) { Log.Warning(ex, "VLC: VideoView detach failed"); }
+                ThreadPool.QueueUserWorkItem(release);
+            };
+
+            try
+            {
+                if (videoView == null || videoView.IsDisposed || !videoView.IsHandleCreated)
+                    ThreadPool.QueueUserWorkItem(release);
+                else if (videoView.InvokeRequired)
+                    videoView.BeginInvoke(detach);
+                else
+                    detach();
+            }
+            catch (InvalidOperationException)
+            {
+                // The handle went away between the checks; nothing is attached now.
+                ThreadPool.QueueUserWorkItem(release);
             }
         }
 
@@ -227,10 +277,15 @@ namespace opentuner.MediaPlayers.VLC
 
             Stop();
             ts_data_queue.Clear();
-            CreatePlayerObjects();
-            media_input.ts_sync = false;
-            media_input.end = false;
-            updateVideoPlayer(_mediaplayer, true);
+            MediaPlayer newPlayer;
+            lock (playerSwapLock)
+            {
+                CreatePlayerObjects();
+                media_input.ts_sync = false;
+                media_input.end = false;
+                newPlayer = _mediaplayer;
+            }
+            updateVideoPlayer(newPlayer, true);
         }
 
         public override void SetVolume(int Volume)
