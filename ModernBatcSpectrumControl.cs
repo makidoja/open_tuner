@@ -239,8 +239,10 @@ namespace opentuner
             using (Brush blockBrush = new SolidBrush(Color.FromArgb(35, Accent2)))
             using (Pen blockPen = new Pen(Color.FromArgb(135, Accent2)))
             {
-                float topRight = plot.Left;
-                float bottomRight = plot.Left;
+                // Two label rows at the top and two at the bottom: a label that would
+                // overlap its neighbour drops to the second row instead of vanishing.
+                float[] topRight = { plot.Left, plot.Left };
+                float[] bottomRight = { plot.Left, plot.Left };
                 foreach (signal.Sig sig in localSignals.OrderBy(item => item.frequency))
                 {
                     double rel = (sig.frequency - StartMHz) / SpanMHz;
@@ -279,21 +281,25 @@ namespace opentuner
                         SizeF size = g.MeasureString(top, labelFont);
                         float left = Math.Max(plot.Left + 3, Math.Min(plot.Right - size.Width - 3,
                             x - size.Width / 2f));
-                        if (left >= topRight + 3 && left + size.Width <= plot.Right)
+                        for (int row = 0; row < 2; row++)
                         {
-                            g.DrawString(top, labelFont, labelBrush, left, plot.Top + 3);
-                            topRight = left + size.Width;
+                            if (left < topRight[row] + 3 || left + size.Width > plot.Right) continue;
+                            g.DrawString(top, labelFont, labelBrush, left, plot.Top + 3 + row * (size.Height - 1));
+                            topRight[row] = left + size.Width;
+                            break;
                         }
                     }
 
                     SizeF bottomSize = g.MeasureString(bottom, labelFont);
                     float bottomLeft = Math.Max(plot.Left + 3, Math.Min(plot.Right - bottomSize.Width - 3,
                         x - bottomSize.Width / 2f));
-                    if (bottomLeft >= bottomRight + 3 && bottomLeft + bottomSize.Width <= plot.Right)
+                    for (int row = 0; row < 2; row++)
                     {
+                        if (bottomLeft < bottomRight[row] + 3 || bottomLeft + bottomSize.Width > plot.Right) continue;
                         g.DrawString(bottom, labelFont, labelBrush, bottomLeft,
-                            plot.Bottom - bottomSize.Height - 3);
-                        bottomRight = bottomLeft + bottomSize.Width;
+                            plot.Bottom - 3 - (row + 1) * bottomSize.Height + row);
+                        bottomRight[row] = bottomLeft + bottomSize.Width;
+                        break;
                     }
                 }
             }

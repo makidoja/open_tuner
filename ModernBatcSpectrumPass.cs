@@ -258,7 +258,8 @@ namespace opentuner
             // RX3/RX4 are only visible in the actual 4 RX configuration.
             const int stripWidth = 265;
             int usableWidth = Math.Max(300, card.ClientSize.Width - 36 - stripWidth);
-            int width = Math.Min(1140, usableWidth);
+            // Use the room available (up to 1600 px) so close channels keep their labels.
+            int width = Math.Min(1600, usableWidth);
             int height = receivers >= 4 ? 172 : 108;
             int totalWidth = width + stripWidth;
             int left = Math.Max(12, (card.ClientSize.Width - totalWidth) / 2);
