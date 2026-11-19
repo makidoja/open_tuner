@@ -37,8 +37,12 @@ namespace opentuner
             txtMessage.Dock = DockStyle.Bottom;
             txtMessage.MinimumSize = new Size(0, 28);
             txtMessage.Height = 30;
-            splitContainer1.Panel2.Controls.SetChildIndex(txtMessage, 0);
-            splitContainer1.Panel2.Controls.SetChildIndex(richChat, 1);
+            // Docking is applied from the back of the z-order to the front, so the
+            // Fill control must be at the front (index 0) to take only the space
+            // left above the Bottom-docked input. The reverse order made the
+            // transcript fill the whole panel with the input laid over its last line.
+            splitContainer1.Panel2.Controls.SetChildIndex(richChat, 0);
+            splitContainer1.Panel2.Controls.SetChildIndex(txtMessage, 1);
             Shown += delegate { EnsureChatLayout(); };
             Resize += delegate { EnsureChatLayout(); };
 
@@ -55,6 +59,12 @@ namespace opentuner
             if (txtMessage.Height < 28) txtMessage.Height = 30;
             if (richChat.Dock != DockStyle.Fill) richChat.Dock = DockStyle.Fill;
             lbChat.Visible = false;
+            Control.ControlCollection panel = splitContainer1.Panel2.Controls;
+            if (panel.GetChildIndex(richChat) != 0 || panel.GetChildIndex(txtMessage) != 1)
+            {
+                panel.SetChildIndex(richChat, 0);
+                panel.SetChildIndex(txtMessage, 1);
+            }
         }
 
         private SocketIO client = null;
