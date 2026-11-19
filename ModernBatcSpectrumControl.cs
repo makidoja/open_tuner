@@ -351,8 +351,10 @@ namespace opentuner
                     float labelX = Math.Max(plot.Left + 2,
                         Math.Min(plot.Right - g.MeasureString(label, f).Width - 2, x + 5));
                     // Tag sits just under the arrow head, clear of the frequency labels
-                    // drawn along the bottom of the spectrum.
-                    g.DrawString(label, f, b, labelX, top + 4);
+                    // drawn along the bottom of the spectrum. RX1's arrow head is at the
+                    // top edge, where callsign/dBb labels are drawn, so it goes one line lower.
+                    float labelY = rx == 0 ? top + 4 + f.Height : top + 4;
+                    g.DrawString(label, f, b, labelX, labelY);
                 }
             }
         }
