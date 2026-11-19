@@ -4,7 +4,7 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Latest release — v1.3.7:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Latest release — v1.3.8:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
@@ -63,6 +63,13 @@ The interface provides independent receiver cards and three information views:
 The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## v1.3.8 service patch — VLC freeze fix and video mouse controls
+
+**v1.3.8** fixes a "Not Responding" freeze with the VLC player when receivers retune at the same moment (for example Auto Scan rotation on RX1 and RX2), makes right-click open or close full screen while left-click toggles the information bar, and stops the BATC chat input covering the last chat line.
+
+See [v1.3.8 release notes](RELEASE_NOTES_1.3.8.md).
+
 
 ## v1.3.7 service patch — WinterHill Quick Tune first click
 
