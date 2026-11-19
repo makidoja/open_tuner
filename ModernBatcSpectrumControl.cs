@@ -350,7 +350,9 @@ namespace opentuner
                     string label = "RX" + (rx + 1);
                     float labelX = Math.Max(plot.Left + 2,
                         Math.Min(plot.Right - g.MeasureString(label, f).Width - 2, x + 5));
-                    g.DrawString(label, f, b, labelX, bottom - f.Height - 2);
+                    // Tag sits just under the arrow head, clear of the frequency labels
+                    // drawn along the bottom of the spectrum.
+                    g.DrawString(label, f, b, labelX, top + 4);
                 }
             }
         }
