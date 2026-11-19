@@ -11,10 +11,44 @@ namespace opentuner
 
         // Full-screen window that sees ESC and the arrow keys before any child
         // control (or WinForms focus navigation) can consume them.
-        private sealed class FullscreenForm : Form
+        private sealed class FullscreenForm : Form, IMessageFilter
         {
             public event Action ExitRequested;
             public event Action<int> MoveRequested;
+
+            private const int WM_RBUTTONUP = 0x0205;
+            private const int WM_RBUTTONDOWN = 0x0204;
+            private const int WM_CONTEXTMENU = 0x007B;
+
+            [System.Runtime.InteropServices.DllImport("user32.dll")]
+            private static extern bool IsChild(IntPtr parent, IntPtr child);
+
+            // Right-click anywhere in the window (including over the video
+            // control, which never raises this form's mouse events) closes it.
+            protected override void OnHandleCreated(EventArgs e)
+            {
+                base.OnHandleCreated(e);
+                Application.AddMessageFilter(this);
+            }
+
+            protected override void OnFormClosed(FormClosedEventArgs e)
+            {
+                Application.RemoveMessageFilter(this);
+                base.OnFormClosed(e);
+            }
+
+            public bool PreFilterMessage(ref Message m)
+            {
+                if (m.Msg != WM_RBUTTONDOWN && m.Msg != WM_RBUTTONUP && m.Msg != WM_CONTEXTMENU)
+                    return false;
+                if (IsDisposed || !IsHandleCreated) return false;
+                if (m.HWnd != Handle && !IsChild(Handle, m.HWnd)) return false;
+
+                // Close on release; swallow the press and any context menu too.
+                if (m.Msg == WM_RBUTTONUP && ExitRequested != null)
+                    BeginInvoke((MethodInvoker)delegate { if (!IsDisposed && ExitRequested != null) ExitRequested(); });
+                return true;
+            }
 
             protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
             {
@@ -155,8 +189,8 @@ namespace opentuner
             Label hint = new Label
             {
                 Text = Screen.AllScreens.Length > 1
-                    ? "Press ESC to exit full screen  •  ← → move to another screen"
-                    : "Press ESC to exit full screen",
+                    ? "ESC or right-click to exit full screen  •  ← → move to another screen"
+                    : "ESC or right-click to exit full screen",
                 AutoSize = true,
                 BackColor = Color.FromArgb(150, 0, 0, 0),
                 ForeColor = Color.White,
