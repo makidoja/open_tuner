@@ -110,6 +110,24 @@ namespace opentuner
 
             HookButtons(form);
             form.Shown += delegate { HookButtons(form); };
+
+            // Right-click on a receiver's video opens it in full screen. In full
+            // screen, right-click is taken by FullscreenForm and closes it instead.
+            MainForm backend = form.Backend;
+            if (backend != null)
+            {
+                backend.BackendVideoRightClick += delegate(int tuner)
+                {
+                    if (form.IsDisposed) return;
+                    form.BeginInvoke((MethodInvoker)delegate
+                    {
+                        Form existing;
+                        if (activeWindows.TryGetValue(tuner, out existing) && existing != null && !existing.IsDisposed)
+                            return;
+                        ToggleFullscreen(form, tuner);
+                    });
+                };
+            }
         }
 
         private static void HookButtons(ModernConceptForm form)

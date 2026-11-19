@@ -844,6 +844,16 @@ namespace opentuner
         {
             int video_nr = (int)((Control)sender).Tag;
 
+            // Right-click opens full screen (Modern UI); only left-click toggles
+            // the information bar.
+            if (e.Button == MouseButtons.Right)
+            {
+                Action<int> rightClick = BackendVideoRightClick;
+                if (rightClick != null) rightClick(video_nr);
+                return;
+            }
+            if (e.Button != MouseButtons.Left) return;
+
             if (info_display.Count > video_nr)
             {
                 if (info_display[video_nr] != null)

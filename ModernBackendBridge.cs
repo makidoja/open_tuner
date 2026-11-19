@@ -17,6 +17,10 @@ namespace opentuner
     {
         public event Action<int, OTSourceData, string> BackendSourceData;
 
+        // Raised when a receiver's video is right-clicked (0-based receiver).
+        // The Modern UI uses it to open that receiver in full screen.
+        public event Action<int> BackendVideoRightClick;
+
         private bool backendSourceHooked;
         private bool backendStartupRetuneDone;
 
