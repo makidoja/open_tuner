@@ -350,6 +350,7 @@ namespace opentuner
 
                 // RX title occupies the first 55px. Reserve at least 65px
                 // for service status; the volume slider flexes with width.
+                int titleRight = 0;
                 foreach (Control item in header.Controls)
                 {
                     Button btn = item as Button;
@@ -379,11 +380,16 @@ namespace opentuner
                         if (Math.Abs(lbl.Font.Size - size) > 0.1f)
                             lbl.Font = CachedFont("Segoe UI Semibold", size);
                         lbl.AutoSize = false;
-                        lbl.Bounds = compact4 ? new Rectangle(6, 5, 62, 27) : new Rectangle(6, 5, 74, 27);
+                        // Width from the rendered text, so the title is not clipped when
+                        // Windows display scaling makes the font larger than at 100%.
+                        int titleWidth = Math.Max(compact4 ? 62 : 74,
+                            TextRenderer.MeasureText(title, lbl.Font).Width + 4);
+                        lbl.Bounds = new Rectangle(6, 5, titleWidth, 27);
                         lbl.TextAlign = ContentAlignment.MiddleLeft;
+                        titleRight = lbl.Right;
                     }
                 }
-                int x = compact4 ? 70 : 82;
+                int x = Math.Max(compact4 ? 70 : 82, titleRight + 2);
                 // Give the speaker glyph a readable size in both 2-RX and
                 // 4-RX headers. Keep its centre aligned with the volume slider.
                 int speakerWidth = compact4 ? 24 : 28;
@@ -581,12 +587,16 @@ namespace opentuner
                 : new Rectangle(infoLeft, 4, available,
                     Math.Max(72, controls.ClientSize.Height - 8));
             int tabWidth = Math.Max(55, (tabs.ClientSize.Width - 2) / 3);
+            // Tab strip height follows the rendered text height, so the labels are
+            // not clipped when Windows display scaling enlarges the font.
+            int tabHeight = Math.Max(compact4 ? 19 : 23,
+                TextRenderer.MeasureText("Tuner Data", tabButtons[tuner, 0].Font).Height + 6);
             for (int page = 0; page < 3; page++)
             {
                 tabButtons[tuner, page].Bounds = new Rectangle(page * tabWidth, 0,
-                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, compact4 ? 19 : 23);
-                infoPages[tuner, page].Bounds = new Rectangle(0, compact4 ? 19 : 23,
-                    tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - (compact4 ? 19 : 23)));
+                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, tabHeight);
+                infoPages[tuner, page].Bounds = new Rectangle(0, tabHeight,
+                    tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - tabHeight));
                 infoPages[tuner, page].SendToBack();
             }
             Panel pageCurrent = infoPages[tuner, 0];
