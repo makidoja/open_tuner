@@ -165,7 +165,7 @@
             this.comboMediaPlayer4.Items.AddRange(new object[] {
             "VLC",
             "FFMPEG",
-            "MPV"});
+            "MPV (H.264/H.265/H.266)"});
             this.comboMediaPlayer4.Location = new System.Drawing.Point(171, 270);
             this.comboMediaPlayer4.Margin = new System.Windows.Forms.Padding(4);
             this.comboMediaPlayer4.Name = "comboMediaPlayer4";
@@ -179,7 +179,7 @@
             this.comboMediaPlayer3.Items.AddRange(new object[] {
             "VLC",
             "FFMPEG",
-            "MPV"});
+            "MPV (H.264/H.265/H.266)"});
             this.comboMediaPlayer3.Location = new System.Drawing.Point(171, 210);
             this.comboMediaPlayer3.Margin = new System.Windows.Forms.Padding(4);
             this.comboMediaPlayer3.Name = "comboMediaPlayer3";
@@ -238,7 +238,7 @@
             this.comboMediaPlayer2.Items.AddRange(new object[] {
             "VLC",
             "FFMPEG",
-            "MPV"});
+            "MPV (H.264/H.265/H.266)"});
             this.comboMediaPlayer2.Location = new System.Drawing.Point(171, 150);
             this.comboMediaPlayer2.Margin = new System.Windows.Forms.Padding(4);
             this.comboMediaPlayer2.Name = "comboMediaPlayer2";
@@ -252,7 +252,7 @@
             this.comboMediaPlayer1.Items.AddRange(new object[] {
             "VLC",
             "FFMPEG",
-            "MPV"});
+            "MPV (H.264/H.265/H.266)"});
             this.comboMediaPlayer1.Location = new System.Drawing.Point(171, 90);
             this.comboMediaPlayer1.Margin = new System.Windows.Forms.Padding(4);
             this.comboMediaPlayer1.Name = "comboMediaPlayer1";

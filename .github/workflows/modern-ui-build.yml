@@ -55,6 +55,30 @@ jobs:
           Copy-Item -Path $ffmpegDir.FullName -Destination 'bin/Release/ffmpeg' -Recurse -Force
           Write-Host "Packaged FFmpeg runtime from $($ffmpegDir.FullName)"
 
+      - name: Add libmpv (MPV player with H.266 / VVC decoding)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The MPV player (Media Settings -> MPV) loads libmpv-2.dll from the app
+          # folder. Current shinchiro mpv-winbuild-cmake builds include an FFmpeg
+          # with the native H.266/VVC decoder.
+          $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; 'User-Agent' = 'opentuner-build' }
+          $release = Invoke-RestMethod -Headers $headers -Uri 'https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest'
+          $asset = $release.assets | Where-Object { $_.name -match '^mpv-dev-x86_64-\d{8}-git-[0-9a-f]+\.7z$' } | Select-Object -First 1
+          if (-not $asset) { throw "No mpv-dev-x86_64 asset found in shinchiro release $($release.tag_name)." }
+          Write-Host "Using libmpv from $($asset.name) (release $($release.tag_name))"
+          $archive = Join-Path $env:RUNNER_TEMP $asset.name
+          & curl.exe -L --fail --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --output $archive $asset.browser_download_url
+          if ($LASTEXITCODE -ne 0) { throw "libmpv download failed (curl exit $LASTEXITCODE)." }
+          $extract = Join-Path $env:RUNNER_TEMP 'libmpv'
+          & 7z x $archive "-o$extract" -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "libmpv extract failed (7z exit $LASTEXITCODE)." }
+          $dll = Get-ChildItem -Path $extract -Filter 'libmpv-2.dll' -Recurse | Select-Object -First 1
+          if (-not $dll) { throw 'libmpv-2.dll not found in the mpv-dev archive.' }
+          Copy-Item $dll.FullName 'bin/Release/libmpv-2.dll' -Force
+          Set-Content -Path 'bin/Release/libmpv-version.txt' -Value "$($asset.name)`r`nhttps://github.com/shinchiro/mpv-winbuild-cmake/releases/tag/$($release.tag_name)"
+
       - name: Verify packaged runtime
         shell: pwsh
         run: |
@@ -63,6 +87,8 @@ jobs:
           $dlls = Get-ChildItem 'bin/Release/ffmpeg' -Filter '*.dll' -Recurse
           if ($dlls.Count -lt 3) { throw 'ffmpeg runtime appears incomplete.' }
           Write-Host "FFmpeg runtime contains $($dlls.Count) DLLs"
+          if (-not (Test-Path 'bin/Release/libmpv-2.dll')) { throw 'libmpv-2.dll missing from Release output.' }
+          if ((Get-Item 'bin/Release/libmpv-2.dll').Length -lt 20MB) { throw 'libmpv-2.dll is unexpectedly small.' }
 
       - name: Install Inno Setup
         shell: pwsh
