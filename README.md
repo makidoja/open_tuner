@@ -4,7 +4,7 @@
 
 OpenTuner M0CKE is an actively developed interface based on the original **[Open Tuner](https://www.zr6tg.co.za/open-tuner/)** project by ZR6TG. It brings DATV reception, receiver controls, live transport-stream information, and QO-100 tools together in a dark Windows desktop UI.
 
-> **Latest release — v1.3.9:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
+> **Latest release — v1.4.0:** The features described here are being developed and hardware-tested on the [`connect-state-test` branch](https://github.com/makidoja/open_tuner/tree/connect-state-test). Builds are experimental. The existing `modern-ui` branch is being kept separate during this work.
 
 ## Highlights
 
@@ -63,6 +63,13 @@ The interface provides independent receiver cards and three information views:
 The **4 RX** view uses a 2×2 video layout with compact left-side receiver information and tuning controls. The 1–2 RX modes retain the larger information layout.
 
 **Diagnostic availability is hardware-dependent.** RF input level, BER, carrier frequency offset, LDPC errors and constellation coordinates may not be provided by the selected device or its protocol. Unsupported values are displayed as unavailable rather than estimated.
+
+## v1.4.0 release — H.266 (VVC) playback
+
+**v1.4.0** adds H.266 / VVC decoding: the MPV player is now bundled and listed in Media Settings as **MPV (H.264/H.265/H.266)**. It also fixes receiver panel text being clipped at high Windows display scaling.
+
+See [v1.4.0 release notes](RELEASE_NOTES_1.4.0.md).
+
 
 ## v1.3.9 service patch — QO-100 Quick Tune spectrum
 
