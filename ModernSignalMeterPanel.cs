@@ -32,6 +32,15 @@ namespace opentuner
         private readonly Timer timer;
         private readonly ModernConstellationControl constellation;
         private readonly double[] fraction = new double[4];
+        // Needle ballistics: displayed position and velocity per dial.
+        private readonly double[] needle = new double[4];
+        private readonly double[] needleVelocity = new double[4];
+        private readonly System.Diagnostics.Stopwatch frameClock = System.Diagnostics.Stopwatch.StartNew();
+        private double lastFrameSeconds;
+        // Spring-damper tuned to feel like a moving-coil meter: about 0.3 s to
+        // settle, with a slight (~5%) overshoot.
+        private const double NeedleOmega = 11.0;   // natural frequency, rad/s
+        private const double NeedleDamping = 0.7;  // damping ratio
         private readonly double[] peak = new double[4];
         private readonly DateTime[] peakTime = new DateTime[4];
         private readonly string[] valueText = { "—", "—", "—", "—" };
@@ -57,7 +66,8 @@ namespace opentuner
 
             // 40 ms UI refresh: the NIM thread produces new readings about every
             // 40-60 ms while the panel is visible, so each one is drawn promptly.
-            timer = new Timer { Interval = 40 };
+            // ~60 fps redraw for smooth needles; new readings arrive every ~40 ms.
+            timer = new Timer { Interval = 16 };
             timer.Tick += delegate { Poll(); };
             timer.Start();
         }
@@ -88,7 +98,11 @@ namespace opentuner
                 }
                 return;
             }
-            if (s.MeterSequence == lastSequence && hasData) return;
+            if (s.MeterSequence == lastSequence && hasData)
+            {
+                AnimateNeedles();
+                return;
+            }
             lastSequence = s.MeterSequence;
             hasData = true;
 
@@ -129,7 +143,30 @@ namespace opentuner
 
             UpdateConstellation(demodLocked ? s.Constellation : null, s.DemodStatus);
             PlaceConstellation();
+            AnimateNeedles();
             Invalidate();
+        }
+
+        // Advance each needle towards its reading as a damped spring and redraw
+        // only while something is still moving.
+        private void AnimateNeedles()
+        {
+            double now = frameClock.Elapsed.TotalSeconds;
+            double dt = Math.Min(0.05, Math.Max(0.001, now - lastFrameSeconds));
+            lastFrameSeconds = now;
+            bool moving = false;
+            for (int i = 0; i < 4; i++)
+            {
+                double error = fraction[i] - needle[i];
+                double accel = NeedleOmega * NeedleOmega * error - 2 * NeedleDamping * NeedleOmega * needleVelocity[i];
+                needleVelocity[i] += accel * dt;
+                needle[i] += needleVelocity[i] * dt;
+                // End stops, like a real movement.
+                if (needle[i] < -0.02) { needle[i] = -0.02; needleVelocity[i] = 0; }
+                if (needle[i] > 1.04) { needle[i] = 1.04; needleVelocity[i] = 0; }
+                if (Math.Abs(error) > 0.001 || Math.Abs(needleVelocity[i]) > 0.002) moving = true;
+            }
+            if (moving) Invalidate();
         }
 
         private void UpdateConstellation(byte[,] points, byte demodStatus)
@@ -335,13 +372,13 @@ namespace opentuner
                         cy + (float)Math.Sin(a) * (arcRadius - zoneWidth * 2.5f),
                         cx + (float)Math.Cos(a) * (arcRadius + 1), cy + (float)Math.Sin(a) * (arcRadius + 1));
             }
-            double needle = Angle(fraction[index]);
+            double needleAngle = (135 + 270 * needle[index]) * Math.PI / 180;
             using (Pen needlePen = new Pen(Color.FromArgb(235, 50, 40), Math.Max(2f, size / 30f)))
             {
                 needlePen.StartCap = LineCap.Round;
                 needlePen.EndCap = LineCap.Round;
-                g.DrawLine(needlePen, cx, cy, cx + (float)Math.Cos(needle) * (arcRadius - 2),
-                    cy + (float)Math.Sin(needle) * (arcRadius - 2));
+                g.DrawLine(needlePen, cx, cy, cx + (float)Math.Cos(needleAngle) * (arcRadius - 2),
+                    cy + (float)Math.Sin(needleAngle) * (arcRadius - 2));
             }
             float hub = Math.Max(5f, size / 9f);
             using (SolidBrush hubBrush = new SolidBrush(Color.FromArgb(70, 85, 100)))
