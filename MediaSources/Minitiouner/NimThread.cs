@@ -341,6 +341,44 @@ namespace opentuner
             return err;
         }
 
+        bool fast_meter_error_logged = false;
+
+        // Lightweight meter read for the modern UI Signal tab: lock flags, lock
+        // detector levels, RF level and MER for both demodulators.
+        void read_fast_meters()
+        {
+            byte[] demods = { stv0910.STV0910_DEMOD_TOP, stv0910.STV0910_DEMOD_BOTTOM };
+            for (int tuner = 0; tuner < 2; tuner++)
+            {
+                byte demod = demods[tuner];
+                byte state = 0, dstatus = 0;
+                sbyte ldi = 0;
+                short tmg = 0;
+                ushort agc1 = 0, agc2 = 0;
+                Int32 mer = 0;
+
+                byte err = _stv0910.stv0910_read_scan_state(demod, ref state);
+                if (err == 0) err = _stv0910.stv0910_read_signal_meters(demod, ref dstatus, ref ldi, ref tmg);
+                if (err == 0) err = _stv0910.stv0910_read_agc1_gain(demod, ref agc1);
+                if (err == 0) err = _stv0910.stv0910_read_agc2_gain(demod, ref agc2);
+                if (err == 0 && (state == stv0910.DEMOD_S || state == stv0910.DEMOD_S2))
+                    err = _stv0910.stv0910_read_mer(demod, ref mer);
+
+                if (err != 0)
+                {
+                    if (!fast_meter_error_logged)
+                    {
+                        Log.Information("Signal meters: STV0910 read error " + err.ToString() + " on tuner " + (tuner + 1).ToString());
+                        fast_meter_error_logged = true;
+                    }
+                    continue;
+                }
+
+                ModernTunerDiagnostics.UpdateSignalMeters(tuner, dstatus, ldi, tmg,
+                    get_rf_level(agc1, agc2), mer);
+            }
+        }
+
         public void worker_thread()
         {
             int hw_errors = 0;
@@ -492,7 +530,23 @@ namespace opentuner
                     else
                     {
                         get_nim_status();
-                        Thread.Sleep(200);
+                        read_fast_meters();
+
+                        // Signal tab on screen: refresh just the meter registers
+                        // every ~40 ms between full status polls. A pending tune
+                        // request still breaks out straight away.
+                        if (ModernTunerDiagnostics.FastMetersRequested)
+                        {
+                            for (int fast = 0; fast < 4 && config_queue.Count() == 0; fast++)
+                            {
+                                Thread.Sleep(40);
+                                read_fast_meters();
+                            }
+                        }
+                        else
+                        {
+                            Thread.Sleep(200);
+                        }
                     }
                 }
             }

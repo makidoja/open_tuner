@@ -750,6 +750,27 @@ namespace opentuner
             return err;
         }
 
+        /* -------------------------------------------------------------------------------------------------- */
+        /* Fast signal-meter read for the modern UI Signal tab: lock flags and lock-detector levels only.     */
+        /* dstatus: DSTATUS (bit7 CAR_LOCK, bits6:5 TMGLOCK_QUALITY, bit3 LOCK_DEFINITIF)                     */
+        /* ldi: carrier lock detector integrator (signed); tmg: timing (symbol rate) lock level (signed)       */
+        /* -------------------------------------------------------------------------------------------------- */
+        public byte stv0910_read_signal_meters(byte demod, ref byte dstatus, ref sbyte ldi, ref short tmg)
+        {
+            byte err;
+            byte value = 0, high = 0, low = 0;
+            bool top = demod == STV0910_DEMOD_TOP;
+
+            err = stv0910_read_reg(top ? stv0910_regs.RSTV0910_P2_DSTATUS : stv0910_regs.RSTV0910_P1_DSTATUS, ref dstatus);
+            if (err == 0) err = stv0910_read_reg(top ? stv0910_regs.RSTV0910_P2_LDI : stv0910_regs.RSTV0910_P1_LDI, ref value);
+            if (err == 0) ldi = unchecked((sbyte)value);
+            if (err == 0) err = stv0910_read_reg(top ? stv0910_regs.RSTV0910_P2_TMGLOCK1 : stv0910_regs.RSTV0910_P1_TMGLOCK1, ref high);
+            if (err == 0) err = stv0910_read_reg(top ? stv0910_regs.RSTV0910_P2_TMGLOCK0 : stv0910_regs.RSTV0910_P1_TMGLOCK0, ref low);
+            if (err == 0) tmg = unchecked((short)((high << 8) | low));
+
+            return err;
+        }
+
         public byte stv0910_read_scan_state(byte demod, ref byte state)
         {
             byte err = 0;

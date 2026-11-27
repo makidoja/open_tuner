@@ -61,9 +61,10 @@ namespace opentuner
         private static readonly Color Text = Color.FromArgb(242, 247, 252);
         private static readonly Color Muted = Color.FromArgb(142, 165, 190);
         private static readonly Panel[] infoTabs = new Panel[4];
-        private static readonly Panel[,] infoPages = new Panel[4, 3];
-        private static readonly Button[,] tabButtons = new Button[4, 3];
+        private static readonly Panel[,] infoPages = new Panel[4, 4];
+        private static readonly Button[,] tabButtons = new Button[4, 4];
         private static readonly TsBitrateGraph[] tsGraphs = new TsBitrateGraph[4];
+        private static readonly ModernSignalMeterPanel[] signalPanels = new ModernSignalMeterPanel[4];
         private static readonly DateTime[] lastTsSample = new DateTime[4];
         private static readonly Label[] currentFreq = new Label[4];
         private static readonly Label[] currentMer = new Label[4];
@@ -491,7 +492,7 @@ namespace opentuner
                     BackColor = Color.FromArgb(21, 42, 62),
                     BorderStyle = BorderStyle.FixedSingle
                 };
-                string[] names = { "Current", "TS Info", "Tuner Data" };
+                string[] names = { "Current", "TS Info", "Tuner Data", "Signal" };
                 for (int page = 0; page < names.Length; page++)
                 {
                     int index = page;
@@ -529,6 +530,13 @@ namespace opentuner
                 };
                 tsGraphs[tuner] = graph;
                 infoPages[tuner, 1].Controls.Add(graph);
+                // Signal tab: lock LEDs, bar meters and constellation (USB MiniTiouner / PicoTuner).
+                ModernSignalMeterPanel signal = new ModernSignalMeterPanel(tuner)
+                {
+                    Name = "ModernSignalMeters" + tuner
+                };
+                signalPanels[tuner] = signal;
+                infoPages[tuner, 3].Controls.Add(signal);
                 current.Controls.Add(freq);
                 current.Controls.Add(mer);
                 current.Controls.Add(margin);
@@ -586,19 +594,22 @@ namespace opentuner
                     Math.Max(85, tunerBox.Top - 8))
                 : new Rectangle(infoLeft, 4, available,
                     Math.Max(72, controls.ClientSize.Height - 8));
-            int tabWidth = Math.Max(55, (tabs.ClientSize.Width - 2) / 3);
+            int tabWidth = Math.Max(50, (tabs.ClientSize.Width - 2) / 4);
             // Tab strip height follows the rendered text height, so the labels are
             // not clipped when Windows display scaling enlarges the font.
             int tabHeight = Math.Max(compact4 ? 19 : 23,
                 TextRenderer.MeasureText("Tuner Data", tabButtons[tuner, 0].Font).Height + 6);
-            for (int page = 0; page < 3; page++)
+            for (int page = 0; page < 4; page++)
             {
                 tabButtons[tuner, page].Bounds = new Rectangle(page * tabWidth, 0,
-                    page == 2 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, tabHeight);
+                    page == 3 ? tabs.ClientSize.Width - page * tabWidth : tabWidth, tabHeight);
                 infoPages[tuner, page].Bounds = new Rectangle(0, tabHeight,
                     tabs.ClientSize.Width, Math.Max(30, tabs.ClientSize.Height - tabHeight));
                 infoPages[tuner, page].SendToBack();
             }
+            if (signalPanels[tuner] != null && !signalPanels[tuner].IsDisposed)
+                signalPanels[tuner].Bounds = new Rectangle(0, 0,
+                    infoPages[tuner, 3].ClientSize.Width, infoPages[tuner, 3].ClientSize.Height);
             Panel pageCurrent = infoPages[tuner, 0];
             // Scale Current diagnostics to the actual available panel space.
             // In 4 RX the tall sidebar has room for larger, legible readings;
@@ -721,7 +732,7 @@ namespace opentuner
 
         private static void SelectInfoPage(int tuner, int selected)
         {
-            for (int page = 0; page < 3; page++)
+            for (int page = 0; page < 4; page++)
             {
                 Panel panel = infoPages[tuner, page];
                 Button button = tabButtons[tuner, page];

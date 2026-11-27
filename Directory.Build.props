@@ -26,6 +26,7 @@
     <Compile Include="ModernBatcSpectrumPass.cs" Condition="Exists('ModernBatcSpectrumPass.cs')" />
     <Compile Include="ModernTunerDiagnostics.cs" Condition="Exists('ModernTunerDiagnostics.cs')" />
     <Compile Include="ModernConstellationControl.cs" Condition="Exists('ModernConstellationControl.cs')" />
+    <Compile Include="ModernSignalMeterPanel.cs" Condition="Exists('ModernSignalMeterPanel.cs')" />
     <Compile Include="ModernConstellationPass.cs" Condition="Exists('ModernConstellationPass.cs')" />
     <Compile Include="ModernConceptForm.cs" Condition="Exists('ModernConceptForm.cs')" />
     <Compile Include="ModernConceptRuntimeFixes.cs" Condition="Exists('ModernConceptRuntimeFixes.cs')" />
