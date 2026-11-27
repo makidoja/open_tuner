@@ -343,12 +343,17 @@ namespace opentuner
 
         bool fast_meter_error_logged = false;
 
+        // Receivers actually present: 1 for the MiniTiouner (FTDI), 2 for the
+        // PicoTuner. The fast meter loop skips the unused demodulator.
+        public int MeterReceivers = 2;
+
         // Lightweight meter read for the modern UI Signal tab: lock flags, lock
         // detector levels, RF level and MER for both demodulators.
         void read_fast_meters()
         {
             byte[] demods = { stv0910.STV0910_DEMOD_TOP, stv0910.STV0910_DEMOD_BOTTOM };
-            for (int tuner = 0; tuner < 2; tuner++)
+            int receivers = Math.Max(1, Math.Min(2, MeterReceivers));
+            for (int tuner = 0; tuner < receivers; tuner++)
             {
                 byte demod = demods[tuner];
                 byte state = 0, dstatus = 0;

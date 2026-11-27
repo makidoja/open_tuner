@@ -521,6 +521,7 @@ namespace opentuner.MediaSources.Minitiouner
 
             // configure nim thread
             NimThread nim_thread = new NimThread(config_queue, hardware_interface, nim_status_feedback, false);
+            nim_thread.MeterReceivers = ts_devices;
             nim_thread_t = new Thread(nim_thread.worker_thread);
 
 
