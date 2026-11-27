@@ -156,8 +156,10 @@ namespace opentuner
                 // Put the checkbox beside the frequency and dedicate the
                 // full available Current-tab height to the constellation plot.
                 bool compact4 = current.ClientSize.Width < 330 || current.ClientSize.Height < 105;
-                int plotWidth = compact4 ? 84 : (current.ClientSize.Width >= 540 ? 180 : 126);
                 int plotHeight = compact4 ? Math.Max(58, Math.Min(110, current.ClientSize.Height - 8)) : Math.Max(90, current.ClientSize.Height - 12);
+                // Box sized so the plot inside is square (the control keeps
+                // 20 px horizontal and 34 px vertical margins for its title).
+                int plotWidth = plotHeight - 14;
                 int plotLeft = compact4 ? Math.Max(143, current.ClientSize.Width - plotWidth - 5) :
                     Math.Max(270, current.ClientSize.Width - plotWidth - 10);
                 plot.Size = new Size(plotWidth, plotHeight);
@@ -169,6 +171,7 @@ namespace opentuner
                 toggle.Location = compact4 ? new Point(6, 77) : new Point(210, 10);
                 toggle.Font = new Font("Segoe UI", compact4 ? 7f : 8f);
                 toggle.BackColor = current.BackColor;
+                plot.BackColor = current.BackColor;
             }
             else
             {

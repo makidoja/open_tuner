@@ -59,7 +59,7 @@ namespace opentuner
 
             constellation = new ModernConstellationControl
             {
-                BackColor = Color.FromArgb(7, 19, 31),
+                BackColor = BackColor,
                 Visible = false
             };
             Controls.Add(constellation);
@@ -239,9 +239,11 @@ namespace opentuner
         // Constellation on the right when there is room for a usable square.
         private bool ConstellationArea(out Rectangle plot)
         {
-            int side = Math.Min(Height - 6, (int)(Width * 0.36));
-            plot = new Rectangle(Width - side - 4, 3, Math.Max(0, side), Math.Max(0, side));
-            return side >= 70 && Width - side >= 200;
+            // Box 14 px narrower than tall gives a square plot inside it.
+            int height = Math.Min(Height - 6, (int)(Width * 0.36) + 14);
+            int width = height - 14;
+            plot = new Rectangle(Width - width - 4, 3, Math.Max(0, width), Math.Max(0, height));
+            return height >= 70 && Width - width >= 200;
         }
 
         private void PlaceConstellation()

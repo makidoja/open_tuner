@@ -54,7 +54,9 @@ namespace opentuner
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(BackColor);
 
-            Rectangle plot = new Rectangle(10, 24, Math.Max(10, Width - 20), Math.Max(10, Height - 34));
+            // Square plot area so QPSK/8PSK points are not stretched.
+            int side = Math.Max(10, Math.Min(Width - 20, Height - 34));
+            Rectangle plot = new Rectangle((Width - side) / 2, 24, side, side);
             using (Pen border = new Pen(Color.FromArgb(65, 95, 120)))
             using (Pen axis = new Pen(Color.FromArgb(55, 110, 135)))
             using (Brush dot = new SolidBrush(Color.FromArgb(255, 218, 48)))
@@ -65,7 +67,7 @@ namespace opentuner
                 int cy = plot.Top + plot.Height / 2;
                 g.DrawLine(axis, cx, plot.Top, cx, plot.Bottom);
                 g.DrawLine(axis, plot.Left, cy, plot.Right, cy);
-                g.DrawString(modeText, Font, text, 8, 5);
+                g.DrawString(modeText, Font, text, plot.Left - 2, 5);
 
                 foreach (PointF sample in history)
                 {
