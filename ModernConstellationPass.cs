@@ -158,8 +158,8 @@ namespace opentuner
                 bool compact4 = current.ClientSize.Width < 330 || current.ClientSize.Height < 105;
                 int plotHeight = compact4 ? Math.Max(58, Math.Min(110, current.ClientSize.Height - 8)) : Math.Max(90, current.ClientSize.Height - 12);
                 // Box sized so the plot inside is square (the control keeps
-                // 20 px horizontal and 34 px vertical margins for its title).
-                int plotWidth = plotHeight - 14;
+                // 20 px horizontal and 22 px vertical margins for its label).
+                int plotWidth = plotHeight - 2;
                 int plotLeft = compact4 ? Math.Max(143, current.ClientSize.Width - plotWidth - 5) :
                     Math.Max(270, current.ClientSize.Width - plotWidth - 10);
                 plot.Size = new Size(plotWidth, plotHeight);

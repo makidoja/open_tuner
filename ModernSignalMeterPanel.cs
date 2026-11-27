@@ -212,9 +212,10 @@ namespace opentuner
         // Constellation on the right when there is room for a usable square.
         private bool ConstellationArea(out Rectangle plot)
         {
-            // Box 14 px narrower than tall gives a square plot inside it.
-            int height = Math.Min(Height - 6, (int)(Width * 0.36) + 14);
-            int width = height - 14;
+            // Box 2 px narrower than tall gives a square plot inside it; the
+            // plot sits at the top, level with the dial faces.
+            int height = Math.Min(Height - 6, (int)(Width * 0.36) + 2);
+            int width = height - 2;
             plot = new Rectangle(Width - width - 4, 3, Math.Max(0, width), Math.Max(0, height));
             return height >= 70 && Width - width >= 200;
         }

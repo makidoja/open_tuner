@@ -54,9 +54,10 @@ namespace opentuner
             g.SmoothingMode = SmoothingMode.AntiAlias;
             g.Clear(BackColor);
 
-            // Square plot area so QPSK/8PSK points are not stretched.
-            int side = Math.Max(10, Math.Min(Width - 20, Height - 34));
-            Rectangle plot = new Rectangle((Width - side) / 2, 24, side, side);
+            // Square plot at the top of the box (level with neighbouring meters),
+            // mode label centred underneath. A box 2 px narrower than tall is square.
+            int side = Math.Max(10, Math.Min(Width - 20, Height - 22));
+            Rectangle plot = new Rectangle((Width - side) / 2, 1, side, side);
             using (Pen border = new Pen(Color.FromArgb(65, 95, 120)))
             using (Pen axis = new Pen(Color.FromArgb(55, 110, 135)))
             using (Brush dot = new SolidBrush(Color.FromArgb(255, 218, 48)))
@@ -67,7 +68,9 @@ namespace opentuner
                 int cy = plot.Top + plot.Height / 2;
                 g.DrawLine(axis, cx, plot.Top, cx, plot.Bottom);
                 g.DrawLine(axis, plot.Left, cy, plot.Right, cy);
-                g.DrawString(modeText, Font, text, plot.Left - 2, 5);
+                using (StringFormat centre = new StringFormat { Alignment = StringAlignment.Center })
+                    g.DrawString(modeText, Font, text,
+                        new RectangleF(0, plot.Bottom + 3, Width, Math.Max(10, Height - plot.Bottom - 3)), centre);
 
                 foreach (PointF sample in history)
                 {
