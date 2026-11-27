@@ -162,8 +162,14 @@ namespace opentuner
                 int plotWidth = plotHeight - 2;
                 int plotLeft = compact4 ? Math.Max(143, current.ClientSize.Width - plotWidth - 5) :
                     Math.Max(270, current.ClientSize.Width - plotWidth - 10);
-                plot.Size = new Size(plotWidth, plotHeight);
-                plot.Location = new Point(plotLeft, 5);
+                Rectangle shared;
+                if (ModernSignalMeterPanel.ConstellationBox(current.ClientSize, out shared))
+                    plot.Bounds = shared;   // same box as the Signal tab
+                else
+                {
+                    plot.Size = new Size(plotWidth, plotHeight);
+                    plot.Location = new Point(plotLeft, 5);
+                }
                 toggle.AutoSize = false;
                 toggle.Size = compact4 ? new Size(104, 16) : new Size(118, 20);
                 // Align the end of the 'Constellation' label with the ends

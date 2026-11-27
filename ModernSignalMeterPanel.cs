@@ -212,12 +212,20 @@ namespace opentuner
         // Constellation on the right when there is room for a usable square.
         private bool ConstellationArea(out Rectangle plot)
         {
+            return ConstellationBox(Size, out plot);
+        }
+
+        // Shared by the Current and Signal tabs (both pages are the same size),
+        // so the constellation box is identical on both and does not jump when
+        // switching tabs.
+        internal static bool ConstellationBox(Size page, out Rectangle plot)
+        {
             // Box 2 px narrower than tall gives a square plot inside it; the
             // plot sits at the top, level with the dial faces.
-            int height = Math.Min(Height - 6, (int)(Width * 0.36) + 2);
+            int height = Math.Min(page.Height - 6, (int)(page.Width * 0.36) + 2);
             int width = height - 2;
-            plot = new Rectangle(Width - width - 4, 3, Math.Max(0, width), Math.Max(0, height));
-            return height >= 70 && Width - width >= 200;
+            plot = new Rectangle(page.Width - width - 4, 3, Math.Max(0, width), Math.Max(0, height));
+            return height >= 70 && page.Width - width >= 200;
         }
 
         private void PlaceConstellation()
