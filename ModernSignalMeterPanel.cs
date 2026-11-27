@@ -23,7 +23,6 @@ namespace opentuner
         private static readonly Color GridColour = Color.FromArgb(40, 70, 95);
 
         private const int CarrierMeter = 0, TimingMeter = 1, RfMeter = 2, MerMeter = 3;
-        private static readonly string[] MeterNames = { "Carrier lock", "SR lock", "RF power", "C/N MER" };
         private static readonly string[] DialNames = { "Carrier Lock", "SR Lock", "RF Power", "C/N MER" };
         private static readonly string[,] ScaleEnds = { { "0", "100" }, { "0", "100" }, { "-100", "-30" }, { "-3", "20" } };
 
@@ -276,23 +275,90 @@ namespace opentuner
                 return;
             }
 
-            int textHeight = TextRenderer.MeasureText("Ag", LedFont).Height;
-            int ledRow = textHeight + 6;
+            int textHeight = TextRenderer.MeasureText("Ag", LabelFont).Height;
+            int toggleRow = textHeight + 4;
             Rectangle plot;
             int right = ConstellationArea(out plot) ? plot.Left - 6 : Width - 6;
 
-            // LEDs: Carrier, SR, Full.
-            int x = 8;
-            x = DrawLed(g, x, 3, textHeight, carrierLed, "Carrier");
-            x = DrawLed(g, x + 12, 3, textHeight, timingLed, "SR");
-            x = DrawLed(g, x + 12, 3, textHeight, fullLed, "Full");
-
             bool dial = DialStyle;
-            DrawStyleToggle(g, x + 12, right, 2, textHeight + 2, dial);
+            DrawStyleToggle(g, 8, right, 2, textHeight + 2, dial);
 
-            Rectangle area = new Rectangle(4, ledRow + 2, Math.Max(20, right - 4), Math.Max(20, Height - ledRow - 4));
-            if (dial) DrawDials(g, area);
-            else DrawBars(g, area, textHeight);
+            // Meters and bars share one layout: four slots, with the Carrier,
+            // SR and Full LEDs in the gaps between them in both styles.
+            Rectangle area = new Rectangle(4, toggleRow + 2, Math.Max(20, right - 4),
+                Math.Max(20, Height - toggleRow - 4));
+            Rectangle[] slots;
+            Point[] leds;
+            int ledSize;
+            ComputeLayout(area, out slots, out leds, out ledSize);
+            for (int i = 0; i < 4; i++)
+            {
+                if (dial) DrawDial(g, slots[i], textHeight, i);
+                else DrawVerticalBar(g, slots[i], textHeight, i);
+            }
+            DrawLed(g, leds[0], ledSize, CarrierLedColour(), "Carrier");
+            DrawLed(g, leds[1], ledSize, TimingLedColour(), "SR");
+            DrawLed(g, leds[2], ledSize, FullLedColour(), "Full");
+        }
+
+        // LED colours follow the meters: green locked, amber close, red not locked.
+        private Color CarrierLedColour()
+        {
+            if (carrierLed) return MeterColour(1);
+            return fraction[CarrierMeter] >= 0.33 ? MeterColour(0.5) : MeterColour(0);
+        }
+
+        private Color TimingLedColour()
+        {
+            if (timingLed) return MeterColour(1);
+            return fraction[TimingMeter] >= 0.33 ? MeterColour(0.5) : MeterColour(0);
+        }
+
+        private Color FullLedColour()
+        {
+            if (fullLed) return MeterColour(1);
+            return carrierLed && timingLed ? MeterColour(0.5) : MeterColour(0);
+        }
+
+        // Four meter slots (a dial face plus its name underneath) and the three
+        // LED centres. Wide panels: one row, LEDs in the three gaps at dial
+        // centre height. Narrow, tall panels (4 RX): 2 x 2 grid with the LEDs in
+        // a column between the two columns.
+        private void ComputeLayout(Rectangle area, out Rectangle[] slots, out Point[] leds, out int ledSize)
+        {
+            int nameHeight = TextRenderer.MeasureText("Ag", LabelFont).Height;
+            ledSize = 2 * Math.Max(10, TextRenderer.MeasureText("Ag", LedFont).Height - 2);
+            int gap = Math.Max(ledSize, TextRenderer.MeasureText("Carrier", LedFont).Width) + 10;
+
+            int rowSize = Math.Min(area.Height - nameHeight - 3, (area.Width - 3 * gap) / 4);
+            int gridSize = Math.Min((area.Width - gap) / 2, (area.Height - 2 * nameHeight - 8) / 2);
+            slots = new Rectangle[4];
+            leds = new Point[3];
+            if (rowSize >= gridSize)
+            {
+                int size = Math.Max(20, rowSize);
+                int total = 4 * size + 3 * gap;
+                int left = area.Left + Math.Max(0, (area.Width - total) / 2);
+                for (int i = 0; i < 4; i++)
+                    slots[i] = new Rectangle(left + i * (size + gap), area.Top, size, size + nameHeight + 2);
+                int ledY = area.Top + size / 2;
+                for (int i = 0; i < 3; i++)
+                    leds[i] = new Point(slots[i].Right + gap / 2, ledY);
+            }
+            else
+            {
+                int size = Math.Max(20, gridSize);
+                int total = 2 * size + gap;
+                int left = area.Left + Math.Max(0, (area.Width - total) / 2);
+                int rowHeight = size + nameHeight + 6;
+                for (int i = 0; i < 4; i++)
+                    slots[i] = new Rectangle(left + (i % 2) * (size + gap), area.Top + (i / 2) * rowHeight,
+                        size, size + nameHeight + 2);
+                int ledX = left + size + gap / 2;
+                leds[0] = new Point(ledX, area.Top + size / 2);
+                leds[1] = new Point(ledX, area.Top + rowHeight - 3);
+                leds[2] = new Point(ledX, area.Top + rowHeight + size / 2);
+            }
         }
 
         // Segmented "Meters | Bars" switch at the right of the LED row.
@@ -322,53 +388,62 @@ namespace opentuner
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
         }
 
-        private void DrawBars(Graphics g, Rectangle area, int textHeight)
+        // Vertical bar graph in a meter slot, same footprint as a dial.
+        private void DrawVerticalBar(Graphics g, Rectangle slot, int nameHeight, int index)
         {
-            int labelWidth = Math.Max(TextRenderer.MeasureText("Carrier lock", LabelFont).Width,
-                TextRenderer.MeasureText("C/N MER", LabelFont).Width) + 4;
-            int valueWidth = TextRenderer.MeasureText("-100 dBm", ValueFont).Width + 4;
-            int rowHeight = Math.Max(textHeight, (area.Height - 1) / 4);
-            int barLeft = 8 + labelWidth;
-            int barWidth = Math.Max(20, area.Right - barLeft - valueWidth - 6);
-            for (int i = 0; i < 4; i++)
-            {
-                int rowTop = area.Top + i * rowHeight;
-                Rectangle labelRect = new Rectangle(8, rowTop, labelWidth, rowHeight);
-                TextRenderer.DrawText(g, MeterNames[i], LabelFont, labelRect, MutedColour,
-                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
-                int barHeight = Math.Max(6, Math.Min(16, rowHeight - 5));
-                Rectangle bar = new Rectangle(barLeft, rowTop + (rowHeight - barHeight) / 2, barWidth, barHeight);
-                DrawBar(g, bar, fraction[i], peak[i]);
-                Rectangle valueRect = new Rectangle(bar.Right + 6, rowTop, valueWidth, rowHeight);
-                TextRenderer.DrawText(g, valueText[i], ValueFont, valueRect, TextColour,
-                    TextFormatFlags.VerticalCenter | TextFormatFlags.Left | TextFormatFlags.NoPadding);
-            }
-        }
+            int size = slot.Width;
+            if (size < 30) return;
+            Font small = size >= 90 ? LabelFont : SmallFont;
+            int valueHeight = TextRenderer.MeasureText("Ag", ValueFont).Height;
+            int barWidth = Math.Max(14, size / 3);
+            Rectangle bar = new Rectangle(slot.Left + (size - barWidth) / 2, slot.Top + 3,
+                barWidth, Math.Max(20, size - valueHeight - 6));
 
-        // Analogue dials, MiniTioune style: four in a row when the area is wide,
-        // otherwise a 2 x 2 grid.
-        private void DrawDials(Graphics g, Rectangle area)
-        {
-            int nameHeight = TextRenderer.MeasureText("Ag", LabelFont).Height;
-            int wide = Math.Min(area.Width / 4, area.Height - nameHeight);
-            int grid = Math.Min(area.Width / 2, (area.Height - 2 * nameHeight) / 2);
-            bool row = wide >= grid;
-            int columns = row ? 4 : 2;
-            int cellWidth = area.Width / columns;
-            int cellHeight = row ? area.Height : area.Height / 2;
-            for (int i = 0; i < 4; i++)
+            using (SolidBrush track = new SolidBrush(TrackColour))
+                g.FillRectangle(track, bar);
+            int filled = (int)Math.Round(bar.Height * fraction[index]);
+            if (filled > 0)
+                using (SolidBrush brush = new SolidBrush(MeterColour(fraction[index])))
+                    g.FillRectangle(brush, bar.Left, bar.Bottom - filled, bar.Width, filled);
+            using (Pen grid = new Pen(GridColour))
             {
-                Rectangle cell = new Rectangle(area.Left + (i % columns) * cellWidth,
-                    area.Top + (i / columns) * cellHeight, cellWidth, cellHeight);
-                DrawDial(g, cell, nameHeight, i);
+                for (int i = 1; i < 10; i++)
+                {
+                    int gy = bar.Bottom - bar.Height * i / 10;
+                    int len = i == 5 ? 5 : 3;
+                    g.DrawLine(grid, bar.Left, gy, bar.Left + len, gy);
+                    g.DrawLine(grid, bar.Right - 1 - len, gy, bar.Right - 1, gy);
+                }
+                g.DrawRectangle(grid, bar.Left, bar.Top, bar.Width - 1, bar.Height - 1);
             }
+            if (peak[index] > 0.005)
+            {
+                int py = bar.Bottom - 2 - (int)Math.Round((bar.Height - 2) * peak[index]);
+                using (SolidBrush mark = new SolidBrush(Color.White))
+                    g.FillRectangle(mark, bar.Left, py, bar.Width, 2);
+            }
+
+            // Scale ends beside the bar, value under it, name under the slot.
+            Size top = TextRenderer.MeasureText(ScaleEnds[index, 1], small);
+            Size bottom = TextRenderer.MeasureText(ScaleEnds[index, 0], small);
+            TextRenderer.DrawText(g, ScaleEnds[index, 1], small,
+                new Point(bar.Left - top.Width - 3, bar.Top), MutedColour, TextFormatFlags.NoPadding);
+            TextRenderer.DrawText(g, ScaleEnds[index, 0], small,
+                new Point(bar.Left - bottom.Width - 3, bar.Bottom - bottom.Height), MutedColour, TextFormatFlags.NoPadding);
+            Rectangle valueRect = new Rectangle(slot.Left - 6, bar.Bottom + 2, size + 12, valueHeight);
+            TextRenderer.DrawText(g, valueText[index], size >= 90 ? ValueFont : SmallFont, valueRect, TextColour,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPadding);
+            Rectangle nameRect = new Rectangle(slot.Left - 8, slot.Top + size + 1, size + 16, nameHeight);
+            TextRenderer.DrawText(g, DialNames[index], LabelFont, nameRect, MutedColour,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPadding |
+                TextFormatFlags.EndEllipsis);
         }
 
         private void DrawDial(Graphics g, Rectangle cell, int nameHeight, int index)
         {
-            int size = Math.Min(cell.Width - 6, cell.Height - nameHeight - 2);
+            int size = cell.Width;
             if (size < 30) return;
-            Rectangle face = new Rectangle(cell.Left + (cell.Width - size) / 2, cell.Top + 1, size, size);
+            Rectangle face = new Rectangle(cell.Left, cell.Top + 1, size, size);
             float cx = face.Left + size / 2f, cy = face.Top + size / 2f;
             float radius = size / 2f;
 
@@ -428,7 +503,7 @@ namespace opentuner
                 (int)(radius * 0.6f));
             TextRenderer.DrawText(g, valueText[index], size >= 90 ? ValueFont : SmallFont, valueRect, TextColour,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-            Rectangle nameRect = new Rectangle(cell.Left, face.Bottom + 1, cell.Width, nameHeight);
+            Rectangle nameRect = new Rectangle(cell.Left - 8, face.Bottom + 1, cell.Width + 16, nameHeight);
             TextRenderer.DrawText(g, DialNames[index], LabelFont, nameRect, MutedColour,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPadding |
                 TextFormatFlags.EndEllipsis);
@@ -454,50 +529,22 @@ namespace opentuner
             TextRenderer.DrawText(g, text, font, new Point(x, y), colour, TextFormatFlags.NoPadding);
         }
 
-        private static int DrawLed(Graphics g, int x, int y, int textHeight, bool on, string label)
+        // Large LED centred on a point, label underneath.
+        private static void DrawLed(Graphics g, Point centre, int d, Color core, string label)
         {
-            int d = Math.Max(10, textHeight - 2);
-            Rectangle led = new Rectangle(x, y + (textHeight - d) / 2 + 1, d, d);
-            Color core = on ? Color.FromArgb(60, 220, 90) : Color.FromArgb(200, 40, 40);
-            Color dark = on ? Color.FromArgb(20, 110, 40) : Color.FromArgb(95, 15, 15);
+            Rectangle led = new Rectangle(centre.X - d / 2, centre.Y - d / 2, d, d);
+            Color dark = Color.FromArgb(core.R / 2, core.G / 2, core.B / 2);
             using (LinearGradientBrush fill = new LinearGradientBrush(led, ControlPaint.Light(core), dark, 60f))
                 g.FillEllipse(fill, led);
-            using (Pen rim = new Pen(Color.FromArgb(10, 20, 30)))
+            using (Pen rim = new Pen(Color.FromArgb(10, 20, 30), 1.5f))
                 g.DrawEllipse(rim, led);
-            int textLeft = led.Right + 4;
+            // Small highlight so it reads as a lamp.
+            int h = Math.Max(3, d / 4);
+            using (SolidBrush shine = new SolidBrush(Color.FromArgb(120, 255, 255, 255)))
+                g.FillEllipse(shine, led.Left + d / 4, led.Top + d / 6, h, h);
             Size size = TextRenderer.MeasureText(label, LedFont);
-            TextRenderer.DrawText(g, label, LedFont, new Point(textLeft, y + 1), on ? TextColour : MutedColour,
-                TextFormatFlags.NoPadding);
-            return textLeft + size.Width;
-        }
-
-        private static void DrawBar(Graphics g, Rectangle bar, double value, double peakValue)
-        {
-            using (SolidBrush track = new SolidBrush(TrackColour))
-                g.FillRectangle(track, bar);
-            int filled = (int)Math.Round(bar.Width * value);
-            if (filled > 0)
-            {
-                Rectangle fill = new Rectangle(bar.Left, bar.Top, filled, bar.Height);
-                using (SolidBrush brush = new SolidBrush(MeterColour(value)))
-                    g.FillRectangle(brush, fill);
-            }
-            using (Pen grid = new Pen(GridColour))
-            {
-                for (int i = 1; i < 10; i++)
-                {
-                    int gx = bar.Left + bar.Width * i / 10;
-                    g.DrawLine(grid, gx, bar.Top, gx, bar.Top + 2);
-                    g.DrawLine(grid, gx, bar.Bottom - 3, gx, bar.Bottom - 1);
-                }
-                g.DrawRectangle(grid, bar.Left, bar.Top, bar.Width - 1, bar.Height - 1);
-            }
-            if (peakValue > 0.005)
-            {
-                int px = bar.Left + (int)Math.Round((bar.Width - 2) * peakValue);
-                using (SolidBrush mark = new SolidBrush(Color.FromArgb(255, 255, 255)))
-                    g.FillRectangle(mark, px, bar.Top, 2, bar.Height);
-            }
+            TextRenderer.DrawText(g, label, LedFont, new Point(centre.X - size.Width / 2, led.Bottom + 2),
+                TextColour, TextFormatFlags.NoPadding);
         }
 
         private static Color MeterColour(double value)
