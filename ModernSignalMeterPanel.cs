@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Windows.Forms;
-using opentuner.Utilities;
 
 namespace opentuner
 {
@@ -19,19 +18,12 @@ namespace opentuner
         private static readonly Font SmallFont = new Font("Segoe UI", 6.5f);
         private static readonly Color TextColour = Color.FromArgb(242, 247, 252);
         private static readonly Color MutedColour = Color.FromArgb(142, 165, 190);
-        private static readonly Color TrackColour = Color.FromArgb(20, 40, 58);
         private static readonly Color GridColour = Color.FromArgb(40, 70, 95);
 
         private const int CarrierMeter = 0, TimingMeter = 1, RfMeter = 2, MerMeter = 3;
         private static readonly string[] DialNames = { "Carrier Lock", "SR Lock", "RF Power", "C/N MER" };
         private static readonly string[,] ScaleEnds = { { "0", "100" }, { "0", "100" }, { "-100", "-30" }, { "-3", "20" } };
 
-        // Display style shared by every receiver's Signal tab and saved in
-        // settings\signal_meter_settings.json.
-        private static SignalMeterSettings styleSettings;
-        private static SettingsManager<SignalMeterSettings> styleManager;
-        private static event Action StyleChanged;
-        private Rectangle metersButton, barsButton;
         private const double RfMin = -100, RfMax = -30;
         private const double MerMin = -3, MerMax = 20;
         private const double TimingDefaultScale = 2048;
@@ -68,67 +60,12 @@ namespace opentuner
             timer = new Timer { Interval = 40 };
             timer.Tick += delegate { Poll(); };
             timer.Start();
-            StyleChanged += OnStyleChanged;
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing)
-            {
-                StyleChanged -= OnStyleChanged;
-                timer.Dispose();
-            }
+            if (disposing) timer.Dispose();
             base.Dispose(disposing);
-        }
-
-        private void OnStyleChanged()
-        {
-            if (!IsDisposed) Invalidate();
-        }
-
-        private static bool DialStyle
-        {
-            get
-            {
-                if (styleSettings == null)
-                {
-                    try
-                    {
-                        styleManager = new SettingsManager<SignalMeterSettings>("signal_meter_settings");
-                        styleSettings = styleManager.LoadSettings(new SignalMeterSettings());
-                    }
-                    catch (Exception ex)
-                    {
-                        Serilog.Log.Warning(ex, "Signal meters: could not load display style");
-                        styleSettings = new SignalMeterSettings();
-                    }
-                }
-                return string.Equals(styleSettings.Style, "Meters", StringComparison.OrdinalIgnoreCase);
-            }
-            set
-            {
-                if (DialStyle == value) return;
-                styleSettings.Style = value ? "Meters" : "Bars";
-                try { if (styleManager != null) styleManager.SaveSettings(styleSettings); }
-                catch (Exception ex) { Serilog.Log.Warning(ex, "Signal meters: could not save display style"); }
-                Action handler = StyleChanged;
-                if (handler != null) handler();
-            }
-        }
-
-        protected override void OnMouseClick(MouseEventArgs e)
-        {
-            base.OnMouseClick(e);
-            if (e.Button != MouseButtons.Left) return;
-            if (metersButton.Contains(e.Location)) DialStyle = true;
-            else if (barsButton.Contains(e.Location)) DialStyle = false;
-        }
-
-        protected override void OnMouseMove(MouseEventArgs e)
-        {
-            base.OnMouseMove(e);
-            Cursor = metersButton.Contains(e.Location) || barsButton.Contains(e.Location)
-                ? Cursors.Hand : Cursors.Default;
         }
 
         private void Poll()
@@ -267,7 +204,6 @@ namespace opentuner
 
             if (!hasData)
             {
-                metersButton = barsButton = Rectangle.Empty;
                 TextRenderer.DrawText(g,
                     "Signal meters are available with a MiniTiouner or PicoTuner connected by USB.",
                     LabelFont, new Rectangle(8, 4, Math.Max(10, Width - 16), Math.Max(10, Height - 8)),
@@ -276,26 +212,17 @@ namespace opentuner
             }
 
             int textHeight = TextRenderer.MeasureText("Ag", LabelFont).Height;
-            int toggleRow = textHeight + 4;
             Rectangle plot;
             int right = ConstellationArea(out plot) ? plot.Left - 6 : Width - 6;
 
-            bool dial = DialStyle;
-            DrawStyleToggle(g, 8, right, 2, textHeight + 2, dial);
-
-            // Meters and bars share one layout: four slots, with the Carrier,
-            // SR and Full LEDs in the gaps between them in both styles.
-            Rectangle area = new Rectangle(4, toggleRow + 2, Math.Max(20, right - 4),
-                Math.Max(20, Height - toggleRow - 4));
+            // Four dial meters with the Carrier, SR and Full LEDs in the gaps.
+            Rectangle area = new Rectangle(4, 3, Math.Max(20, right - 4), Math.Max(20, Height - 6));
             Rectangle[] slots;
             Point[] leds;
             int ledSize;
             ComputeLayout(area, out slots, out leds, out ledSize);
             for (int i = 0; i < 4; i++)
-            {
-                if (dial) DrawDial(g, slots[i], textHeight, i);
-                else DrawVerticalBar(g, slots[i], textHeight, i);
-            }
+                DrawDial(g, slots[i], textHeight, i);
             DrawLed(g, leds[0], ledSize, CarrierLedColour(), "Carrier");
             DrawLed(g, leds[1], ledSize, TimingLedColour(), "SR");
             DrawLed(g, leds[2], ledSize, FullLedColour(), "Full");
@@ -359,84 +286,6 @@ namespace opentuner
                 leds[1] = new Point(ledX, area.Top + rowHeight - 3);
                 leds[2] = new Point(ledX, area.Top + rowHeight + size / 2);
             }
-        }
-
-        // Segmented "Meters | Bars" switch at the right of the LED row.
-        private void DrawStyleToggle(Graphics g, int minLeft, int right, int top, int height, bool dial)
-        {
-            int w1 = TextRenderer.MeasureText("Meters", LabelFont).Width + 8;
-            int w2 = TextRenderer.MeasureText("Bars", LabelFont).Width + 8;
-            int left = right - w1 - w2;
-            if (left < minLeft)
-            {
-                metersButton = barsButton = Rectangle.Empty;
-                return;
-            }
-            metersButton = new Rectangle(left, top, w1, height);
-            barsButton = new Rectangle(left + w1, top, w2, height);
-            DrawSegment(g, metersButton, "Meters", dial);
-            DrawSegment(g, barsButton, "Bars", !dial);
-        }
-
-        private static void DrawSegment(Graphics g, Rectangle r, string text, bool selected)
-        {
-            using (SolidBrush fill = new SolidBrush(selected ? Color.FromArgb(34, 68, 98) : Color.FromArgb(17, 35, 52)))
-                g.FillRectangle(fill, r);
-            using (Pen border = new Pen(GridColour))
-                g.DrawRectangle(border, r.Left, r.Top, r.Width - 1, r.Height - 1);
-            TextRenderer.DrawText(g, text, LabelFont, r, selected ? TextColour : MutedColour,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-        }
-
-        // Vertical bar graph in a meter slot, same footprint as a dial.
-        private void DrawVerticalBar(Graphics g, Rectangle slot, int nameHeight, int index)
-        {
-            int size = slot.Width;
-            if (size < 30) return;
-            Font small = size >= 90 ? LabelFont : SmallFont;
-            int valueHeight = TextRenderer.MeasureText("Ag", ValueFont).Height;
-            int barWidth = Math.Max(14, size / 3);
-            Rectangle bar = new Rectangle(slot.Left + (size - barWidth) / 2, slot.Top + 3,
-                barWidth, Math.Max(20, size - valueHeight - 6));
-
-            using (SolidBrush track = new SolidBrush(TrackColour))
-                g.FillRectangle(track, bar);
-            int filled = (int)Math.Round(bar.Height * fraction[index]);
-            if (filled > 0)
-                using (SolidBrush brush = new SolidBrush(MeterColour(fraction[index])))
-                    g.FillRectangle(brush, bar.Left, bar.Bottom - filled, bar.Width, filled);
-            using (Pen grid = new Pen(GridColour))
-            {
-                for (int i = 1; i < 10; i++)
-                {
-                    int gy = bar.Bottom - bar.Height * i / 10;
-                    int len = i == 5 ? 5 : 3;
-                    g.DrawLine(grid, bar.Left, gy, bar.Left + len, gy);
-                    g.DrawLine(grid, bar.Right - 1 - len, gy, bar.Right - 1, gy);
-                }
-                g.DrawRectangle(grid, bar.Left, bar.Top, bar.Width - 1, bar.Height - 1);
-            }
-            if (peak[index] > 0.005)
-            {
-                int py = bar.Bottom - 2 - (int)Math.Round((bar.Height - 2) * peak[index]);
-                using (SolidBrush mark = new SolidBrush(Color.White))
-                    g.FillRectangle(mark, bar.Left, py, bar.Width, 2);
-            }
-
-            // Scale ends beside the bar, value under it, name under the slot.
-            Size top = TextRenderer.MeasureText(ScaleEnds[index, 1], small);
-            Size bottom = TextRenderer.MeasureText(ScaleEnds[index, 0], small);
-            TextRenderer.DrawText(g, ScaleEnds[index, 1], small,
-                new Point(bar.Left - top.Width - 3, bar.Top), MutedColour, TextFormatFlags.NoPadding);
-            TextRenderer.DrawText(g, ScaleEnds[index, 0], small,
-                new Point(bar.Left - bottom.Width - 3, bar.Bottom - bottom.Height), MutedColour, TextFormatFlags.NoPadding);
-            Rectangle valueRect = new Rectangle(slot.Left - 6, bar.Bottom + 2, size + 12, valueHeight);
-            TextRenderer.DrawText(g, valueText[index], size >= 90 ? ValueFont : SmallFont, valueRect, TextColour,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPadding);
-            Rectangle nameRect = new Rectangle(slot.Left - 8, slot.Top + size + 1, size + 16, nameHeight);
-            TextRenderer.DrawText(g, DialNames[index], LabelFont, nameRect, MutedColour,
-                TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPadding |
-                TextFormatFlags.EndEllipsis);
         }
 
         private void DrawDial(Graphics g, Rectangle cell, int nameHeight, int index)
@@ -556,11 +405,3 @@ namespace opentuner
     }
 }
 
-namespace opentuner
-{
-    // settings\signal_meter_settings.json
-    public class SignalMeterSettings
-    {
-        public string Style = "Bars";   // "Bars" or "Meters"
-    }
-}
